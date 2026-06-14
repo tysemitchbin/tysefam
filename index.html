@@ -189,6 +189,16 @@ ul.list{list-style:none;margin:0;padding:0;}
 .taskcount b{color:var(--meadow-deep);}
 .taskbar{height:6px;border-radius:999px;background:var(--line);overflow:hidden;margin:9px 0 4px;}
 .taskbar > i{display:block;height:100%;background:var(--meadow);border-radius:999px;transition:width .25s;}
+/* clickable links inside text */
+.lnk{color:var(--sky-deep);font-weight:700;text-decoration:underline;text-underline-offset:2px;word-break:break-all;}
+.lnk:hover{color:var(--meadow-deep);}
+/* click-to-edit project notes */
+.proj-notes{margin-top:10px;border:1px dashed var(--line);border-radius:10px;background:#fdfcf7;
+  padding:9px;font-size:.9rem;line-height:1.4;min-height:40px;cursor:text;white-space:pre-wrap;word-break:break-word;}
+.proj-notes:hover{border-color:var(--meadow);}
+.proj-notes .note-ph{color:#bdb6a6;font-style:italic;}
+.note-edit{width:100%;border:1px dashed var(--meadow);border-radius:10px;background:#fff;
+  padding:9px;margin-top:10px;resize:vertical;min-height:54px;outline:none;font-size:.9rem;line-height:1.4;}
 
 /* ───────────── Calendar ───────────── */
 .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
@@ -507,12 +517,30 @@ const state = { groceries:{}, projects:{}, shopping:{}, events:{}, meals:{} };
 let MODE = 'local';
 let db = null;
 let projRenderPending = false;
+let editingNotes = null;
 
 const DAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 const DAY_LABEL = {monday:'Mon',tuesday:'Tue',wednesday:'Wed',thursday:'Thu',friday:'Fri',saturday:'Sat',sunday:'Sun'};
 const $ = s => document.querySelector(s);
 const el = (t,c)=>{const e=document.createElement(t);if(c)e.className=c;return e;};
 const esc = s => (s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+// Turn URLs in plain text into safe, clickable links (escapes everything else).
+function linkify(text){
+  text=text||'';
+  const re=/(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+)/gi;
+  let out='',last=0,m;
+  while((m=re.exec(text))!==null){
+    out+=esc(text.slice(last,m.index));
+    let url=m[0],trail='';
+    const tm=url.match(/[)\].,!?;:]+$/);            // don't swallow trailing punctuation
+    if(tm){trail=tm[0];url=url.slice(0,-trail.length);}
+    const href=url.match(/^https?:/i)?url:'https://'+url;
+    out+=`<a class="lnk" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>`+esc(trail);
+    last=m.index+m[0].length;
+  }
+  out+=esc(text.slice(last));
+  return out;
+}
 const uid = ()=>'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 
 /* ───────── identity (per-device) ───────── */
@@ -620,7 +648,7 @@ function listRow(col,id,it){
   const ck=el('div','check'+(it.done?' done':''));
   ck.onclick=()=>patch(col,id,{done:!it.done});
   const txt=el('div','txt');
-  txt.innerHTML=esc(it.text)+(it.qty?` <span class="meta">(${esc(it.qty)})</span>`:'')+whoPill(it.by);
+  txt.innerHTML=linkify(it.text)+(it.qty?` <span class="meta">(${esc(it.qty)})</span>`:'')+whoPill(it.by);
   const del=el('button','del');del.innerHTML='🗑';del.title='Remove';
   del.onclick=()=>remove(col,id);
   li.append(ck,txt,del);
@@ -689,8 +717,20 @@ function renderProjects(){
         <span class="parts">🧰 <b>${open}</b> part${open===1?'':'s'} to buy${parts.length?` · ${parts.length} tagged`:''}</span>
         <button class="btn ghost sm jump">Add parts →</button>
       </div>`;
-    const ta=el('textarea');ta.placeholder='Notes — measurements, links, who is on it…';ta.value=p.notes||'';
-    ta.addEventListener('input',()=>{ if(MODE==='cloud'){clearTimeout(ta._t);ta._t=setTimeout(()=>db.ref('projects/'+id+'/notes').set(ta.value),400);} else {state.projects[id].notes=ta.value;saveLocal();} });
+    // ── notes: click to edit; links are clickable in view mode ──
+    let notesEl;
+    if(editingNotes===id){
+      notesEl=el('textarea','note-edit');
+      notesEl.placeholder='Notes — measurements, links, who is on it…';
+      notesEl.value=p.notes||'';
+      const saveNotes=v=>{ if(MODE==='cloud'){db.ref('projects/'+id+'/notes').set(v);} else {state.projects[id].notes=v;saveLocal();} };
+      notesEl.addEventListener('input',()=>{clearTimeout(notesEl._t);notesEl._t=setTimeout(()=>saveNotes(notesEl.value),400);});
+      notesEl.addEventListener('blur',()=>{clearTimeout(notesEl._t);saveNotes(notesEl.value);editingNotes=null;renderProjects();});
+    }else{
+      notesEl=el('div','proj-notes');
+      notesEl.innerHTML=p.notes?linkify(p.notes):'<span class="note-ph">+ Add notes &amp; links…</span>';
+      notesEl.onclick=e=>{ if(e.target.closest('a'))return; editingNotes=id; renderProjects(); };
+    }
 
     // ── task checklist ──
     const tsec=el('div','tasks');
@@ -702,7 +742,7 @@ function renderProjects(){
         const row=el('div','task'+(t.done?' done':''));
         const ck=el('div','check'+(t.done?' done':''));
         ck.onclick=()=>toggleTask(id,tid,!t.done);
-        const tx=el('div','t-txt');tx.innerHTML=esc(t.text)+whoPill(t.by);
+        const tx=el('div','t-txt');tx.innerHTML=linkify(t.text)+whoPill(t.by);
         const dl=el('button','del');dl.innerHTML='🗑';dl.title='Remove task';
         dl.onclick=()=>removeTask(id,tid);
         row.append(ck,tx,dl);tsec.appendChild(row);
@@ -718,13 +758,17 @@ function renderProjects(){
     addRow.append(tin,tbtn);
     tsec.appendChild(addRow);
 
-    div.querySelector('.proj-foot').before(ta);
+    div.querySelector('.proj-foot').before(notesEl);
     div.querySelector('.proj-foot').before(tsec);
     div.querySelector('.statuspick').onchange=e=>patch('projects',id,{status:e.target.value});
     div.querySelector('.del').onclick=()=>{ if(confirm('Delete "'+p.name+'"? Tagged parts stay on the Tools & Parts list.')) remove('projects',id); };
     div.querySelector('.jump').onclick=()=>{go('shopping');$('#partProj').value=id;$('#partFilter').value=id;renderShopping();$('#partInput').focus();};
     box.appendChild(div);
   });
+  if(editingNotes){
+    const f=box.querySelector('.note-edit');
+    if(f){f.focus();const L=f.value.length;try{f.setSelectionRange(L,L);}catch(e){}}
+  }
   refreshProjOptions();
 }
 function refreshProjOptions(){
@@ -751,7 +795,7 @@ function renderShopping(){
     ck.onclick=()=>patch('shopping',id,{done:!it.done});
     const txt=el('div','txt');
     const proj=it.projectId?` <span class="meta">· ${esc(projectName(it.projectId))||'project'}</span>`:'';
-    txt.innerHTML=esc(it.text)+proj+whoPill(it.by);
+    txt.innerHTML=linkify(it.text)+proj+whoPill(it.by);
     const del=el('button','del');del.innerHTML='🗑';del.onclick=()=>remove('shopping',id);
     li.append(ck,txt,del);ul.appendChild(li);
   });
