@@ -172,6 +172,23 @@ ul.list{list-style:none;margin:0;padding:0;}
 .proj-foot{display:flex;align-items:center;gap:10px;margin-top:9px;flex-wrap:wrap;}
 .proj-foot .parts{font-size:.82rem;color:var(--ink-soft);font-weight:700;}
 .proj-foot .parts b{color:var(--meadow-deep);}
+/* project task checklist */
+.tasks{margin-top:11px;}
+.task{display:flex;align-items:center;gap:9px;padding:6px 2px;animation:pop .18s ease;}
+.task .check{width:20px;height:20px;border-radius:7px;margin-top:0;}
+.task .check.done::after{font-size:.72rem;}
+.task .t-txt{flex:1;min-width:0;font-size:.92rem;line-height:1.3;word-break:break-word;}
+.task.done .t-txt{text-decoration:line-through;color:var(--ink-soft);}
+.task .del{font-size:1rem;}
+.addtask{display:flex;gap:7px;margin-top:8px;}
+.addtask input{flex:1;min-width:0;border:2px solid var(--line);background:#fdfcf7;border-radius:10px;
+  padding:7px 10px;outline:none;font-size:.9rem;transition:.15s;}
+.addtask input:focus{border-color:var(--meadow);}
+.addtask .btn{padding:7px 12px;}
+.taskcount{font-size:.82rem;color:var(--ink-soft);font-weight:700;}
+.taskcount b{color:var(--meadow-deep);}
+.taskbar{height:6px;border-radius:999px;background:var(--line);overflow:hidden;margin:9px 0 4px;}
+.taskbar > i{display:block;height:100%;background:var(--meadow);border-radius:999px;transition:width .25s;}
 
 /* ───────────── Calendar ───────────── */
 .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
@@ -477,11 +494,11 @@ ul.list{list-style:none;margin:0;padding:0;}
    ║  (See the README for the 5-minute walkthrough.)                ║
    ╚══════════════════════════════════════════════════════════════╝ */
 const FIREBASE_CONFIG = {
-  apiKey:        "AIzaSyAXdxN9mAbCklLcUZEo1sr6_JzIQsILiNQ",
-  authDomain:    "tysefam-3bbc2.firebaseapp.com",
-  databaseURL:   "https://tysefam-3bbc2-default-rtdb.europe-west1.firebasedatabase.app/",   // <-- this one matters most (…firebasedatabase.app)
-  projectId:     "tysefam-3bbc2",
-  appId:         "1:305299350072:web:502e5980a77c97efd63ccd"
+  apiKey:        "PASTE_HERE",
+  authDomain:    "PASTE_HERE",
+  databaseURL:   "PASTE_HERE",   // <-- this one matters most (…firebasedatabase.app)
+  projectId:     "PASTE_HERE",
+  appId:         "PASTE_HERE"
 };
 
 /* ──────────────────────────────────────────────────────────────── */
@@ -489,6 +506,7 @@ const COLS = ['groceries','projects','shopping','events'];
 const state = { groceries:{}, projects:{}, shopping:{}, events:{}, meals:{} };
 let MODE = 'local';
 let db = null;
+let projRenderPending = false;
 
 const DAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 const DAY_LABEL = {monday:'Mon',tuesday:'Tue',wednesday:'Wed',thursday:'Thu',friday:'Fri',saturday:'Sat',sunday:'Sun'};
@@ -559,6 +577,21 @@ function setMeal(day,text){
   if(MODE==='cloud'){db.ref('meals/'+day).set(text);}
   else{state.meals[day]=text;saveLocal();/* no rerender: keeps typing smooth */}
 }
+/* tasks live nested inside a project: projects/<pid>/tasks/<tid> */
+function addTask(pid,text){
+  const obj={text,done:false,by:meName(),ts:Date.now()};
+  if(MODE==='cloud'){db.ref('projects/'+pid+'/tasks').push(obj);}
+  else{const p=state.projects[pid];if(!p.tasks)p.tasks={};p.tasks[uid()]=obj;saveLocal();renderAll();}
+}
+function toggleTask(pid,tid,done){
+  if(MODE==='cloud'){db.ref('projects/'+pid+'/tasks/'+tid).update({done});}
+  else{state.projects[pid].tasks[tid].done=done;saveLocal();renderAll();}
+}
+function removeTask(pid,tid){
+  if(MODE==='cloud'){db.ref('projects/'+pid+'/tasks/'+tid).remove();}
+  else{delete state.projects[pid].tasks[tid];saveLocal();renderAll();}
+}
+function taskList(p){return Object.entries(p.tasks||{}).sort((a,b)=>(a[1].ts||0)-(b[1].ts||0));}
 function entries(col){
   return Object.entries(state[col]||{}).sort((a,b)=>(a[1].ts||0)-(b[1].ts||0));
 }
@@ -622,7 +655,10 @@ function partsForProject(pid){
   return entries('shopping').filter(([,it])=>it.projectId===pid);
 }
 function renderProjects(){
-  const box=$('#projList');box.innerHTML='';
+  const box=$('#projList');
+  if(box.contains(document.activeElement)){projRenderPending=true;return;} // don't yank focus mid-edit
+  projRenderPending=false;
+  box.innerHTML='';
   const items=entries('projects');
   if(!items.length){box.innerHTML='<div class="empty"><span class="big">🪴</span>No projects yet — what should you two tackle first?</div>';refreshProjOptions();return;}
   const order={todo:0,doing:1,done:2};
@@ -631,6 +667,9 @@ function renderProjects(){
     const status=p.status||'todo';
     const parts=partsForProject(id);
     const open=parts.filter(([,x])=>!x.done).length;
+    const tasks=taskList(p);
+    const doneCount=tasks.filter(([,t])=>t.done).length;
+    const pct=tasks.length?Math.round(doneCount/tasks.length*100):0;
     const div=el('div','proj'+(status==='done'?' done':''));
     const tagClass=status==='done'?'done':status==='doing'?'doing':'todo';
     const tagText=status==='done'?'done':status==='doing'?'in progress':'to do';
@@ -652,7 +691,35 @@ function renderProjects(){
       </div>`;
     const ta=el('textarea');ta.placeholder='Notes — measurements, links, who is on it…';ta.value=p.notes||'';
     ta.addEventListener('input',()=>{ if(MODE==='cloud'){clearTimeout(ta._t);ta._t=setTimeout(()=>db.ref('projects/'+id+'/notes').set(ta.value),400);} else {state.projects[id].notes=ta.value;saveLocal();} });
+
+    // ── task checklist ──
+    const tsec=el('div','tasks');
+    if(tasks.length){
+      tsec.innerHTML=`<div class="taskcount">✓ <b>${doneCount}</b> / ${tasks.length} done</div>
+        <div class="taskbar"><i style="width:${pct}%"></i></div>`;
+      const order2=tasks.slice().sort((a,b)=>(a[1].done?1:0)-(b[1].done?1:0)||a[1].ts-b[1].ts);
+      order2.forEach(([tid,t])=>{
+        const row=el('div','task'+(t.done?' done':''));
+        const ck=el('div','check'+(t.done?' done':''));
+        ck.onclick=()=>toggleTask(id,tid,!t.done);
+        const tx=el('div','t-txt');tx.innerHTML=esc(t.text)+whoPill(t.by);
+        const dl=el('button','del');dl.innerHTML='🗑';dl.title='Remove task';
+        dl.onclick=()=>removeTask(id,tid);
+        row.append(ck,tx,dl);tsec.appendChild(row);
+      });
+    }
+    const addRow=el('div','addtask');
+    const tin=el('input');tin.placeholder='Add a task…';
+    const tbtn=el('button','btn sm');tbtn.textContent='Add';
+    const doAdd=()=>{const v=tin.value.trim();if(!v)return;addTask(id,v);tin.value='';setTimeout(()=>{const f=document.querySelector(`[data-add="${id}"]`);if(f)f.focus();},60);};
+    tin.dataset.add=id;
+    tin.addEventListener('keydown',e=>{if(e.key==='Enter')doAdd();});
+    tbtn.onclick=doAdd;
+    addRow.append(tin,tbtn);
+    tsec.appendChild(addRow);
+
     div.querySelector('.proj-foot').before(ta);
+    div.querySelector('.proj-foot').before(tsec);
     div.querySelector('.statuspick').onchange=e=>patch('projects',id,{status:e.target.value});
     div.querySelector('.del').onclick=()=>{ if(confirm('Delete "'+p.name+'"? Tagged parts stay on the Tools & Parts list.')) remove('projects',id); };
     div.querySelector('.jump').onclick=()=>{go('shopping');$('#partProj').value=id;$('#partFilter').value=id;renderShopping();$('#partInput').focus();};
@@ -788,6 +855,11 @@ function closeOverlay(id){$('#'+id).classList.remove('open');}
 /* ───────── wire up ───────── */
 function wire(){
   document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>go(t.dataset.page));
+
+  // if a sync update arrived while editing a project, apply it once focus leaves
+  $('#projList').addEventListener('focusout',()=>setTimeout(()=>{
+    if(projRenderPending && !$('#projList').contains(document.activeElement))renderProjects();
+  },60));
 
   $('#grocInput').addEventListener('keydown',e=>{if(e.key==='Enter')addGroc();});
   $('#grocAdd').onclick=addGroc;
