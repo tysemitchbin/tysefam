@@ -3,7 +3,9 @@
 Our family website: a home page with a growing collection of little web tools.
 Plain HTML/CSS/JS with no build step.
 
-**Tools so far:** 🥚 [Wanderlings](tools/wanderlings/README.md), a walking game where every walk hatches a creature.
+**Tools so far:**
+- 🥚 [Wanderlings](tools/wanderlings/README.md), a walking game where every walk hatches a creature.
+- 📚 Statsborgerprøven (`tools/statsborger/`), a study tool for the Norwegian citizenship test. The notes and questions live in `tools/statsborger/data.js`.
 
 ```
 index.html                 home page: lists every tool from site.js

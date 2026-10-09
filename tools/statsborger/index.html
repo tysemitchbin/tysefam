@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Statsborgerprøven</title>
+
+<!-- ════════════════════════════════════════════════════════════════
+     STATSBORGERPRØVEN — study tool for the Norwegian citizenship test.
+
+       data.js     the curriculum notes and all practice questions
+                   (written from samfunnskunnskap.no, bokmål)
+       this file   the app: Plan, Les (read), Øv (practice),
+                   Prøve (timed mock exam) and Kort (flashcards)
+
+     Progress is saved per person with Family.store('statsborger'),
+     so it follows you between devices.
+═════════════════════════════════════════════════════════════════ -->
+
+<link rel="stylesheet" href="../../shared/family.css">
+<style>
+/* Layout: one study column under a sticky header with five tabs; the question card is the hero of each mode.
+   Colours come from shared/family.css (--meadow, --forest, --cream, --paper, --ink, --line…). */
+:root{
+  --bgc:var(--cream); --surf:var(--bgc); --sunk:#eef0e8;
+  --accent:var(--meadow-deep); --accent-ink:#fff; --accent-soft:#e3f1df;
+  --flag:#BA0C2F; --flag-cross:#00205B;
+  --ok:#3f8a52; --ok-soft:#e3f1df; --bad:#c2453a; --bad-soft:#fdeceb; --warn:#b07d12; --warn-soft:#fcf3d2;
+  --f-display:"Fredoka", system-ui, sans-serif;
+  --f-body:"Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"Nunito", system-ui, sans-serif;
+  --rr:14px;
+}
+*{box-sizing:border-box}
+body{font-size:16px;line-height:1.55}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;color:var(--forest);line-height:1.2;text-wrap:balance;margin:0}
+button{font:inherit;color:inherit}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+.en{display:none}
+.show-en .en{display:block;color:var(--ink-soft);font-size:.88em;font-style:italic;margin-top:2px}
+.show-en span.en.inl{display:inline}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--bgc);border-bottom:1px solid var(--line)}
+.top-in{max-width:880px;margin:0 auto;padding:12px 16px 0;display:flex;flex-direction:column;gap:10px}
+.brand{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.brand-r{display:flex;align-items:center;gap:8px}
+.brand-l{display:flex;align-items:center;gap:12px;min-width:0}
+.flagmark{width:30px;height:22px;border-radius:3px;flex:none;background:
+  linear-gradient(90deg,transparent 0 8px,var(--flag-cross) 8px 12px,transparent 12px) ,
+  linear-gradient(180deg,transparent 0 9px,var(--flag-cross) 9px 13px,transparent 13px),
+  linear-gradient(90deg,transparent 0 7px,#fff 7px 13px,transparent 13px),
+  linear-gradient(180deg,transparent 0 8px,#fff 8px 14px,transparent 14px), var(--flag)}
+.brand h1{font-size:1.2rem;letter-spacing:-.01em}
+.brand small{display:block;font-family:var(--f-body);font-weight:400;font-size:.78rem;color:var(--ink-soft);letter-spacing:.02em}
+.entoggle{display:flex;align-items:center;gap:8px;background:var(--surf);border:1px solid var(--line);border-radius:999px;padding:5px 12px 5px 6px;cursor:pointer;font-size:.85rem;white-space:nowrap}
+.entoggle .sw{width:30px;height:18px;border-radius:9px;background:var(--sunk);position:relative;transition:background .15s}
+.entoggle .sw::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--ink-soft);transition:transform .15s,background .15s}
+.entoggle[aria-pressed="true"] .sw{background:var(--accent)}
+.entoggle[aria-pressed="true"] .sw::after{transform:translateX(12px);background:var(--accent-ink)}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:none;border:0;padding:8px 14px 10px;cursor:pointer;color:var(--ink-soft);font-weight:700;border-bottom:3px solid transparent;white-space:nowrap;font-size:.95rem}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--flag)}
+.tab:hover{color:var(--ink)}
+
+main.sb{max-width:880px;margin:0 auto;padding-inline:16px;padding-block:24px 64px;display:flex;flex-direction:column;gap:24px}
+
+/* generic */
+.eyebrow{font-size:.74rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft)}
+.scard{background:var(--surf);border:1px solid var(--line);border-radius:var(--rr);padding:20px}
+.muted{color:var(--ink-soft)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.sbtn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surf);padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:700;font-size:.95rem;text-decoration:none;color:var(--ink)}
+.sbtn:hover{border-color:var(--accent)}
+.sbtn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.sbtn.primary:hover{filter:brightness(1.08)}
+.sbtn.ghost{background:none}
+.sbtn.small{padding:6px 11px;font-size:.85rem}
+.sbtn[disabled]{opacity:.45;cursor:not-allowed}
+.mono{font-variant-numeric:tabular-nums;font-weight:800}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surf);border-radius:999px;padding:6px 12px;font-size:.85rem;cursor:pointer;color:var(--ink);text-align:left}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink);font-weight:700}
+.chip .n{color:var(--ink-soft);font-family:var(--f-mono);font-size:.78rem;margin-left:4px}
+.modlabel{font-size:.74rem;color:var(--ink-soft);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:10px 0 6px}
+.bar{height:6px;border-radius:3px;background:var(--sunk);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--ok);border-radius:3px}
+
+/* plan */
+.hero h2{font-size:clamp(1.7rem,4.6vw,2.4rem);letter-spacing:-.02em}
+.hero p{margin:.5em 0 0;max-width:62ch}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0;border:1px solid var(--line);border-radius:var(--rr);background:var(--surf);overflow:hidden}
+.fact{padding:14px 16px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);margin:0 -1px -1px 0}
+.fact b{display:block;font-family:var(--f-display);font-size:1.7rem;line-height:1.1}
+.fact span{font-size:.85rem;color:var(--ink-soft)}
+.days{display:flex;flex-direction:column;gap:10px}
+.day{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:start;background:var(--surf);border:1px solid var(--line);border-radius:var(--rr);padding:14px 16px}
+.day.done{opacity:.62}
+.day .dnum{font-family:var(--f-display);font-size:1.5rem;line-height:1;width:2.2ch;color:var(--flag)}
+.day h3{font-size:1.05rem;font-family:var(--f-body)}
+.day .chs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.day .chs button{font-size:.82rem}
+.scheck{width:26px;height:26px;border-radius:6px;border:2px solid var(--line);background:var(--surf);cursor:pointer;display:grid;place-items:center;color:var(--accent-ink)}
+.scheck[aria-pressed="true"]{background:var(--ok);border-color:var(--ok)}
+.prog{display:grid;grid-template-columns:1fr;gap:2px}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) 110px 64px;gap:12px;align-items:center;padding:9px 4px;border-bottom:1px solid var(--line);cursor:pointer;background:none;border-left:0;border-right:0;border-top:0;text-align:left;width:100%}
+.prow:hover{background:var(--sunk)}
+.prow .lbl{min-width:0}
+.prow .pct{text-align:right;font-size:.82rem;color:var(--ink-soft)}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+td,th{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:.74rem;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft)}
+td.k{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:500;color:var(--accent)}
+.history{display:flex;gap:8px;flex-wrap:wrap}
+.hpill{font-family:var(--f-mono);font-size:.82rem;padding:5px 10px;border-radius:999px;border:1px solid var(--line)}
+.hpill.pass{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.hpill.fail{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+
+/* notes */
+.notes h2{font-size:1.6rem}
+.notes ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:0}
+.notes li{padding:11px 0 11px 18px;border-bottom:1px solid var(--line);position:relative;max-width:70ch}
+.notes li::before{content:"";position:absolute;left:2px;top:20px;width:6px;height:6px;border-radius:50%;background:var(--flag)}
+.notes li.h{padding:22px 0 6px;border-bottom:0}
+.notes li.h::before{display:none}
+.notes li.h .nb{font-family:var(--f-display);font-size:1.12rem;font-weight:700}
+select.sel{font:inherit;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surf);color:var(--ink);max-width:100%}
+
+/* question */
+.qcard{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:16px}
+.qmeta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:.84rem;color:var(--ink-soft)}
+.qtext .nb{font-size:1.28rem;font-weight:700;line-height:1.35}
+.opts{display:flex;flex-direction:column;gap:10px}
+.opt{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:center;text-align:left;width:100%;background:var(--bgc);border:2px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .12s,background .12s}
+.opt:hover:not([disabled]){border-color:var(--accent)}
+.opt .L{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:var(--surf);border:1px solid var(--line);font-size:.9rem}
+.opt .t{min-width:0}
+.opt[disabled]{cursor:default}
+.opt.sel{border-color:var(--accent);background:var(--accent-soft)}
+.opt.sel .L{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft)}
+.opt.right .L{background:var(--ok);color:var(--accent-ink);border-color:var(--ok)}
+.opt.wrong{border-color:var(--bad);background:var(--bad-soft)}
+.opt.wrong .L{background:var(--bad);color:var(--accent-ink);border-color:var(--bad)}
+.verdict{border-radius:10px;padding:12px 14px;font-size:.95rem}
+.verdict.ok{background:var(--ok-soft);color:var(--ink);border-left:4px solid var(--ok)}
+.verdict.no{background:var(--bad-soft);color:var(--ink);border-left:4px solid var(--bad)}
+.verdict b{display:block;margin-bottom:2px}
+.kbd{font-family:var(--f-mono);font-size:.75rem;border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--ink-soft)}
+.score{display:flex;gap:16px;flex-wrap:wrap;font-size:.9rem}
+.score b{font-family:var(--f-mono)}
+
+/* exam */
+.exambar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.timer{font-family:var(--f-mono);font-size:1.4rem;font-variant-numeric:tabular-nums;padding:4px 12px;border-radius:8px;background:var(--surf);border:1px solid var(--line)}
+.timer.low{color:var(--bad);border-color:var(--bad)}
+.grid36{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:5px}
+@media (max-width:560px){.grid36{grid-template-columns:repeat(9,minmax(0,1fr))}}
+.gcell{aspect-ratio:1;border-radius:6px;border:1px solid var(--line);background:var(--surf);font-family:var(--f-mono);font-size:.75rem;cursor:pointer;display:grid;place-items:center;padding:0;max-width:100%}
+.gcell.a{background:var(--accent-soft);border-color:var(--accent)}
+.gcell.cur{outline:2px solid var(--ink);outline-offset:1px}
+.gcell.r{background:var(--ok-soft);border-color:var(--ok)}
+.gcell.w{background:var(--bad-soft);border-color:var(--bad)}
+.result{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.result .big{font-family:var(--f-display);font-size:clamp(2.6rem,9vw,4rem);line-height:1}
+.stamp{display:inline-block;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:6px 14px;border:2px solid;border-radius:6px;transform:rotate(-2deg)}
+.stamp.pass{color:var(--ok);border-color:var(--ok)}
+.stamp.fail{color:var(--bad);border-color:var(--bad)}
+.review{display:flex;flex-direction:column;gap:12px}
+.rv{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--surf)}
+.rv .yours{color:var(--bad)}
+.rv .corr{color:var(--ok)}
+.confirm{border:2px solid var(--warn);background:var(--warn-soft);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
+
+/* flashcards */
+.flash{perspective:1200px}
+.fcard{min-height:250px;border-radius:14px;border:1px solid var(--line);background:var(--surf);padding:26px;display:flex;flex-direction:column;justify-content:center;gap:14px;cursor:pointer;width:100%;text-align:left}
+.fcard>span{display:block}
+.fcard .side{font-size:.74rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);font-weight:700}
+.fcard .front .nb{font-size:1.3rem;font-weight:700}
+.fcard .ans .nb{font-family:var(--f-display);font-size:1.45rem;color:var(--ok)}
+.fcard.flipped{border-color:var(--ok)}
+@media (prefers-reduced-motion:no-preference){.qcard,.fcard{animation:rise .22s ease-out}}
+@keyframes rise{from{transform:translateY(4px);opacity:.6}to{transform:none;opacity:1}}
+.foot{font-size:.8rem;color:var(--ink-soft);border-top:1px solid var(--line);padding-top:16px}
+@media (max-width:560px){
+  .prow{grid-template-columns:minmax(0,1fr) 70px 48px}
+  .qcard{padding:16px}
+  .qtext .nb{font-size:1.15rem}
+  .brand small{display:none}
+}
+.sbadge{font-size:.75rem;font-weight:800;padding:4px 10px;border-radius:999px;background:var(--sunk);color:var(--ink-soft);white-space:nowrap}
+.sbadge.ok{background:var(--accent-soft);color:var(--forest)}
+</style>
+</head>
+<body data-tool="statsborger">
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <div class="brand-l">
+        <span class="flagmark" aria-hidden="true"></span>
+        <div><h1>Statsborgerprøven</h1><small>Trener basert på samfunnskunnskap.no</small></div>
+      </div>
+      <div class="brand-r">
+        <span class="sbadge" id="sync">…</span>
+        <button class="entoggle" id="entoggle" data-act="en" aria-pressed="false" title="Vis engelsk oversettelse under norsk tekst"><span class="sw"></span>English help</button>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" id="tabs">
+      <button class="tab" role="tab" data-act="tab" data-v="plan">Plan</button>
+      <button class="tab" role="tab" data-act="tab" data-v="les">Les</button>
+      <button class="tab" role="tab" data-act="tab" data-v="ov">Øv</button>
+      <button class="tab" role="tab" data-act="tab" data-v="prove">Prøve</button>
+      <button class="tab" role="tab" data-act="tab" data-v="kort">Kort</button>
+    </nav>
+  </div>
+</header>
+<main class="sb" id="view" aria-live="polite"></main>
+
+<script src="../../site.js"></script>
+<script src="../../shared/family.js"></script>
+<script src="data.js"></script>
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const chById={}; CH.forEach(c=>chById[c.id]=c);
+function hash(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)}
+Q.forEach(x=>{x.id=x.ch+"-"+hash(x.nb)});
+const qById={}; Q.forEach(x=>qById[x.id]=x);
+const byCh={}; CH.forEach(c=>byCh[c.id]=Q.filter(x=>x.ch===c.id));
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function bi(nb,en,cls){return '<span class="nb'+(cls?' '+cls:'')+'">'+nb+'</span>'+(en?'<span class="en" lang="en">'+en+'</span>':'')}
+const L=["A","B","C"];
+
+/* ---------- saving ----------
+   Everything is kept in this browser (localStorage) so the page works instantly.
+   Progress (answers, exam scores, finished days) is ALSO saved to the family account,
+   one record per person in collection "progress", so it follows you between devices.
+   Whichever copy is newest (field "ts") wins. */
+const TOOL_ID="statsborger";
+const store=Family.store(TOOL_ID);
+const KEY="sbp-trener-v1";
+let S={stats:{},en:false,tab:"plan",exams:[],les:"md",ovSel:["all"],kortCh:"all",days:{},exam:null,ts:0};
+try{const raw=localStorage.getItem(KEY); if(raw) Object.assign(S,JSON.parse(raw));}catch(e){}
+// save(): settings and the exam in progress; this device only.
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+// saveProgress(): also sends progress to the family account, a moment later (bundles quick answers together).
+let meId=null, pushTimer=null;
+function saveProgress(){S.ts=Date.now();save();
+  if(!meId) return;
+  clearTimeout(pushTimer);
+  pushTimer=setTimeout(()=>store.set("progress",meId,{stats:S.stats,exams:S.exams,days:S.days,ts:S.ts}),1500);
+}
+store.ready.then(()=>{
+  meId=Family.me();
+  const b=$("#sync"); const cloud=store.mode==="cloud";
+  b.className="sbadge"+(cloud?" ok":""); b.textContent=cloud?"☁️ "+meId+" · synket":"📴 Bare denne enheten";
+  store.watch("progress",items=>{
+    const mine=items[meId];
+    if(mine&&(mine.ts||0)>(S.ts||0)){          // newer progress from another device
+      S.stats=mine.stats||{};S.exams=mine.exams||[];S.days=mine.days||{};S.ts=mine.ts;save();render();
+    }else if((!mine||(mine.ts||0)<(S.ts||0))&&S.ts){   // this device is ahead: upload
+      saveProgress();
+    }
+  });
+});
+function record(id,ok){const s=S.stats[id]||(S.stats[id]={c:0,w:0,l:null});ok?s.c++:s.w++;s.l=ok?1:0;s.t=Date.now();saveProgress()}
+function status(id){const s=S.stats[id];if(!s)return "new";return s.l===1?"ok":"weak"}
+function mastery(list){let m=0;list.forEach(x=>{if(status(x.id)==="ok")m++});return m}
+
+/* ---------- top-level render ---------- */
+function render(){
+  document.documentElement.classList.toggle("show-en",!!S.en);
+  $("#entoggle").setAttribute("aria-pressed",S.en?"true":"false");
+  document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected",t.dataset.v===S.tab?"true":"false"));
+  $("#view").innerHTML=VIEWS[S.tab]();
+  if(S.tab==="prove") tick();
+}
+
+/* ---------- PLAN ---------- */
+const DAYS=[
+  {t:["Demokrati og historie","Democracy and history"],ch:["md","hi"],x:["Størst vekt på prøven. Lær tallene og årstallene.","Weighted heavily on the test. Learn the numbers and dates."]},
+  {t:["Dette er Norge og bærekraft","This is Norway and sustainability"],ch:["dn","bk"],x:["Geografi, helligdager, religion, samene, allemannsretten.","Geography, holidays, religion, the Sami, the right to roam."]},
+  {t:["Arbeid, skole og det nye livet","Work, school and the new life"],ch:["ar","sk","kt","ny"],x:["Velferdsstaten, skatt, skolesystemet, opphold.","Welfare state, tax, the school system, residence."]},
+  {t:["Familie, helse og hverdagsliv","Family, health and everyday life"],ch:["fa","he","rf","fr","po"],x:["Barneloven, nødnumre, fastlege, vold og tvang.","Children Act, emergency numbers, GP, violence and coercion."]},
+  {t:["Prøvedag","Exam rehearsal"],ch:[],x:["Ta 2–3 fulle prøver under tid. Øv på feilene mellom hver. Les huskelista til slutt.","Take 2–3 timed mock exams. Drill your mistakes in between. Finish with the cheat sheet."]}
+];
+const CHEAT=[
+  ["169","representanter på Stortinget, valgt for 4 år","members of Stortinget, elected for 4 years"],
+  ["15 / 357","fylker / kommuner","counties / municipalities"],
+  ["5,6 mill.","innbyggere","inhabitants"],
+  ["18 år","stemmerett og myndighetsalder","voting age and legal adulthood"],
+  ["3 år","botid for å stemme ved lokalvalg uten statsborgerskap","residence needed to vote locally without citizenship"],
+  ["7 · 12 · 15 · 16","barn: si mening · stor vekt · velger utdanning og tro · helseinnsyn","children: be heard · great weight · choose education and faith · health privacy"],
+  ["113","medisinsk nødnummer","medical emergency"],
+  ["116 117","legevakt","out-of-hours doctor"],
+  ["116 111","alarmtelefon for barn og unge","children's emergency helpline"],
+  ["4 uker + 1 dag","ferie etter ferieloven","statutory holiday"],
+  ["10 %","egenkapital for boliglån","down payment for a mortgage"],
+  ["150 m · 2 døgn","telt fra hus/hytte · før du må spørre grunneier","tent from houses · before asking the landowner"],
+  ["15.4–15.9","bålforbud i og nær skog","campfire ban near forest"],
+  ["872","Harald Hårfagre konge over hele Norge","Harald Fairhair king of all Norway"],
+  ["1030","slaget på Stiklestad","Battle of Stiklestad"],
+  ["1300-tallet","svartedauden – en tredel døde","Black Death, a third died"],
+  ["1397","union med Danmark (og Sverige)","union with Denmark (and Sweden)"],
+  ["1517","Martin Luther – protestantismen","Martin Luther, Protestantism"],
+  ["17.5.1814","Grunnloven på Eidsvoll; Stortinget grunnlagt; union med Sverige i november","Constitution at Eidsvoll; Storting founded; union with Sweden in November"],
+  ["1898 / 1913","stemmerett for menn / kvinner","suffrage for men / women"],
+  ["7.6.1905","unionen med Sverige oppløst; Haakon 7. konge","union with Sweden dissolved; Haakon VII king"],
+  ["1919","åtte timers arbeidsdag","eight-hour day"],
+  ["9.4.1940","Tyskland okkuperer Norge (frigjort mai 1945)","German occupation (liberated May 1945)"],
+  ["1948","FNs menneskerettighetserklæring","UN Declaration of Human Rights"],
+  ["1959","samisk tillatt i skolen igjen","Sami allowed in schools again"],
+  ["1967","første oljefunn i Nordsjøen","first North Sea oil find"],
+  ["1976","abortloven","abortion law"],
+  ["1987","Brundtland-rapporten – bærekraftig utvikling","Brundtland report, sustainable development"],
+  ["1989","Sametinget åpnet","Sami Parliament opened"],
+  ["2009","to av samme kjønn kan gifte seg","same-sex marriage"],
+  ["2012","statskirken avviklet","state church abolished"]
+];
+function viewPlan(){
+  const total=Q.length, m=mastery(Q);
+  const pct=Math.round(m/total*100);
+  let h='<section class="hero"><div class="eyebrow">Fem dager igjen</div><h2>13 kapitler. 36 oppgaver. Minst 24 riktige.</h2>'+
+    '<p>'+bi("Alt her er laget fra pensum på samfunnskunnskap.no. Les et kapittel, øv på spørsmålene til du svarer riktig, og ta prøven under tid før den ekte dagen.","Everything here comes from the curriculum at samfunnskunnskap.no. Read a chapter, practise until you answer correctly, then take timed mock exams before the real day.")+'</p></section>';
+  h+='<section class="facts" aria-label="Om prøven">'+
+    fact("36","oppgaver","tasks")+fact("3","svaralternativer, ett riktig","options, one correct")+
+    fact("24","riktige for å bestå","correct to pass")+fact("60","minutter maks","minutes max")+fact("NO","prøven er på norsk","the test is in Norwegian")+'</section>';
+  h+='<p class="muted" style="margin:-12px 0 0;font-size:.85rem">'+bi("Ifølge HK-dir teller 32 av oppgavene, og du må ha minst 24 av dem riktig. Sjekk detaljer i innkallingen din.","Per HK-dir, 32 of the tasks are scored and you need at least 24 of them right. Check your invitation for details.")+'</p>';
+  h+='<section class="scard"><div class="row" style="justify-content:space-between"><div><div class="eyebrow">Fremgang</div><h3 style="font-size:1.3rem;margin-top:4px">'+m+' av '+total+' spørsmål sitter</h3>'+
+    '<span class="en">'+m+' of '+total+' questions mastered (last answer correct)</span></div><div class="mono" style="font-size:1.8rem">'+pct+' %</div></div>'+
+    '<div class="bar" style="margin-top:12px"><i style="width:'+pct+'%"></i></div>';
+  if(S.exams.length){h+='<div style="margin-top:16px"><div class="eyebrow" style="margin-bottom:6px">Prøveresultater</div><div class="history">'+
+    S.exams.slice(-8).map(e=>'<span class="hpill '+(e.s>=27?'pass':'fail')+'">'+e.s+'/36</span>').join("")+'</div></div>'}
+  h+='</section>';
+  h+='<section><div class="eyebrow" style="margin-bottom:10px">Studieplan · 5 dager</div><div class="days">';
+  DAYS.forEach((d,i)=>{const done=!!S.days[i];
+    h+='<div class="day'+(done?' done':'')+'"><div class="dnum">'+(i+1)+'</div><div><h3>'+bi(d.t[0],d.t[1])+'</h3><div class="muted" style="font-size:.9rem;margin-top:2px">'+bi(d.x[0],d.x[1])+'</div><div class="chs">';
+    if(d.ch.length){d.ch.forEach(c=>{h+='<button class="sbtn small ghost" data-act="read" data-v="'+c+'">'+chById[c].nb+'</button>'});
+      h+='<button class="sbtn small primary" data-act="drill" data-v="'+d.ch.join(",")+'">Øv dagens kapitler</button>';}
+    else{h+='<button class="sbtn small primary" data-act="tab" data-v="prove">Start prøve</button><button class="sbtn small" data-act="drillweak">Øv på feil</button>'}
+    h+='</div></div><button class="scheck" data-act="day" data-v="'+i+'" aria-pressed="'+done+'" aria-label="Marker dag '+(i+1)+' som ferdig">'+(done?'✓':'')+'</button></div>'});
+  h+='</div></section>';
+  h+='<section class="scard"><div class="eyebrow" style="margin-bottom:8px">Kapitler · trykk for å øve</div><div class="prog">';
+  [1,2,3].forEach(mo=>{h+='<div class="modlabel">'+MOD[mo][0]+'</div>';
+    CH.filter(c=>c.m===mo).forEach(c=>{const l=byCh[c.id],mm=mastery(l),p=Math.round(mm/l.length*100);
+      h+='<button class="prow" data-act="drill" data-v="'+c.id+'"><span class="lbl">'+bi(c.nb,c.en)+'</span><span class="bar"><i style="width:'+p+'%"></i></span><span class="pct mono">'+mm+'/'+l.length+'</span></button>'})});
+  h+='</div></section>';
+  h+='<section class="scard"><div class="eyebrow">Huskeliste</div><h3 style="font-size:1.3rem;margin:4px 0 12px">Tall og årstall som går igjen</h3><div class="tbl-wrap"><table><thead><tr><th>Tall</th><th>Betyr</th></tr></thead><tbody>'+
+    CHEAT.map(r=>'<tr><td class="k">'+r[0]+'</td><td>'+bi(r[1],r[2])+'</td></tr>').join("")+'</tbody></table></div></section>';
+  h+='<p class="foot">'+bi("Kilde: samfunnskunnskap.no (bokmål), lest 9. oktober 2026. Fremgangen din lagres på familiekontoen og følger deg mellom enhetene.","Source: samfunnskunnskap.no (bokmål), read 9 October 2026. Your progress is saved to the family account and follows you between devices.")+'</p>';
+  return h;
+}
+function fact(n,nb,en){return '<div class="fact"><b>'+n+'</b><span>'+nb+'</span><span class="en">'+en+'</span></div>'}
+
+/* ---------- LES ---------- */
+function chipsSingle(cur,act,withAll){
+  let h='';
+  if(withAll) h+='<div class="chips" style="margin-bottom:4px"><button class="chip" data-act="'+act+'" data-v="all" aria-pressed="'+(cur==="all")+'">Alle kapitler<span class="n">'+Q.length+'</span></button></div>';
+  [1,2,3].forEach(mo=>{h+='<div class="modlabel">'+MOD[mo][0]+'</div><div class="chips">';
+    CH.filter(c=>c.m===mo).forEach(c=>{h+='<button class="chip" data-act="'+act+'" data-v="'+c.id+'" aria-pressed="'+(cur===c.id)+'">'+c.nb+'<span class="n">'+byCh[c.id].length+'</span></button>'});
+    h+='</div>'});
+  return h;
+}
+function viewLes(){
+  const c=chById[S.les]; const n=NOTES[c.id];
+  let h='<section>'+chipsSingle(S.les,"read",false)+'</section>';
+  h+='<article class="scard notes"><div class="eyebrow">Modul '+c.m+' · '+MOD[c.m][0]+'</div><h2 style="margin-top:6px">'+c.nb+'</h2><span class="en">'+c.en+'</span><ul style="margin-top:8px">';
+  n.forEach(p=>{if(p[0][0]==="#") h+='<li class="h">'+bi(p[0].slice(1),p[1])+'</li>'; else h+='<li>'+bi(p[0],p[1])+'</li>'});
+  h+='</ul><div class="row" style="margin-top:18px"><button class="sbtn primary" data-act="drill" data-v="'+c.id+'">Øv på kapitlet ('+byCh[c.id].length+')</button><button class="sbtn" data-act="cards" data-v="'+c.id+'">Kort</button>'+
+    '<a class="sbtn ghost" href="https://samfunnskunnskap.no/nb/'+c.slug+'.html" target="_blank" rel="noopener">Originalteksten ↗</a></div></article>';
+  return h;
+}
+
+/* ---------- ØV (practice) ---------- */
+let P=null;
+function prio(x){const s=status(x.id);return s==="weak"?0:s==="new"?1:2}
+function startDrill(sel,weakOnly){
+  let pool=Q.filter(x=>sel.includes("all")||sel.includes(x.ch));
+  if(weakOnly) pool=pool.filter(x=>status(x.id)!=="ok");
+  shuffle(pool); pool.sort((a,b)=>prio(a)-prio(b));
+  P={queue:pool.map(x=>x.id),i:0,ans:null,order:shuffle([0,1,2]),right:0,done:0,requeued:{},weakOnly:!!weakOnly};
+}
+function viewOv(){
+  if(!P) return viewOvSetup();
+  if(P.i>=P.queue.length) return viewOvDone();
+  const x=qById[P.queue[P.i]], c=chById[x.ch];
+  let h='<div class="row" style="justify-content:space-between"><div class="score"><span>Riktige: <b>'+P.right+'</b></span><span>Besvart: <b>'+P.done+'</b></span><span>Igjen: <b>'+(P.queue.length-P.i)+'</b></span></div>'+
+    '<button class="sbtn small ghost" data-act="ovquit">Bytt kapitler</button></div>';
+  h+=qCard(x,c,P.order,P.ans,true);
+  return h;
+}
+function qCard(x,c,order,ans,feedback,meta){
+  const st=status(x.id);
+  let h='<div class="qcard"><div class="qmeta"><span>'+(meta||c.nb)+'</span><span>'+(feedback?(st==="weak"?'Du bommet sist':st==="new"?'Nytt spørsmål':'Svarte riktig sist'):'')+'</span></div>';
+  h+='<div class="qtext">'+bi(x.nb,x.en)+'</div><div class="opts">';
+  order.forEach((oi,pos)=>{const o=x.o[oi];let cls="";
+    if(ans!==null&&ans!==undefined){
+      if(feedback){ if(oi===0) cls="right"; else if(oi===ans) cls="wrong"; }
+      else if(oi===ans) cls="sel";
+    }
+    h+='<button class="opt '+cls+'" data-act="'+(feedback?'pick':'xpick')+'" data-v="'+oi+'"'+(feedback&&ans!==null?' disabled':'')+'><span class="L">'+L[pos]+'</span><span class="t">'+bi(o[0],o[1])+'</span></button>'});
+  h+='</div>';
+  if(feedback&&ans!==null){
+    const ok=ans===0;
+    h+='<div class="verdict '+(ok?'ok':'no')+'"><b>'+(ok?'Riktig!':'Feil. Riktig svar: '+x.o[0][0])+'</b>'+
+      (ok?'':'<span class="en">Correct answer: '+x.o[0][1]+'</span>')+
+      (x.xnb?bi(x.xnb,x.xen):'')+'</div>';
+    h+='<div class="row" style="justify-content:space-between"><button class="sbtn primary" data-act="next" id="nextbtn">Neste →</button><span class="muted" style="font-size:.8rem">Tastatur: <span class="kbd">1</span> <span class="kbd">2</span> <span class="kbd">3</span> og <span class="kbd">Enter</span></span></div>';
+  }
+  h+='</div>';
+  return h;
+}
+function viewOvSetup(){
+  const sel=S.ovSel;
+  const pool=Q.filter(x=>sel.includes("all")||sel.includes(x.ch));
+  const weak=pool.filter(x=>status(x.id)==="weak").length, nw=pool.filter(x=>status(x.id)==="new").length;
+  let h='<section><div class="eyebrow">Øv</div><h2 style="font-size:1.6rem;margin:4px 0 6px">Velg hva du vil øve på</h2><p class="muted" style="margin:0">'+bi("Spørsmål du har bommet på kommer først, så nye. Bommer du, kommer spørsmålet tilbake litt senere.","Questions you missed come first, then new ones. Miss one and it comes back a few questions later.")+'</p></section>';
+  h+='<section class="scard"><div class="chips" style="margin-bottom:4px"><button class="chip" data-act="ovsel" data-v="all" aria-pressed="'+sel.includes("all")+'">Alle kapitler<span class="n">'+Q.length+'</span></button></div>';
+  [1,2,3].forEach(mo=>{h+='<div class="modlabel">'+MOD[mo][0]+'</div><div class="chips">';
+    CH.filter(c=>c.m===mo).forEach(c=>{const on=!sel.includes("all")&&sel.includes(c.id);
+      h+='<button class="chip" data-act="ovsel" data-v="'+c.id+'" aria-pressed="'+on+'">'+c.nb+'<span class="n">'+mastery(byCh[c.id])+'/'+byCh[c.id].length+'</span></button>'});h+='</div>'});
+  h+='<div class="row" style="margin-top:18px"><button class="sbtn primary" data-act="ovstart"'+(pool.length?'':' disabled')+'>Start ('+pool.length+' spørsmål)</button>'+
+    '<button class="sbtn" data-act="ovstartweak"'+((weak+nw)?'':' disabled')+'>Bare feil og nye ('+(weak+nw)+')</button></div>'+
+    '<p class="muted" style="font-size:.85rem;margin:10px 0 0">'+weak+' bommet sist · '+nw+' ikke sett ennå</p></section>';
+  return h;
+}
+function viewOvDone(){
+  const pct=P.done?Math.round(P.right/P.done*100):0;
+  return '<section class="scard result"><div class="eyebrow">Runden er ferdig</div><div class="big">'+P.right+' / '+P.done+'</div><p class="muted" style="margin:0">'+pct+' % riktig på første forsøk og repetisjoner</p>'+
+    '<div class="row" style="margin-top:12px"><button class="sbtn primary" data-act="ovagain">Øv igjen</button><button class="sbtn" data-act="drillweak">Bare feil og nye</button><button class="sbtn ghost" data-act="ovquit">Bytt kapitler</button></div></section>';
+}
+
+/* ---------- PRØVE (mock exam) ---------- */
+const EXAM_MIX={md:6,hi:6,dn:5,ar:3,he:3,sk:2,fa:2,rf:2,bk:2,ny:2,fr:1,po:1,kt:1};
+const PASS=27;
+function newExam(){
+  let ids=[];
+  Object.keys(EXAM_MIX).forEach(ch=>{ids=ids.concat(shuffle(byCh[ch].slice()).slice(0,EXAM_MIX[ch]).map(x=>x.id))});
+  shuffle(ids);
+  S.exam={ids:ids,order:ids.map(()=>shuffle([0,1,2])),ans:ids.map(()=>null),i:0,start:Date.now(),dur:3600,done:false,confirm:false};
+  save();
+}
+function remaining(){return Math.max(0,Math.round(S.exam.dur-(Date.now()-S.exam.start)/1000))}
+function fmt(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
+function viewProve(){
+  const E=S.exam;
+  if(!E) return '<section><div class="eyebrow">Prøve</div><h2 style="font-size:1.6rem;margin:4px 0 8px">Ta en full øvingsprøve</h2><p style="max-width:62ch;margin:0">'+
+    bi("36 oppgaver trukket fra alle kapitlene, med flest fra demokrati, historie og Dette er Norge. Du har 60 minutter. Du får ikke se fasit før du leverer, akkurat som på den ekte prøven.","36 tasks drawn from all chapters, weighted towards democracy, history and This is Norway. You have 60 minutes. You see the answers only after you submit, just like the real test.")+'</p></section>'+
+    '<section class="scard"><ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px"><li>'+bi("Velg ett svar per oppgave. Du kan hoppe fram og tilbake.","Pick one answer per task. You can jump back and forth.")+'</li><li>'+
+    bi("Mål for å føle deg trygg: minst "+PASS+" av 36 (75 %). Det tilsvarer 24 av 32 på den ekte prøven.","Target to feel safe: at least "+PASS+" of 36 (75%). That matches 24 of 32 on the real test.")+'</li><li>'+
+    bi("Svarene dine teller med i fremgangen din.","Your answers count towards your progress.")+'</li></ul>'+
+    '<div class="row" style="margin-top:16px"><button class="sbtn primary" data-act="examstart">Start prøven · 60:00</button></div></section>'+
+    (S.exams.length?'<section class="scard"><div class="eyebrow" style="margin-bottom:8px">Tidligere resultater</div><div class="history">'+S.exams.slice(-10).map(e=>'<span class="hpill '+(e.s>=PASS?'pass':'fail')+'">'+e.s+'/36 · '+e.d+'</span>').join("")+'</div></section>':'');
+  if(E.done) return viewResult();
+  const x=qById[E.ids[E.i]];
+  const answered=E.ans.filter(a=>a!==null).length;
+  let h='<div class="exambar"><div><div class="eyebrow">Øvingsprøve</div><div style="font-weight:700">Oppgave '+(E.i+1)+' av 36 · '+answered+' besvart</div></div><div class="timer mono'+(remaining()<300?' low':'')+'" id="timer">'+fmt(remaining())+'</div></div>';
+  h+=qCard(x,chById[x.ch],E.order[E.i],E.ans[E.i],false,"Oppgave "+(E.i+1));
+  h+='<div class="row" style="justify-content:space-between"><div class="row"><button class="sbtn" data-act="xprev"'+(E.i===0?' disabled':'')+'>← Forrige</button><button class="sbtn" data-act="xnext"'+(E.i===35?' disabled':'')+'>Neste →</button></div><button class="sbtn primary" data-act="xsubmit">Lever prøven</button></div>';
+  if(E.confirm){const un=36-answered;
+    h+='<div class="confirm"><b>'+(un?'Du har '+un+' ubesvarte oppgaver. Vil du levere likevel?':'Vil du levere prøven nå?')+'</b><span class="en">'+(un?un+' tasks unanswered. Submit anyway?':'Submit the exam now?')+'</span><div class="row"><button class="sbtn primary" data-act="xconfirm">Ja, lever</button><button class="sbtn" data-act="xcancel">Fortsett prøven</button></div></div>'}
+  h+='<div class="grid36" aria-label="Oversikt over oppgaver">'+E.ids.map((id,k)=>'<button class="gcell'+(E.ans[k]!==null?' a':'')+(k===E.i?' cur':'')+'" data-act="xgo" data-v="'+k+'" aria-label="Oppgave '+(k+1)+'">'+(k+1)+'</button>').join("")+'</div>';
+  h+='<div class="row"><button class="sbtn small ghost" data-act="xabort">Avbryt prøven</button></div>';
+  return h;
+}
+function finishExam(){
+  const E=S.exam; if(!E||E.done) return;
+  let s=0; E.ids.forEach((id,k)=>{const a=E.ans[k]; const ok=a===0; if(ok)s++; if(a!==null) record(id,ok); else record(id,false)});
+  E.done=true; E.score=s; E.used=Math.min(E.dur,Math.round((Date.now()-E.start)/1000));
+  const d=new Date(); S.exams.push({s:s,d:d.getDate()+"."+(d.getMonth()+1)});
+  saveProgress();
+}
+function viewResult(){
+  const E=S.exam, pass=E.score>=PASS;
+  const wrongBy={}; E.ids.forEach((id,k)=>{if(E.ans[k]!==0){const ch=qById[id].ch;wrongBy[ch]=(wrongBy[ch]||0)+1}});
+  let h='<section class="scard result"><div class="eyebrow">Resultat</div><div class="big mono">'+E.score+' / 36</div>'+
+    '<span class="stamp '+(pass?'pass':'fail')+'">'+(pass?'Bestått':'Ikke bestått ennå')+'</span>'+
+    '<p class="muted" style="margin:6px 0 0">'+bi("Tid brukt: "+fmt(E.used)+". Trygg grense i denne øvingen: "+PASS+" av 36.","Time used: "+fmt(E.used)+". Safe threshold here: "+PASS+" of 36.")+'</p>'+
+    '<div class="row" style="margin-top:12px"><button class="sbtn primary" data-act="examstart">Ny prøve</button><button class="sbtn" data-act="drillweak">Øv på feilene</button><button class="sbtn ghost" data-act="xclear">Tilbake</button></div></section>';
+  const keys=Object.keys(wrongBy).sort((a,b)=>wrongBy[b]-wrongBy[a]);
+  if(keys.length){h+='<section class="scard"><div class="eyebrow" style="margin-bottom:8px">Feil per kapittel</div><div class="chips">'+keys.map(k=>'<button class="chip" data-act="read" data-v="'+k+'">'+chById[k].nb+'<span class="n">'+wrongBy[k]+'</span></button>').join("")+'</div></section>'}
+  h+='<div class="grid36">'+E.ids.map((id,k)=>'<span class="gcell '+(E.ans[k]===0?'r':'w')+'">'+(k+1)+'</span>').join("")+'</div>';
+  const wrong=E.ids.map((id,k)=>({x:qById[id],a:E.ans[k],k:k})).filter(r=>r.a!==0);
+  if(wrong.length){h+='<section class="review"><h3 style="font-size:1.2rem">Gå gjennom feilene</h3>';
+    wrong.forEach(r=>{h+='<div class="rv"><div class="muted" style="font-size:.8rem">Oppgave '+(r.k+1)+' · '+chById[r.x.ch].nb+'</div><div style="font-weight:700;margin:4px 0 8px">'+bi(r.x.nb,r.x.en)+'</div>'+
+      (r.a===null?'<div class="yours">Ikke besvart</div>':'<div class="yours">✗ '+bi(r.x.o[r.a][0],r.x.o[r.a][1])+'</div>')+
+      '<div class="corr" style="margin-top:4px">✓ '+bi(r.x.o[0][0],r.x.o[0][1])+'</div>'+(r.x.xnb?'<div class="muted" style="font-size:.9rem;margin-top:6px">'+bi(r.x.xnb,r.x.xen)+'</div>':'')+'</div>'});
+    h+='</section>'}
+  return h;
+}
+let timerId=null;
+function tick(){
+  if(timerId) return;
+  timerId=setInterval(()=>{
+    const E=S.exam; if(!E||E.done||S.tab!=="prove"){clearInterval(timerId);timerId=null;return}
+    const r=remaining(); const t=document.getElementById("timer");
+    if(t){t.textContent=fmt(r); t.classList.toggle("low",r<300)}
+    if(r<=0){finishExam();render()}
+  },1000);
+}
+
+/* ---------- KORT (flashcards) ---------- */
+let K=null;
+function startCards(ch){
+  let pool=Q.filter(x=>ch==="all"||x.ch===ch); shuffle(pool); pool.sort((a,b)=>prio(a)-prio(b));
+  K={ch:ch,ids:pool.map(x=>x.id),i:0,flip:false,known:0};
+}
+function viewKort(){
+  if(!K||K.ch!==S.kortCh) startCards(S.kortCh);
+  let h='<section>'+chipsSingle(S.kortCh,"cards",true)+'</section>';
+  if(K.i>=K.ids.length){return h+'<section class="scard result"><div class="eyebrow">Bunken er ferdig</div><div class="big">'+K.known+' / '+K.ids.length+'</div><p class="muted" style="margin:0">kort du kunne</p><div class="row" style="margin-top:12px"><button class="sbtn primary" data-act="cardsre">Start på nytt</button></div></section>'}
+  const x=qById[K.ids[K.i]];
+  h+='<div class="row" style="justify-content:space-between"><span class="muted mono" style="font-size:.85rem">'+(K.i+1)+' / '+K.ids.length+'</span><span class="muted" style="font-size:.85rem">'+chById[x.ch].nb+'</span></div>';
+  h+='<div class="flash"><button class="fcard'+(K.flip?' flipped':'')+'" data-act="flip"><span class="side">'+(K.flip?'Svar':'Spørsmål · trykk for å snu')+'</span><span class="front">'+bi(x.nb,x.en)+'</span>'+
+    (K.flip?'<span class="ans">'+bi(x.o[0][0],x.o[0][1])+'</span>'+(x.xnb?'<span class="muted" style="font-size:.92rem">'+bi(x.xnb,x.xen)+'</span>':''):'')+'</button></div>';
+  h+='<div class="row">'+(K.flip?'<button class="sbtn primary" data-act="cardyes">Kunne det</button><button class="sbtn" data-act="cardno">Øv mer på dette</button>':'<button class="sbtn primary" data-act="flip">Vis svar</button><button class="sbtn ghost" data-act="cardskip">Hopp over</button>')+'</div>';
+  return h;
+}
+
+const VIEWS={plan:viewPlan,les:viewLes,ov:viewOv,prove:viewProve,kort:viewKort};
+
+/* ---------- actions ---------- */
+function go(tab){S.tab=tab;save();render();window.scrollTo(0,0)}
+const ACT={
+  en(){S.en=!S.en;save();render()},
+  tab(v){go(v)},
+  read(v){S.les=v;go("les")},
+  drill(v){S.ovSel=v.split(",");startDrill(S.ovSel,false);go("ov")},
+  drillweak(){S.ovSel=["all"];startDrill(["all"],true);go("ov")},
+  cards(v){S.kortCh=v;K=null;go("kort")},
+  cardsre(){K=null;render()},
+  day(v){S.days[v]=!S.days[v];saveProgress();render()},
+  ovsel(v){
+    if(v==="all") S.ovSel=["all"];
+    else{let s=S.ovSel.filter(x=>x!=="all"); s=s.includes(v)?s.filter(x=>x!==v):s.concat(v); S.ovSel=s.length?s:["all"]}
+    save();render()},
+  ovstart(){startDrill(S.ovSel,false);render()},
+  ovstartweak(){startDrill(S.ovSel,true);render()},
+  ovagain(){startDrill(S.ovSel,P&&P.weakOnly);render()},
+  ovquit(){P=null;render()},
+  pick(v){
+    if(!P||P.ans!==null) return;
+    const a=+v, id=P.queue[P.i], ok=a===0;
+    P.ans=a; P.done++; if(ok)P.right++; record(id,ok);
+    if(!ok&&!P.requeued[id]){P.requeued[id]=1;P.queue.splice(Math.min(P.queue.length,P.i+5),0,id)}
+    render(); const n=document.getElementById("nextbtn"); if(n) n.focus({preventScroll:true});
+  },
+  next(){if(!P)return;P.i++;P.ans=null;P.order=shuffle([0,1,2]);render();window.scrollTo(0,0)},
+  examstart(){newExam();go("prove")},
+  xpick(v){const E=S.exam;if(!E||E.done)return;E.ans[E.i]=+v;save();render()},
+  xprev(){const E=S.exam;if(E.i>0){E.i--;save();render()}},
+  xnext(){const E=S.exam;if(E.i<35){E.i++;save();render()}},
+  xgo(v){S.exam.i=+v;S.exam.confirm=false;save();render()},
+  xsubmit(){S.exam.confirm=true;save();render();const c=document.querySelector(".confirm");if(c)c.scrollIntoView({block:"center"})},
+  xcancel(){S.exam.confirm=false;save();render()},
+  xconfirm(){finishExam();render();window.scrollTo(0,0)},
+  xabort(){S.exam=null;save();render()},
+  xclear(){S.exam=null;save();render()},
+  flip(){K.flip=!K.flip;render()},
+  cardyes(){record(K.ids[K.i],true);K.known++;K.i++;K.flip=false;render()},
+  cardno(){const id=K.ids[K.i];record(id,false);K.ids.splice(Math.min(K.ids.length,K.i+6),0,id);K.i++;K.flip=false;render()},
+  cardskip(){K.i++;K.flip=false;render()}
+};
+document.addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(!b||b.disabled)return;const f=ACT[b.dataset.act];if(f)f(b.dataset.v,b)});
+document.addEventListener("keydown",e=>{
+  if(e.target.closest("input,select,textarea")||e.metaKey||e.ctrlKey||e.altKey) return;
+  if((e.key===" "||e.key==="Enter")&&e.target.closest("button")) return;
+  const k=e.key;
+  if(S.tab==="ov"&&P&&P.i<P.queue.length){
+    if(P.ans===null&&/^[1-3]$/.test(k)){ACT.pick(String(P.order[+k-1]));e.preventDefault()}
+    else if(P.ans!==null&&(k==="Enter"||k==="ArrowRight")){ACT.next();e.preventDefault()}
+  }else if(S.tab==="prove"&&S.exam&&!S.exam.done){
+    if(/^[1-3]$/.test(k)){ACT.xpick(String(S.exam.order[S.exam.i][+k-1]))}
+    else if(k==="ArrowRight")ACT.xnext(); else if(k==="ArrowLeft")ACT.xprev();
+  }else if(S.tab==="kort"&&K&&K.i<K.ids.length){
+    if(k===" "){ACT.flip();e.preventDefault()}
+  }
+});
+if(S.exam&&!S.exam.done&&remaining()<=0) finishExam();
+render();
+})();
+</script>
+</body>
+</html>

@@ -37,6 +37,13 @@ window.SITE = {
       color: 'blossom'
     },
     {
+      id: 'statsborger',
+      name: 'Statsborgerprøven',
+      emoji: '📚',
+      description: 'Study for the Norwegian citizenship test: notes, practice questions, timed mock exams and flashcards.',
+      color: 'sky'
+    },
+    {
       id: 'new-tool-template',
       name: 'New Tool Template',
       emoji: '🧪',
