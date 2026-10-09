@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Teoriprøven</title>
+
+<!-- ════════════════════════════════════════════════════════════════
+     TEORIPRØVEN: study tool for the Norwegian class B (car) theory test.
+
+       data.js     notes, road-sign pictures and all practice questions
+                   (topics from Statens vegvesen's curriculum V851)
+       this file   the app: Plan, Les (read), Øv (practice),
+                   Prøve (timed mock exam) and Kort (flashcards)
+
+     Built from the same pattern as tools/statsborger/.
+     Progress is saved per person with Family.store('teoriprove'),
+     so it follows you between devices.
+═════════════════════════════════════════════════════════════════ -->
+
+<link rel="stylesheet" href="../../shared/family.css">
+<style>
+/* Layout: one study column under a sticky header with five tabs; the question card is the hero of each mode.
+   Colours come from shared/family.css (--meadow, --forest, --cream, --paper, --ink, --line…). */
+:root{
+  --bgc:var(--cream); --surf:var(--paper); --sunk:#eef0e8;
+  --accent:var(--meadow-deep); --accent-ink:#fff; --accent-soft:#e3f1df;
+  --road:#c8102e;
+  --ok:#3f8a52; --ok-soft:#e3f1df; --bad:#c2453a; --bad-soft:#fdeceb; --warn:#b07d12; --warn-soft:#fcf3d2;
+  --rr:14px;
+}
+*{box-sizing:border-box}
+body{font-size:16px;line-height:1.55}
+h1,h2,h3{font-family:"Fredoka",system-ui,sans-serif;font-weight:600;color:var(--forest);line-height:1.2;text-wrap:balance;margin:0}
+button{font:inherit;color:inherit}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+/* Language: every text pair is <span class="nb">…</span><span class="en">…</span>.
+   The class on <html> decides which one shows: l-nb (Norwegian), l-both, l-en (English). */
+.en{display:none}
+.l-both .en{display:block;color:var(--ink-soft);font-size:.88em;font-style:italic;font-weight:400;margin-top:2px}
+.l-en .nb{display:none}
+.l-en .en{display:block}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--bgc);border-bottom:1px solid var(--line)}
+.top-in{max-width:880px;margin:0 auto;padding:12px 16px 0;display:flex;flex-direction:column;gap:10px}
+.brand{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.brand-l{display:flex;align-items:center;gap:12px;min-width:0}
+.brand-l .mark{font-size:1.7rem;line-height:1}
+.brand h1{font-size:1.2rem;letter-spacing:-.01em}
+.brand small{display:block;font-weight:400;font-size:.78rem;color:var(--ink-soft);letter-spacing:.02em}
+.brand-r{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;background:var(--surf);padding:3px}
+.seg button{border:0;background:none;border-radius:999px;padding:4px 10px;font-size:.82rem;font-weight:700;color:var(--ink-soft);cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg .s{display:none}
+@media (max-width:560px){.seg .f{display:none}.seg .s{display:inline}}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:none;border:0;padding:8px 14px 10px;cursor:pointer;color:var(--ink-soft);font-weight:700;border-bottom:3px solid transparent;white-space:nowrap;font-size:.95rem}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--road)}
+.tab:hover{color:var(--ink)}
+
+main.sb{max-width:880px;margin:0 auto;padding-inline:16px;padding-block:24px 64px;display:flex;flex-direction:column;gap:24px}
+
+/* generic */
+.eyebrow{font-size:.74rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft)}
+.scard{background:var(--surf);border:1px solid var(--line);border-radius:var(--rr);padding:20px}
+.muted{color:var(--ink-soft)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.sbtn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surf);padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:700;font-size:.95rem;text-decoration:none;color:var(--ink)}
+.sbtn:hover{border-color:var(--accent)}
+.sbtn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.sbtn.primary:hover{filter:brightness(1.08)}
+.sbtn.ghost{background:none}
+.sbtn.small{padding:6px 11px;font-size:.85rem}
+.sbtn[disabled]{opacity:.45;cursor:not-allowed}
+.mono{font-variant-numeric:tabular-nums;font-weight:800}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surf);border-radius:999px;padding:6px 12px;font-size:.85rem;cursor:pointer;color:var(--ink);text-align:left}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);font-weight:700}
+.chip .n{color:var(--ink-soft);font-size:.78rem;margin-left:4px}
+.modlabel{font-size:.74rem;color:var(--ink-soft);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:10px 0 6px}
+.bar{height:6px;border-radius:3px;background:var(--sunk);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--ok);border-radius:3px}
+
+/* plan */
+.hero h2{font-size:clamp(1.7rem,4.6vw,2.4rem);letter-spacing:-.02em}
+.hero p{margin:.5em 0 0;max-width:62ch}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));border:1px solid var(--line);border-radius:var(--rr);background:var(--surf);overflow:hidden}
+.fact{padding:14px 16px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);margin:0 -1px -1px 0}
+.fact b{display:block;font-family:"Fredoka",sans-serif;font-size:1.7rem;line-height:1.1}
+.fact span{font-size:.85rem;color:var(--ink-soft)}
+.days{display:flex;flex-direction:column;gap:10px}
+.day{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:start;background:var(--surf);border:1px solid var(--line);border-radius:var(--rr);padding:14px 16px}
+.day.done{opacity:.62}
+.day .dnum{font-family:"Fredoka",sans-serif;font-size:1.5rem;line-height:1;width:2.2ch;color:var(--road)}
+.day h3{font-size:1.05rem;font-family:inherit}
+.day .chs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.scheck{width:26px;height:26px;border-radius:6px;border:2px solid var(--line);background:var(--surf);cursor:pointer;display:grid;place-items:center;color:var(--accent-ink);padding:0}
+.scheck[aria-pressed="true"]{background:var(--ok);border-color:var(--ok)}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) 110px 64px;gap:12px;align-items:center;padding:9px 4px;border:0;border-bottom:1px solid var(--line);cursor:pointer;background:none;text-align:left;width:100%}
+.prow:hover{background:var(--sunk)}
+.prow .lbl{min-width:0}
+.prow .pct{text-align:right;font-size:.82rem;color:var(--ink-soft)}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+td,th{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:.74rem;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft)}
+td.k{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:800;color:var(--accent)}
+.history{display:flex;gap:8px;flex-wrap:wrap}
+.hpill{font-size:.82rem;font-weight:700;padding:5px 10px;border-radius:999px;border:1px solid var(--line)}
+.hpill.pass{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.hpill.fail{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+
+/* notes */
+.notes h2{font-size:1.6rem}
+.notes ul{list-style:none;padding:0;margin:0}
+.notes li{padding:11px 0 11px 18px;border-bottom:1px solid var(--line);position:relative;max-width:70ch}
+.notes li::before{content:"";position:absolute;left:2px;top:20px;width:6px;height:6px;border-radius:50%;background:var(--road)}
+.notes li.h{padding:22px 0 6px;border-bottom:0;font-family:"Fredoka",sans-serif;font-size:1.12rem;font-weight:600;color:var(--forest)}
+.notes li.h::before{display:none}
+.signs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:14px}
+.sgn{display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:start;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bgc)}
+.sgn svg{width:64px;height:64px;display:block}
+.sgn b{display:block}
+.sgn .m{font-size:.88rem;color:var(--ink-soft)}
+
+/* question */
+.qcard{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:16px}
+.qmeta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:.84rem;color:var(--ink-soft)}
+.qimg svg{width:120px;height:120px;display:block}
+.qtext{font-size:1.28rem;font-weight:700;line-height:1.35}
+.opts{display:flex;flex-direction:column;gap:10px}
+.opt{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:center;text-align:left;width:100%;background:var(--bgc);border:2px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .12s,background .12s}
+.opt:hover:not([disabled]){border-color:var(--accent)}
+.opt .L{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:var(--surf);border:1px solid var(--line);font-size:.9rem}
+.opt .t{min-width:0}
+.opt[disabled]{cursor:default}
+.opt.sel{border-color:var(--accent);background:var(--accent-soft)}
+.opt.sel .L{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft)}
+.opt.right .L{background:var(--ok);color:var(--accent-ink);border-color:var(--ok)}
+.opt.wrong{border-color:var(--bad);background:var(--bad-soft)}
+.opt.wrong .L{background:var(--bad);color:var(--accent-ink);border-color:var(--bad)}
+.verdict{border-radius:10px;padding:12px 14px;font-size:.95rem}
+.verdict.ok{background:var(--ok-soft);border-left:4px solid var(--ok)}
+.verdict.no{background:var(--bad-soft);border-left:4px solid var(--bad)}
+.verdict .vh{font-weight:800;margin-bottom:2px}
+.kbd{font-size:.75rem;border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--ink-soft)}
+.score{display:flex;gap:16px;flex-wrap:wrap;font-size:.9rem}
+
+/* exam */
+.exambar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.timer{font-size:1.4rem;font-variant-numeric:tabular-nums;font-weight:800;padding:4px 12px;border-radius:8px;background:var(--surf);border:1px solid var(--line)}
+.timer.low{color:var(--bad);border-color:var(--bad)}
+.grid45{display:grid;grid-template-columns:repeat(15,minmax(0,1fr));gap:5px}
+@media (max-width:560px){.grid45{grid-template-columns:repeat(9,minmax(0,1fr))}}
+.gcell{aspect-ratio:1;border-radius:6px;border:1px solid var(--line);background:var(--surf);font-size:.75rem;cursor:pointer;display:grid;place-items:center;padding:0;max-width:100%}
+.gcell.a{background:var(--accent-soft);border-color:var(--accent)}
+.gcell.cur{outline:2px solid var(--ink);outline-offset:1px}
+.gcell.r{background:var(--ok-soft);border-color:var(--ok)}
+.gcell.w{background:var(--bad-soft);border-color:var(--bad)}
+.result{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.result .big{font-family:"Fredoka",sans-serif;font-size:clamp(2.6rem,9vw,4rem);line-height:1}
+.stamp{display:inline-block;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:6px 14px;border:2px solid;border-radius:6px;transform:rotate(-2deg)}
+.stamp.pass{color:var(--ok);border-color:var(--ok)}
+.stamp.fail{color:var(--bad);border-color:var(--bad)}
+.review{display:flex;flex-direction:column;gap:12px}
+.rv{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--surf)}
+.rv .qimg svg{width:72px;height:72px}
+.rv .yours{color:var(--bad)}
+.rv .corr{color:var(--ok)}
+.confirm{border:2px solid var(--warn);background:var(--warn-soft);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
+
+/* flashcards */
+.fcard{min-height:250px;border-radius:14px;border:1px solid var(--line);background:var(--surf);padding:26px;display:flex;flex-direction:column;justify-content:center;gap:14px;cursor:pointer;width:100%;text-align:left}
+.fcard>span{display:block}
+.fcard .side{font-size:.74rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);font-weight:700}
+.fcard .front{font-size:1.3rem;font-weight:700}
+.fcard .ans{font-family:"Fredoka",sans-serif;font-size:1.45rem;color:var(--ok)}
+.fcard.flipped{border-color:var(--ok)}
+@media (prefers-reduced-motion:no-preference){.qcard,.fcard{animation:rise .22s ease-out}}
+@keyframes rise{from{transform:translateY(4px);opacity:.6}to{transform:none;opacity:1}}
+.foot{font-size:.8rem;color:var(--ink-soft);border-top:1px solid var(--line);padding-top:16px}
+@media (max-width:560px){
+  .prow{grid-template-columns:minmax(0,1fr) 70px 48px}
+  .qcard{padding:16px}
+  .qtext{font-size:1.15rem}
+  .qimg svg{width:96px;height:96px}
+  .brand small{display:none}
+}
+.sbadge{font-size:.75rem;font-weight:800;padding:4px 10px;border-radius:999px;background:var(--sunk);color:var(--ink-soft);white-space:nowrap}
+.sbadge.ok{background:var(--accent-soft);color:var(--forest)}
+</style>
+</head>
+<body data-tool="teoriprove">
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <div class="brand-l">
+        <span class="mark" aria-hidden="true">🚗</span>
+        <div><h1>Teoriprøven</h1><small>Førerkort klasse B · læreplan V851</small></div>
+      </div>
+      <div class="brand-r">
+        <span class="sbadge" id="sync">…</span>
+        <div class="seg" role="group" aria-label="Språk / Language" id="langs"></div>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" id="tabs"></nav>
+  </div>
+</header>
+<main class="sb" id="view" aria-live="polite"></main>
+
+<script src="../../site.js"></script>
+<script src="../../shared/family.js"></script>
+<script src="data.js"></script>
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const chById={}; CH.forEach(c=>chById[c.id]=c);
+// Each question gets a stable id from its chapter + text (+ picture, since several sign questions share the same wording).
+function hash(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)}
+Q.forEach(x=>{x.id=x.ch+"-"+hash(x.nb+(x.img||""))});
+const qById={}; Q.forEach(x=>qById[x.id]=x);
+const byCh={}; CH.forEach(c=>byCh[c.id]=Q.filter(x=>x.ch===c.id));
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function range(n){return Array.from({length:n},(_,i)=>i)}
+// bi(): a Norwegian/English text pair; the language setting decides what shows.
+function bi(nb,en){return '<span class="nb">'+nb+'</span>'+(en?'<span class="en" lang="en">'+en+'</span>':'')}
+// t(): one short UI label, in English only when English is chosen.
+function t(nb,en){return S.lang==="en"?en:nb}
+function pic(x){return x.img&&SIGN[x.img]?'<div class="qimg">'+SIGN[x.img]+'</div>':''}
+const L=["A","B","C","D"];
+
+/* ---------- saving ----------
+   Everything is kept in this browser (localStorage) so the page works instantly.
+   Progress (answers, exam scores, finished days) is ALSO saved to the family account,
+   one record per person in collection "progress", so it follows you between devices.
+   Whichever copy is newest (field "ts") wins. */
+const TOOL_ID="teoriprove";
+const store=Family.store(TOOL_ID);
+const KEY="teoriprove-v1";
+let S={stats:{},lang:"both",tab:"plan",exams:[],les:"fk",ovSel:["all"],kortCh:"all",days:{},exam:null,ts:0};
+try{const raw=localStorage.getItem(KEY); if(raw) Object.assign(S,JSON.parse(raw));}catch(e){}
+// save(): settings and the exam in progress; this device only.
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+// saveProgress(): also sends progress to the family account, a moment later (bundles quick answers together).
+let meId=null, pushTimer=null;
+function saveProgress(){S.ts=Date.now();save();
+  if(!meId) return;
+  clearTimeout(pushTimer);
+  pushTimer=setTimeout(()=>store.set("progress",meId,{stats:S.stats,exams:S.exams,days:S.days,ts:S.ts}),1500);
+}
+function syncBadge(){
+  const b=$("#sync"); if(!store.mode) return;
+  const cloud=store.mode==="cloud";
+  b.className="sbadge"+(cloud?" ok":"");
+  b.textContent=cloud?"☁️ "+meId+" · "+t("synket","synced"):"📴 "+t("Bare denne enheten","This device only");
+}
+store.ready.then(()=>{
+  meId=Family.me(); syncBadge();
+  store.watch("progress",items=>{
+    const mine=items[meId];
+    if(mine&&(mine.ts||0)>(S.ts||0)){          // newer progress from another device
+      S.stats=mine.stats||{};S.exams=mine.exams||[];S.days=mine.days||{};S.ts=mine.ts;save();render();
+    }else if((!mine||(mine.ts||0)<(S.ts||0))&&S.ts){   // this device is ahead: upload
+      saveProgress();
+    }
+  });
+});
+function record(id,ok){const s=S.stats[id]||(S.stats[id]={c:0,w:0,l:null});ok?s.c++:s.w++;s.l=ok?1:0;s.t=Date.now();saveProgress()}
+function status(id){const s=S.stats[id];if(!s)return "new";return s.l===1?"ok":"weak"}
+function mastery(list){let m=0;list.forEach(x=>{if(status(x.id)==="ok")m++});return m}
+
+/* ---------- top-level render ---------- */
+const TABS=[["plan","Plan","Plan"],["les","Les","Read"],["ov","Øv","Practise"],["prove","Prøve","Mock exam"],["kort","Kort","Cards"]];
+const LANGS=[["nb","Norsk","NO"],["both","Norsk + English","NO + EN"],["en","English","EN"]];   // [setting, label, short label for phones]
+function render(){
+  const html=document.documentElement;
+  html.classList.remove("l-nb","l-both","l-en"); html.classList.add("l-"+S.lang);
+  html.lang=S.lang==="en"?"en":"nb";
+  $("#langs").innerHTML=LANGS.map(l=>'<button data-act="lang" data-v="'+l[0]+'" aria-pressed="'+(S.lang===l[0])+'"><span class="f">'+l[1]+'</span><span class="s">'+l[2]+'</span></button>').join("");
+  $("#tabs").innerHTML=TABS.map(x=>'<button class="tab" role="tab" data-act="tab" data-v="'+x[0]+'" aria-selected="'+(S.tab===x[0])+'">'+t(x[1],x[2])+'</button>').join("");
+  syncBadge();
+  $("#view").innerHTML=VIEWS[S.tab]();
+  if(S.tab==="prove") tick();
+}
+
+/* ---------- PLAN ---------- */
+const DAYS=[
+  {t:["Føreren og opplæringen","The driver and the training"],ch:["fk","me","fy"],x:["Opplæringen, rus og trøtthet, fartsgrenser og stopplengde.","The training, alcohol and tiredness, speed limits and stopping distance."]},
+  {t:["Vikeplikt, skilt og oppmerking","Right of way, signs and markings"],ch:["vi","sk","op"],x:["Størst vekt på prøven. Lær høyreregelen, skiltgruppene og lyssignalene.","Weighted heavily. Learn the right-hand rule, sign groups and traffic lights."]},
+  {t:["Plassering, parkering og myke trafikanter","Positioning, parking and vulnerable road users"],ch:["pl","ps","my"],x:["Forbikjøring, hvor du kan stanse, gangfelt og syklister.","Overtaking, where you may stop, crossings and cyclists."]},
+  {t:["Forhold, bil, miljø og ulykker","Conditions, the car, environment and accidents"],ch:["ut","kj","mi","ul"],x:["Mørke, vinter, motorveg, dekk og last, førstehjelp.","Darkness, winter, motorways, tyres and load, first aid."]},
+  {t:["Prøvedag","Exam rehearsal"],ch:[],x:["Ta 2–3 fulle prøver under tid. Øv på feilene mellom hver. Les huskelista til slutt.","Take 2–3 timed mock exams. Drill your mistakes in between. Finish with the cheat sheet."]}
+];
+const CHEAT=[
+  ["45 · 90 · 7","spørsmål · minutter · høyst feil på teoriprøven","questions · minutes · max mistakes on the theory test"],
+  ["50 / 80","km/t i / utenfor tettbygd strøk når ikke annet er skiltet","km/h inside / outside built-up areas unless signed"],
+  ["0,2","promillegrense","blood alcohol limit (per mille)"],
+  ["6 timer","ingen alkohol etter kjøring hvis du kan regne med politietterforskning","no alcohol after driving if you can expect a police investigation"],
+  ["3 sek","minste avstand til bilen foran i gode forhold","minimum gap to the car ahead in good conditions"],
+  ["÷ 3,6","km/t → meter per sekund (reaksjonslengde på 1 sek)","km/h → metres per second (reaction distance in 1 s)"],
+  ["2× fart = 4×","bremselengde og bevegelsesenergi","braking distance and kinetic energy"],
+  ["5 m","ikke stans nærmere kryss eller foran gangfelt","no stopping closer to junctions or before crossings"],
+  ["16 · 25 + 5","øvingskjøring fra 16 år · ledsager minst 25 år med 5 års førerkort","practice from 16 · supervisor at least 25 with 5 years' licence"],
+  ["17 · 4 · 13","timer: trafikalt grunnkurs · sikkerhetskurs bane · sikkerhetskurs veg","hours: basic course · track safety course · road safety course"],
+  ["2 år","prøvetid, prikker teller dobbelt","probation, points count double"],
+  ["8 prikker / 3 år","tap av førerrett i 6 måneder","licence lost for 6 months"],
+  ["1,6 / 3 mm","mønsterdybde sommer / vinter","tread depth summer / winter"],
+  ["3500 / 750 kg","bil klasse B / tilhenger du alltid kan trekke","class B car / trailer you can always tow"],
+  ["80 / 60","km/t med tilhenger med brems / uten brems (over 300 kg)","km/h with braked / unbraked trailer (over 300 kg)"],
+  ["135 cm","under dette: barnesikringsutstyr","below this: child restraint"],
+  ["113 · 112 · 110","ambulanse · politi · brann","ambulance · police · fire"],
+  ["30 : 2","hjerte-lunge-redning","CPR compressions : breaths"],
+  ["25–30 / 140 m","sikt mot gående i mørket uten / med refleks","seeing a pedestrian at night without / with a reflector"]
+];
+const PASS=38, NQ=45, DUR=5400;
+function viewPlan(){
+  const total=Q.length, m=mastery(Q);
+  const pct=Math.round(m/total*100);
+  let h='<section class="hero"><div class="eyebrow">'+t("Teoriprøven klasse B","Class B theory test")+'</div><h2>'+bi("13 kapitler. 45 spørsmål. Høyst 7 feil.","13 chapters. 45 questions. At most 7 wrong.")+'</h2>'+
+    '<p>'+bi("Temaene følger Statens vegvesens læreplan V851 for klasse B. Les et kapittel, øv på spørsmålene til du svarer riktig, og ta prøven under tid før den ekte dagen.","Topics follow Statens vegvesen's class B curriculum V851. Read a chapter, practise until you get it right, then take timed mock exams before the real day.")+'</p></section>';
+  h+='<section class="facts" aria-label="'+t("Om prøven","About the test")+'">'+
+    fact("45","spørsmål","questions")+fact("90","minutter","minutes")+fact("38","riktige for å bestå (høyst 7 feil)","correct to pass (at most 7 wrong)")+
+    fact("18","år for klasse B","age for class B")+fact("16","år: øvingskjøring","age: practice driving")+'</section>';
+  h+='<p class="muted" style="margin:-12px 0 0;font-size:.85rem">'+bi("Sjekk vegvesen.no for oppdatert informasjon om prøven, språk og bestilling.","Check vegvesen.no for current details on the test, languages and booking.")+'</p>';
+  h+='<section class="scard"><div class="row" style="justify-content:space-between"><div><div class="eyebrow">'+t("Fremgang","Progress")+'</div><h3 style="font-size:1.3rem;margin-top:4px">'+
+    t(m+' av '+total+' spørsmål sitter',m+' of '+total+' questions mastered')+'</h3></div><div class="mono" style="font-size:1.8rem">'+pct+' %</div></div>'+
+    '<div class="bar" style="margin-top:12px"><i style="width:'+pct+'%"></i></div>';
+  if(S.exams.length){h+='<div style="margin-top:16px"><div class="eyebrow" style="margin-bottom:6px">'+t("Prøveresultater","Exam results")+'</div><div class="history">'+
+    S.exams.slice(-8).map(e=>'<span class="hpill '+(e.s>=PASS?'pass':'fail')+'">'+e.s+'/'+NQ+'</span>').join("")+'</div></div>'}
+  h+='</section>';
+  h+='<section><div class="eyebrow" style="margin-bottom:10px">'+t("Studieplan · 5 økter","Study plan · 5 sessions")+'</div><div class="days">';
+  DAYS.forEach((d,i)=>{const done=!!S.days[i];
+    h+='<div class="day'+(done?' done':'')+'"><div class="dnum">'+(i+1)+'</div><div><h3>'+bi(d.t[0],d.t[1])+'</h3><div class="muted" style="font-size:.9rem;margin-top:2px">'+bi(d.x[0],d.x[1])+'</div><div class="chs">';
+    if(d.ch.length){d.ch.forEach(c=>{h+='<button class="sbtn small ghost" data-act="read" data-v="'+c+'">'+t(chById[c].nb,chById[c].en)+'</button>'});
+      h+='<button class="sbtn small primary" data-act="drill" data-v="'+d.ch.join(",")+'">'+t("Øv på disse","Practise these")+'</button>';}
+    else{h+='<button class="sbtn small primary" data-act="tab" data-v="prove">'+t("Start prøve","Start exam")+'</button><button class="sbtn small" data-act="drillweak">'+t("Øv på feil","Drill mistakes")+'</button>'}
+    h+='</div></div><button class="scheck" data-act="day" data-v="'+i+'" aria-pressed="'+done+'" aria-label="'+t("Marker økt "+(i+1)+" som ferdig","Mark session "+(i+1)+" done")+'">'+(done?'✓':'')+'</button></div>'});
+  h+='</div></section>';
+  h+='<section class="scard"><div class="eyebrow" style="margin-bottom:8px">'+t("Kapitler · trykk for å øve","Chapters · tap to practise")+'</div>';
+  [1,2,3].forEach(mo=>{h+='<div class="modlabel">'+t(MOD[mo][0],MOD[mo][1])+'</div>';
+    CH.filter(c=>c.m===mo).forEach(c=>{const l=byCh[c.id],mm=mastery(l),p=Math.round(mm/l.length*100);
+      h+='<button class="prow" data-act="drill" data-v="'+c.id+'"><span class="lbl">'+bi(c.nb,c.en)+'</span><span class="bar"><i style="width:'+p+'%"></i></span><span class="pct mono">'+mm+'/'+l.length+'</span></button>'})});
+  h+='</section>';
+  h+='<section class="scard"><div class="eyebrow">'+t("Huskeliste","Cheat sheet")+'</div><h3 style="font-size:1.3rem;margin:4px 0 12px">'+t("Tall som går igjen","Numbers worth knowing")+'</h3><div class="tbl-wrap"><table><thead><tr><th>'+t("Tall","Number")+'</th><th>'+t("Betyr","Means")+'</th></tr></thead><tbody>'+
+    CHEAT.map(r=>'<tr><td class="k">'+r[0]+'</td><td>'+bi(r[1],r[2])+'</td></tr>').join("")+'</tbody></table></div></section>';
+  h+='<p class="foot">'+bi("Kilder: Statens vegvesens læreplan V851 (gyldig fra 1.2.2026), trafikkreglene og vegtrafikkloven, lest oktober 2026. Reglene kan endre seg, så sjekk ","Sources: Statens vegvesen curriculum V851 (valid from 1 Feb 2026), the traffic rules and the Road Traffic Act, read October 2026. Rules can change, so check ")+
+    '<a href="https://www.vegvesen.no/" target="_blank" rel="noopener">vegvesen.no</a> '+t("og","and")+' <a href="https://lovdata.no/dokument/SF/forskrift/1986-03-21-747" target="_blank" rel="noopener">'+t("trafikkreglene på Lovdata","the traffic rules on Lovdata")+'</a>.</p>';
+  return h;
+}
+function fact(n,nb,en){return '<div class="fact"><b>'+n+'</b><span>'+bi(nb,en)+'</span></div>'}
+
+/* ---------- LES (read) ---------- */
+function chipsSingle(cur,act,withAll){
+  let h='';
+  if(withAll) h+='<div class="chips" style="margin-bottom:4px"><button class="chip" data-act="'+act+'" data-v="all" aria-pressed="'+(cur==="all")+'">'+t("Alle kapitler","All chapters")+'<span class="n">'+Q.length+'</span></button></div>';
+  [1,2,3].forEach(mo=>{h+='<div class="modlabel">'+t(MOD[mo][0],MOD[mo][1])+'</div><div class="chips">';
+    CH.filter(c=>c.m===mo).forEach(c=>{h+='<button class="chip" data-act="'+act+'" data-v="'+c.id+'" aria-pressed="'+(cur===c.id)+'">'+t(c.nb,c.en)+'<span class="n">'+byCh[c.id].length+'</span></button>'});
+    h+='</div>'});
+  return h;
+}
+function viewLes(){
+  const c=chById[S.les]||CH[0]; const n=NOTES[c.id];
+  let h='<section>'+chipsSingle(c.id,"read",false)+'</section>';
+  h+='<article class="scard notes"><div class="eyebrow">'+t("Modul ","Module ")+c.m+' · '+t(MOD[c.m][0],MOD[c.m][1])+'</div><h2 style="margin-top:6px">'+bi(c.nb,c.en)+'</h2><ul style="margin-top:8px">';
+  n.forEach(p=>{if(p[0][0]==="#") h+='<li class="h">'+bi(p[0].slice(1),p[1])+'</li>'; else h+='<li>'+bi(p[0],p[1])+'</li>'});
+  h+='</ul>';
+  if(c.id==="sk"){   // the sign gallery
+    h+='<h3 style="margin-top:22px;font-size:1.15rem">'+t("Skilt du må kunne","Signs you must know")+'</h3><div class="signs">'+
+      SIGN_INFO.map(s=>'<div class="sgn">'+SIGN[s[0]]+'<div><b>'+bi(s[1],s[2])+'</b><div class="m">'+bi(s[3],s[4])+'</div></div></div>').join("")+'</div>';
+  }
+  h+='<div class="row" style="margin-top:18px"><button class="sbtn primary" data-act="drill" data-v="'+c.id+'">'+t("Øv på kapitlet","Practise this chapter")+' ('+byCh[c.id].length+')</button><button class="sbtn" data-act="cards" data-v="'+c.id+'">'+t("Kort","Cards")+'</button></div></article>';
+  return h;
+}
+
+/* ---------- ØV (practice) ---------- */
+let P=null;
+function prio(x){const s=status(x.id);return s==="weak"?0:s==="new"?1:2}
+function startDrill(sel,weakOnly){
+  let pool=Q.filter(x=>sel.includes("all")||sel.includes(x.ch));
+  if(weakOnly) pool=pool.filter(x=>status(x.id)!=="ok");
+  shuffle(pool); pool.sort((a,b)=>prio(a)-prio(b));
+  P={queue:pool.map(x=>x.id),i:0,ans:null,order:null,right:0,done:0,requeued:{},weakOnly:!!weakOnly};
+  P.order=pool.length?shuffle(range(pool[0].o.length)):[];
+}
+function viewOv(){
+  if(!P) return viewOvSetup();
+  if(P.i>=P.queue.length) return viewOvDone();
+  const x=qById[P.queue[P.i]], c=chById[x.ch];
+  let h='<div class="row" style="justify-content:space-between"><div class="score"><span>'+t("Riktige","Correct")+': <b>'+P.right+'</b></span><span>'+t("Besvart","Answered")+': <b>'+P.done+'</b></span><span>'+t("Igjen","Left")+': <b>'+(P.queue.length-P.i)+'</b></span></div>'+
+    '<button class="sbtn small ghost" data-act="ovquit">'+t("Bytt kapitler","Change chapters")+'</button></div>';
+  h+=qCard(x,c,P.order,P.ans,true);
+  return h;
+}
+function qCard(x,c,order,ans,feedback,meta){
+  const st=status(x.id);
+  let h='<div class="qcard"><div class="qmeta"><span>'+(meta||t(c.nb,c.en))+'</span><span>'+(feedback?(st==="weak"?t('Du bommet sist','You missed this last time'):st==="new"?t('Nytt spørsmål','New question'):t('Svarte riktig sist','Right last time')):'')+'</span></div>';
+  h+=pic(x)+'<div class="qtext">'+bi(x.nb,x.en)+'</div><div class="opts">';
+  order.forEach((oi,pos)=>{const o=x.o[oi];let cls="";
+    if(ans!==null&&ans!==undefined){
+      if(feedback){ if(oi===0) cls="right"; else if(oi===ans) cls="wrong"; }
+      else if(oi===ans) cls="sel";
+    }
+    h+='<button class="opt '+cls+'" data-act="'+(feedback?'pick':'xpick')+'" data-v="'+oi+'"'+(feedback&&ans!==null?' disabled':'')+'><span class="L">'+L[pos]+'</span><span class="t">'+bi(o[0],o[1])+'</span></button>'});
+  h+='</div>';
+  if(feedback&&ans!==null){
+    const ok=ans===0;
+    h+='<div class="verdict '+(ok?'ok':'no')+'"><div class="vh">'+(ok?t('Riktig!','Correct!'):t('Feil.','Wrong.')+' '+t('Riktig svar','Right answer')+':')+'</div>'+
+      (ok?'':bi(x.o[0][0],x.o[0][1]))+(x.xnb?'<div style="margin-top:6px">'+bi(x.xnb,x.xen)+'</div>':'')+'</div>';
+    h+='<div class="row" style="justify-content:space-between"><button class="sbtn primary" data-act="next" id="nextbtn">'+t("Neste","Next")+' →</button><span class="muted" style="font-size:.8rem">'+t("Tastatur","Keyboard")+': <span class="kbd">1</span> <span class="kbd">2</span> <span class="kbd">3</span> '+t("og","and")+' <span class="kbd">Enter</span></span></div>';
+  }
+  h+='</div>';
+  return h;
+}
+function viewOvSetup(){
+  const sel=S.ovSel;
+  const pool=Q.filter(x=>sel.includes("all")||sel.includes(x.ch));
+  const weak=pool.filter(x=>status(x.id)==="weak").length, nw=pool.filter(x=>status(x.id)==="new").length;
+  let h='<section><div class="eyebrow">'+t("Øv","Practise")+'</div><h2 style="font-size:1.6rem;margin:4px 0 6px">'+t("Velg hva du vil øve på","Choose what to practise")+'</h2><p class="muted" style="margin:0">'+bi("Spørsmål du har bommet på kommer først, så nye. Bommer du, kommer spørsmålet tilbake litt senere.","Questions you missed come first, then new ones. Miss one and it comes back a few questions later.")+'</p></section>';
+  h+='<section class="scard"><div class="chips" style="margin-bottom:4px"><button class="chip" data-act="ovsel" data-v="all" aria-pressed="'+sel.includes("all")+'">'+t("Alle kapitler","All chapters")+'<span class="n">'+Q.length+'</span></button></div>';
+  [1,2,3].forEach(mo=>{h+='<div class="modlabel">'+t(MOD[mo][0],MOD[mo][1])+'</div><div class="chips">';
+    CH.filter(c=>c.m===mo).forEach(c=>{const on=!sel.includes("all")&&sel.includes(c.id);
+      h+='<button class="chip" data-act="ovsel" data-v="'+c.id+'" aria-pressed="'+on+'">'+t(c.nb,c.en)+'<span class="n">'+mastery(byCh[c.id])+'/'+byCh[c.id].length+'</span></button>'});h+='</div>'});
+  h+='<div class="row" style="margin-top:18px"><button class="sbtn primary" data-act="ovstart"'+(pool.length?'':' disabled')+'>Start ('+pool.length+')</button>'+
+    '<button class="sbtn" data-act="ovstartweak"'+((weak+nw)?'':' disabled')+'>'+t("Bare feil og nye","Only missed and new")+' ('+(weak+nw)+')</button></div>'+
+    '<p class="muted" style="font-size:.85rem;margin:10px 0 0">'+t(weak+' bommet sist · '+nw+' ikke sett ennå',weak+' missed last time · '+nw+' not seen yet')+'</p></section>';
+  return h;
+}
+function viewOvDone(){
+  const pct=P.done?Math.round(P.right/P.done*100):0;
+  return '<section class="scard result"><div class="eyebrow">'+t("Runden er ferdig","Round finished")+'</div><div class="big">'+P.right+' / '+P.done+'</div><p class="muted" style="margin:0">'+pct+' % '+t("riktig, med repetisjoner","correct, including repeats")+'</p>'+
+    '<div class="row" style="margin-top:12px"><button class="sbtn primary" data-act="ovagain">'+t("Øv igjen","Again")+'</button><button class="sbtn" data-act="drillweak">'+t("Bare feil og nye","Only missed and new")+'</button><button class="sbtn ghost" data-act="ovquit">'+t("Bytt kapitler","Change chapters")+'</button></div></section>';
+}
+
+/* ---------- PRØVE (mock exam) ----------
+   45 questions drawn per chapter (the numbers below add up to 45), 90 minutes, pass = at most 7 wrong. */
+const EXAM_MIX={vi:6,sk:5,fy:4,me:4,pl:4,my:4,ut:4,op:3,ps:3,kj:3,ul:2,fk:2,mi:1};
+function newExam(){
+  let ids=[];
+  Object.keys(EXAM_MIX).forEach(ch=>{ids=ids.concat(shuffle(byCh[ch].slice()).slice(0,EXAM_MIX[ch]).map(x=>x.id))});
+  shuffle(ids);
+  S.exam={ids:ids,order:ids.map(id=>shuffle(range(qById[id].o.length))),ans:ids.map(()=>null),i:0,start:Date.now(),dur:DUR,done:false,confirm:false};
+  save();
+}
+function remaining(){return Math.max(0,Math.round(S.exam.dur-(Date.now()-S.exam.start)/1000))}
+function fmt(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
+function viewProve(){
+  const E=S.exam;
+  if(!E) return '<section><div class="eyebrow">'+t("Prøve","Mock exam")+'</div><h2 style="font-size:1.6rem;margin:4px 0 8px">'+t("Ta en full øvingsprøve","Take a full mock exam")+'</h2><p style="max-width:62ch;margin:0">'+
+    bi("45 spørsmål fra alle kapitlene, med flest om vikeplikt, skilt og fart. Du har 90 minutter. Du får ikke se fasit før du leverer.","45 questions from every chapter, weighted towards right of way, signs and speed. You have 90 minutes. You see the answers only after you submit.")+'</p></section>'+
+    '<section class="scard"><ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px"><li>'+bi("Velg ett svar per spørsmål. Du kan hoppe fram og tilbake.","Pick one answer per question. You can jump back and forth.")+'</li><li>'+
+    bi("For å bestå trenger du minst "+PASS+" av "+NQ+" (høyst 7 feil), som på den ekte prøven.","To pass you need at least "+PASS+" of "+NQ+" (at most 7 wrong), like the real test.")+'</li><li>'+
+    bi("Svarene dine teller med i fremgangen din.","Your answers count towards your progress.")+'</li></ul>'+
+    '<div class="row" style="margin-top:16px"><button class="sbtn primary" data-act="examstart">'+t("Start prøven","Start the exam")+' · 90:00</button></div></section>'+
+    (S.exams.length?'<section class="scard"><div class="eyebrow" style="margin-bottom:8px">'+t("Tidligere resultater","Previous results")+'</div><div class="history">'+S.exams.slice(-10).map(e=>'<span class="hpill '+(e.s>=PASS?'pass':'fail')+'">'+e.s+'/'+NQ+' · '+e.d+'</span>').join("")+'</div></section>':'');
+  if(E.done) return viewResult();
+  const x=qById[E.ids[E.i]];
+  const answered=E.ans.filter(a=>a!==null).length;
+  let h='<div class="exambar"><div><div class="eyebrow">'+t("Øvingsprøve","Mock exam")+'</div><div style="font-weight:700">'+t("Spørsmål ","Question ")+(E.i+1)+' / '+NQ+' · '+answered+' '+t("besvart","answered")+'</div></div><div class="timer'+(remaining()<300?' low':'')+'" id="timer">'+fmt(remaining())+'</div></div>';
+  h+=qCard(x,chById[x.ch],E.order[E.i],E.ans[E.i],false,t("Spørsmål ","Question ")+(E.i+1));
+  h+='<div class="row" style="justify-content:space-between"><div class="row"><button class="sbtn" data-act="xprev"'+(E.i===0?' disabled':'')+'>← '+t("Forrige","Previous")+'</button><button class="sbtn" data-act="xnext"'+(E.i===NQ-1?' disabled':'')+'>'+t("Neste","Next")+' →</button></div><button class="sbtn primary" data-act="xsubmit">'+t("Lever prøven","Submit")+'</button></div>';
+  if(E.confirm){const un=NQ-answered;
+    h+='<div class="confirm"><b>'+(un?t('Du har '+un+' ubesvarte spørsmål. Vil du levere likevel?',un+' questions unanswered. Submit anyway?'):t('Vil du levere prøven nå?','Submit the exam now?'))+'</b><div class="row"><button class="sbtn primary" data-act="xconfirm">'+t("Ja, lever","Yes, submit")+'</button><button class="sbtn" data-act="xcancel">'+t("Fortsett prøven","Keep going")+'</button></div></div>'}
+  h+='<div class="grid45" aria-label="'+t("Oversikt over spørsmål","Question overview")+'">'+E.ids.map((id,k)=>'<button class="gcell'+(E.ans[k]!==null?' a':'')+(k===E.i?' cur':'')+'" data-act="xgo" data-v="'+k+'" aria-label="'+t("Spørsmål ","Question ")+(k+1)+'">'+(k+1)+'</button>').join("")+'</div>';
+  h+='<div class="row"><button class="sbtn small ghost" data-act="xabort">'+t("Avbryt prøven","Abandon exam")+'</button></div>';
+  return h;
+}
+function finishExam(){
+  const E=S.exam; if(!E||E.done) return;
+  let s=0; E.ids.forEach((id,k)=>{const ok=E.ans[k]===0; if(ok)s++; record(id,ok)});
+  E.done=true; E.score=s; E.used=Math.min(E.dur,Math.round((Date.now()-E.start)/1000));
+  const d=new Date(); S.exams.push({s:s,d:d.getDate()+"."+(d.getMonth()+1)});
+  saveProgress();
+}
+function viewResult(){
+  const E=S.exam, pass=E.score>=PASS;
+  const wrongBy={}; E.ids.forEach((id,k)=>{if(E.ans[k]!==0){const ch=qById[id].ch;wrongBy[ch]=(wrongBy[ch]||0)+1}});
+  let h='<section class="scard result"><div class="eyebrow">'+t("Resultat","Result")+'</div><div class="big mono">'+E.score+' / '+NQ+'</div>'+
+    '<span class="stamp '+(pass?'pass':'fail')+'">'+(pass?t('Bestått','Passed'):t('Ikke bestått ennå','Not passed yet'))+'</span>'+
+    '<p class="muted" style="margin:6px 0 0">'+t("Tid brukt: "+fmt(E.used)+". "+(NQ-E.score)+" feil (høyst 7 for å bestå).","Time used: "+fmt(E.used)+". "+(NQ-E.score)+" wrong (at most 7 to pass).")+'</p>'+
+    '<div class="row" style="margin-top:12px"><button class="sbtn primary" data-act="examstart">'+t("Ny prøve","New exam")+'</button><button class="sbtn" data-act="drillweak">'+t("Øv på feilene","Drill mistakes")+'</button><button class="sbtn ghost" data-act="xclear">'+t("Tilbake","Back")+'</button></div></section>';
+  const keys=Object.keys(wrongBy).sort((a,b)=>wrongBy[b]-wrongBy[a]);
+  if(keys.length){h+='<section class="scard"><div class="eyebrow" style="margin-bottom:8px">'+t("Feil per kapittel","Mistakes by chapter")+'</div><div class="chips">'+keys.map(k=>'<button class="chip" data-act="read" data-v="'+k+'">'+t(chById[k].nb,chById[k].en)+'<span class="n">'+wrongBy[k]+'</span></button>').join("")+'</div></section>'}
+  h+='<div class="grid45">'+E.ids.map((id,k)=>'<span class="gcell '+(E.ans[k]===0?'r':'w')+'">'+(k+1)+'</span>').join("")+'</div>';
+  const wrong=E.ids.map((id,k)=>({x:qById[id],a:E.ans[k],k:k})).filter(r=>r.a!==0);
+  if(wrong.length){h+='<section class="review"><h3 style="font-size:1.2rem">'+t("Gå gjennom feilene","Review your mistakes")+'</h3>';
+    wrong.forEach(r=>{h+='<div class="rv"><div class="muted" style="font-size:.8rem">'+t("Spørsmål ","Question ")+(r.k+1)+' · '+t(chById[r.x.ch].nb,chById[r.x.ch].en)+'</div>'+pic(r.x)+'<div style="font-weight:700;margin:4px 0 8px">'+bi(r.x.nb,r.x.en)+'</div>'+
+      (r.a===null?'<div class="yours">'+t("Ikke besvart","Not answered")+'</div>':'<div class="yours">✗ '+bi(r.x.o[r.a][0],r.x.o[r.a][1])+'</div>')+
+      '<div class="corr" style="margin-top:4px">✓ '+bi(r.x.o[0][0],r.x.o[0][1])+'</div>'+(r.x.xnb?'<div class="muted" style="font-size:.9rem;margin-top:6px">'+bi(r.x.xnb,r.x.xen)+'</div>':'')+'</div>'});
+    h+='</section>'}
+  return h;
+}
+let timerId=null;
+function tick(){
+  if(timerId) return;
+  timerId=setInterval(()=>{
+    const E=S.exam; if(!E||E.done||S.tab!=="prove"){clearInterval(timerId);timerId=null;return}
+    const r=remaining(); const el=document.getElementById("timer");
+    if(el){el.textContent=fmt(r); el.classList.toggle("low",r<300)}
+    if(r<=0){finishExam();render()}
+  },1000);
+}
+
+/* ---------- KORT (flashcards) ---------- */
+let K=null;
+function startCards(ch){
+  let pool=Q.filter(x=>ch==="all"||x.ch===ch); shuffle(pool); pool.sort((a,b)=>prio(a)-prio(b));
+  K={ch:ch,ids:pool.map(x=>x.id),i:0,flip:false,known:0};
+}
+function viewKort(){
+  if(!K||K.ch!==S.kortCh) startCards(S.kortCh);
+  let h='<section>'+chipsSingle(S.kortCh,"cards",true)+'</section>';
+  if(K.i>=K.ids.length){return h+'<section class="scard result"><div class="eyebrow">'+t("Bunken er ferdig","Deck finished")+'</div><div class="big">'+K.known+' / '+K.ids.length+'</div><p class="muted" style="margin:0">'+t("kort du kunne","cards you knew")+'</p><div class="row" style="margin-top:12px"><button class="sbtn primary" data-act="cardsre">'+t("Start på nytt","Start again")+'</button></div></section>'}
+  const x=qById[K.ids[K.i]];
+  h+='<div class="row" style="justify-content:space-between"><span class="muted mono" style="font-size:.85rem">'+(K.i+1)+' / '+K.ids.length+'</span><span class="muted" style="font-size:.85rem">'+t(chById[x.ch].nb,chById[x.ch].en)+'</span></div>';
+  h+='<button class="fcard'+(K.flip?' flipped':'')+'" data-act="flip"><span class="side">'+(K.flip?t('Svar','Answer'):t('Spørsmål · trykk for å snu','Question · tap to flip'))+'</span>'+pic(x)+'<span class="front">'+bi(x.nb,x.en)+'</span>'+
+    (K.flip?'<span class="ans">'+bi(x.o[0][0],x.o[0][1])+'</span>'+(x.xnb?'<span class="muted" style="font-size:.92rem">'+bi(x.xnb,x.xen)+'</span>':''):'')+'</button>';
+  h+='<div class="row">'+(K.flip?'<button class="sbtn primary" data-act="cardyes">'+t("Kunne det","Knew it")+'</button><button class="sbtn" data-act="cardno">'+t("Øv mer på dette","Need more practice")+'</button>':'<button class="sbtn primary" data-act="flip">'+t("Vis svar","Show answer")+'</button><button class="sbtn ghost" data-act="cardskip">'+t("Hopp over","Skip")+'</button>')+'</div>';
+  return h;
+}
+
+const VIEWS={plan:viewPlan,les:viewLes,ov:viewOv,prove:viewProve,kort:viewKort};
+
+/* ---------- actions (every button has data-act="name" and maybe data-v="value") ---------- */
+function go(tab){S.tab=tab;save();render();window.scrollTo(0,0)}
+const ACT={
+  lang(v){S.lang=v;save();render()},
+  tab(v){go(v)},
+  read(v){S.les=v;go("les")},
+  drill(v){S.ovSel=v.split(",");startDrill(S.ovSel,false);go("ov")},
+  drillweak(){S.ovSel=["all"];startDrill(["all"],true);go("ov")},
+  cards(v){S.kortCh=v;K=null;go("kort")},
+  cardsre(){K=null;render()},
+  day(v){S.days[v]=!S.days[v];saveProgress();render()},
+  ovsel(v){
+    if(v==="all") S.ovSel=["all"];
+    else{let s=S.ovSel.filter(x=>x!=="all"); s=s.includes(v)?s.filter(x=>x!==v):s.concat(v); S.ovSel=s.length?s:["all"]}
+    save();render()},
+  ovstart(){startDrill(S.ovSel,false);render()},
+  ovstartweak(){startDrill(S.ovSel,true);render()},
+  ovagain(){startDrill(S.ovSel,P&&P.weakOnly);render()},
+  ovquit(){P=null;render()},
+  pick(v){
+    if(!P||P.ans!==null) return;
+    const a=+v, id=P.queue[P.i], ok=a===0;
+    P.ans=a; P.done++; if(ok)P.right++; record(id,ok);
+    if(!ok&&!P.requeued[id]){P.requeued[id]=1;P.queue.splice(Math.min(P.queue.length,P.i+5),0,id)}
+    render(); const n=document.getElementById("nextbtn"); if(n) n.focus({preventScroll:true});
+  },
+  next(){if(!P)return;P.i++;P.ans=null;
+    if(P.i<P.queue.length) P.order=shuffle(range(qById[P.queue[P.i]].o.length));
+    render();window.scrollTo(0,0)},
+  examstart(){newExam();go("prove")},
+  xpick(v){const E=S.exam;if(!E||E.done)return;E.ans[E.i]=+v;save();render()},
+  xprev(){const E=S.exam;if(E.i>0){E.i--;save();render()}},
+  xnext(){const E=S.exam;if(E.i<NQ-1){E.i++;save();render()}},
+  xgo(v){S.exam.i=+v;S.exam.confirm=false;save();render()},
+  xsubmit(){S.exam.confirm=true;save();render();const c=document.querySelector(".confirm");if(c)c.scrollIntoView({block:"center"})},
+  xcancel(){S.exam.confirm=false;save();render()},
+  xconfirm(){finishExam();render();window.scrollTo(0,0)},
+  xabort(){S.exam=null;save();render()},
+  xclear(){S.exam=null;save();render()},
+  flip(){K.flip=!K.flip;render()},
+  cardyes(){record(K.ids[K.i],true);K.known++;K.i++;K.flip=false;render()},
+  cardno(){const id=K.ids[K.i];record(id,false);K.ids.splice(Math.min(K.ids.length,K.i+6),0,id);K.i++;K.flip=false;render()},
+  cardskip(){K.i++;K.flip=false;render()}
+};
+document.addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(!b||b.disabled)return;const f=ACT[b.dataset.act];if(f)f(b.dataset.v,b)});
+// Keyboard shortcuts: 1–3 pick an answer, Enter / → for next, ← back in the exam, Space flips a card.
+document.addEventListener("keydown",e=>{
+  if(e.target.closest("input,select,textarea")||e.metaKey||e.ctrlKey||e.altKey) return;
+  if((e.key===" "||e.key==="Enter")&&e.target.closest("button")) return;
+  const k=e.key;
+  if(S.tab==="ov"&&P&&P.i<P.queue.length){
+    if(P.ans===null&&/^[1-9]$/.test(k)&&+k<=P.order.length){ACT.pick(String(P.order[+k-1]));e.preventDefault()}
+    else if(P.ans!==null&&(k==="Enter"||k==="ArrowRight")){ACT.next();e.preventDefault()}
+  }else if(S.tab==="prove"&&S.exam&&!S.exam.done){
+    const ord=S.exam.order[S.exam.i];
+    if(/^[1-9]$/.test(k)&&+k<=ord.length){ACT.xpick(String(ord[+k-1]))}
+    else if(k==="ArrowRight")ACT.xnext(); else if(k==="ArrowLeft")ACT.xprev();
+  }else if(S.tab==="kort"&&K&&K.i<K.ids.length){
+    if(k===" "){ACT.flip();e.preventDefault()}
+  }
+});
+// An exam left running in an old tab: drop it if its questions no longer exist, finish it if time ran out.
+if(S.exam&&S.exam.ids.some(id=>!qById[id])) S.exam=null;
+if(S.exam&&!S.exam.done&&remaining()<=0) finishExam();
+if(!chById[S.les]) S.les="fk";
+render();
+})();
+</script>
+</body>
+</html>
