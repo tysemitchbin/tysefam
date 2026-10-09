@@ -21,7 +21,7 @@ supabase/functions/rwgps/  Wanderlings' Ride with GPS bridge (server code)
 
 | Piece | Where |
 |---|---|
-| Website | **Cloudflare** (`npm run deploy`) → https://wanderlings.tysemitchbin.workers.dev. Also works on GitHub Pages as-is. `.assetsignore` keeps everything except the website files private. |
+| Website | **GitHub Pages** → https://tysemitchbin.github.io/tysefam/. Updates by itself a minute or two after anything lands on `main`. |
 | Sign-in, data | **Supabase** project `bhjyybdztvmpyzynkvje` (Tyse Fam). One email + password works in every tool. |
 | Who's allowed in | The guest list, table `allowed_emails`. Only those emails can create an account. |
 | Shared tool data | Table `family_items` (via `Family.store`). Wanderlings keeps its own tables. |
@@ -37,7 +37,7 @@ Everything uses relative links, so the site works at any address (a domain root 
    { id: 'chore-chart', name: 'Chore Chart', emoji: '🧹',
      description: 'Who does what this week.', color: 'peach' },
    ```
-4. Commit, push, and `npm run deploy`. It appears on the home page and in every tool's ☰ menu.
+4. Get it onto `main`. A minute or two later it's live on the home page and in every tool's ☰ menu.
 
 Tip: add `hidden: true` while you're still building a tool. It works at its URL but stays off the home page.
 
@@ -76,10 +76,6 @@ No emails are ever sent; the guest list decides who can join.)
 
 ## Running it on your computer
 
-```
-npm install
-npm run dev       # http://localhost:3000 (talks to the real Supabase project)
-npm run deploy    # publishes the site to Cloudflare
-```
-
-Without Node, `python3 -m http.server` in this folder works too (then visit http://localhost:8000).
+You don't need to: GitHub Pages publishes the site for you. For a private preview before
+merging, run `node dev-server.js` in this folder and visit http://localhost:3000 (it talks to the
+real Supabase project).

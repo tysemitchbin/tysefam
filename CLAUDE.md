@@ -1,8 +1,8 @@
 # Tyse Fam: notes for Claude
 
-Family website: a hub page plus one folder per tool. Static files only, with no build step or
-bundler (npm is only for the local preview server and `wrangler deploy` to Cloudflare). The owner
-edits files directly, so keep code readable and commented for a non-expert.
+Family website: a hub page plus one folder per tool. Static files only, with no build step,
+bundler or npm. The owner isn't a programmer: never ask them to run terminal commands, and keep
+code readable and commented for a non-expert.
 
 ## Layout
 - `site.js`: `window.SITE`: site name, `people`, `supabase {url,key}`, and the `tools` registry.
@@ -21,8 +21,9 @@ edits files directly, so keep code readable and commented for a non-expert.
   project, same origin).
 
 ## Hosting
-- Cloudflare: `npm run deploy` publishes the repo root; `.assetsignore` lists what must NOT be
-  published. Add new non-website files (scripts, notes, SQL) there.
+- GitHub Pages serves `main` from the repo root at https://tysemitchbin.github.io/tysefam/ and
+  republishes on every push to `main`. The repo is public, so every file in it is public too.
+- Local preview: `node dev-server.js` → http://localhost:3000 (`.claude/launch.json` runs it).
 - Supabase project ref `bhjyybdztvmpyzynkvje` also holds the Zip Phrasers to Krill leaderboard in its
   own `zip` schema. Leave that schema alone.
 
