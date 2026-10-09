@@ -1,62 +1,85 @@
-# Wanderlings 🥚
+# 🏔️ Tyse Fam
 
-A gentle walking game. Every walk recorded in Ride with GPS hatches an egg with a creature inside. Creatures live in a little garden where you can name them and play with them, and they grow the more you walk together.
+Our family website: a home page with a growing collection of little web tools.
+Plain HTML/CSS/JS with no build step.
 
-**Design rules:** any walk counts, the app never mentions pace or calories, the weekly goal is gentle, and nothing is lost by missing a day.
+**Tools so far:** 🥚 [Wanderlings](tools/wanderlings/README.md), a walking game where every walk hatches a creature.
+
+```
+index.html                 home page: lists every tool from site.js
+site.js                    ← site name, Supabase settings, list of tools
+shared/family.css          shared look (colours, cards, buttons, lists…)
+shared/family.js           shared helpers: saving data, sign-in, menu bar
+tools/<tool-id>/           one folder per tool
+tools/wanderlings/         the walking game
+tools/new-tool-template/   starter tool to copy
+supabase/setup.sql         database setup for shared family data
+supabase/functions/rwgps/  Wanderlings' Ride with GPS bridge (server code)
+```
 
 ## How it's hosted
 
-| Piece | Where | What it does |
-|---|---|---|
-| Web app (`public/`) | **Cloudflare** (Pages on Workers, project `wanderlings`) → https://wanderlings.tysemitchbin.workers.dev | The whole UI, a static site (`wrangler.jsonc` serves only `public/`) |
-| Sign-in | **Supabase Auth** (project `Wanderlings`, ref `bhjyybdztvmpyzynkvje`) | Email + password (no emails sent). Only emails in `allowed_emails` can sign up. |
-| Saved game | Supabase table `game_state` | Names, companion, hatched eggs, map eggs. Row-level security: each user sees only their own row. |
-| Walk source | Supabase Edge Function `rwgps` | OAuth with Ride with GPS (the client secret lives only here), fetching walking trips + route shapes |
-| Tokens & route cache | Supabase tables `rwgps_tokens`, `rwgps_polylines`, `oauth_states` | Server-only (RLS on, no policies) |
-
-## One-time setup
-
-1. **Invite people.** Run this in the Supabase SQL editor:
-   ```sql
-   insert into public.allowed_emails (email) values ('her@email.com');
-   ```
-2. **Turn off email confirmation.** Supabase → Authentication → Sign In / Providers → Email → switch off **Confirm email**.
-   Sign-in is email + password and no emails are ever sent, so no SMTP is needed. The guest list still decides who can create an account.
-3. Each person opens the site, taps **First time here? Create a password**, and picks a password.
-4. **Ride with GPS API client** (free; any account can create it, e.g. Mitch's). Log in at ridewithgps.com, open https://ridewithgps.com/api/api_clients, create a client, and add this OAuth redirect URI:
-   `https://bhjyybdztvmpyzynkvje.supabase.co/functions/v1/rwgps/callback`
-5. **Secrets.** Supabase → Edge Functions → Secrets. Add:
-   - `RWGPS_CLIENT_ID`
-   - `RWGPS_CLIENT_SECRET`
-   - optional `RWGPS_API_KEY` (the client's API key; only needed if Ride with GPS asks for it)
-   - optional `START_DATE` (e.g. `2026-09-01`). By default, walks from the last 90 days count.
-6. Ellie installs the free **Ride with GPS** app and records walks with it (activity: Walking — slow trips count anyway). In Wanderlings: ⚙ Settings → **Connect Ride with GPS**. Then add Wanderlings to her home screen.
-
-## Develop & deploy
-
-```
-npm run dev       # http://localhost:3000 (talks to the real Supabase project)
-npm run deploy    # pushes public/ to Cloudflare (wrangler deploy)
-```
-
-The edge function source is in `supabase/functions/rwgps/index.ts`. (Strava was dropped: since June 2026 its API needs a paid subscription.)
-
-## How progression works
-
-| Mechanic | What it rewards |
+| Piece | Where |
 |---|---|
-| Egg per walk | Showing up at all. A 5-minute walk counts. |
-| Creature conditions | Variety: dawn, evening, Sundays, seasons, hills, 45+ min outside |
-| ✨ Stretch walk → golden egg | Walking ~15% past her recent average (5-walk rolling, +0.3 to +1 km). The target rises as she does. |
-| 🗺️ Map eggs | 3 eggs a week placed on real paths around home: nearby, stretch distance and a bit further. Each holds a creature you can only get this way. They last 2 weeks. |
-| Companion growth | The chosen companion grows (Hatchling → Sprout → Grown → Radiant) with every km walked while it's the companion |
-| Garden gifts | Total distance unlocks a pond, tree, bench, lanterns, cottage, rainbow… |
+| Website | **Cloudflare** (`npm run deploy`) → https://wanderlings.tysemitchbin.workers.dev. Also works on GitHub Pages as-is. `.assetsignore` keeps everything except the website files private. |
+| Sign-in, data | **Supabase** project `bhjyybdztvmpyzynkvje` (Tyse Fam). One email + password works in every tool. |
+| Who's allowed in | The guest list, table `allowed_emails`. Only those emails can create an account. |
+| Shared tool data | Table `family_items` (via `Family.store`). Wanderlings keeps its own tables. |
 
-## Files
+Everything uses relative links, so the site works at any address (a domain root or a sub-path like `/tysefam/`).
 
-- `public/creatures.js` — the 26 species, encounter rules, progression maths, placeholder art
-- `public/garden.js` — the living garden scene and creature actions
-- `public/geo.js` — polylines, egg placement (snapped to OpenStreetMap paths), route matching
-- `public/backend.js` / `config.js` — Supabase sign-in, saving, edge-function calls
-- `public/app.js` — UI
-- `CREATURE_PROMPTS.md` — Scenario prompts for real creature art (drop PNGs in `public/art/`)
+## Adding a new tool
+
+1. Copy `tools/new-tool-template/` to `tools/<your-tool-id>/` (lowercase, dashes, e.g. `chore-chart`).
+2. In the new `index.html`, set `TOOL_ID` and `<body data-tool="…">` to that id.
+3. Add it to the `tools` list in `site.js`:
+   ```js
+   { id: 'chore-chart', name: 'Chore Chart', emoji: '🧹',
+     description: 'Who does what this week.', color: 'peach' },
+   ```
+4. Commit, push, and `npm run deploy`. It appears on the home page and in every tool's ☰ menu.
+
+Tip: add `hidden: true` while you're still building a tool. It works at its URL but stays off the home page.
+
+### Saving data in a tool
+
+```js
+const store = Family.store('chore-chart');           // this tool's own data
+
+store.watch('chores', chores => draw(chores));        // { id: item, … }, updates live
+const id = await store.add('chores', { text: 'Bins', done: false });  // adds ts + by
+store.update('chores', id, { done: true });           // change some fields
+store.remove('chores', id);
+store.set('settings', 'main', { theme: 'dark' });     // fixed id, handy for settings
+Family.entries(chores)                                // [id, item] pairs, oldest first
+Family.me()                                           // "Mitch"
+```
+
+The first time someone opens a tool on a device, they sign in (same email and password as
+Wanderlings). After that, changes sync live between everyone's devices.
+
+Tools that outgrow this (big data, files, heavy queries) can have their own Supabase
+tables, like Wanderlings does. Add their SQL to `supabase/`.
+
+## Adding a family member
+
+In Supabase → **SQL Editor**:
+
+```sql
+insert into public.allowed_emails (email, display_name)
+values ('their@email.com', 'Their name');
+```
+
+Then they open the site, pick any tool, and tap **First time? Create a password**.
+("Confirm email" must stay switched off in Supabase → Authentication → Sign In / Providers → Email.
+No emails are ever sent; the guest list decides who can join.)
+
+## Running it on your computer
+
+```
+npm install
+npm run dev       # http://localhost:3000 (talks to the real Supabase project)
+npm run deploy    # publishes the site to Cloudflare
+```
+
+Without Node, `python3 -m http.server` in this folder works too (then visit http://localhost:8000).

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Family Home</title>
+
+<!-- ════════════════════════════════════════════════════════════════
+     FAMILY HOME PAGE — lists every tool from site.js.
+     You shouldn't need to edit this file to add a tool; see README.
+═════════════════════════════════════════════════════════════════ -->
+
+<link rel="stylesheet" href="shared/family.css">
+<style>
+/* header scene */
+.scene{position:relative;height:230px;overflow:hidden;background:linear-gradient(#cfeef2 0%,#e7f5ec 60%,#f3f7e6 100%);}
+.scene svg{position:absolute;inset:0;width:100%;height:100%;}
+.cloud{animation:drift 60s linear infinite;}
+.cloud.b{animation-duration:90s;animation-delay:-30s;}
+@keyframes drift{from{transform:translateX(-120px);}to{transform:translateX(900px);}}
+.title-wrap{position:absolute;left:0;right:0;bottom:18px;text-align:center;z-index:2;padding:0 16px;}
+.title-wrap h1{margin:0;font-size:2.4rem;font-weight:700;color:#fff;letter-spacing:.5px;
+  text-shadow:0 2px 6px rgba(63,94,68,.35);}
+.title-wrap .sub{margin:2px 0 0;color:#fff;font-weight:700;font-size:.95rem;opacity:.95;
+  text-shadow:0 1px 4px rgba(63,94,68,.4);}
+@media(prefers-reduced-motion:reduce){.cloud{animation:none;}}
+
+/* greeting */
+.hello{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:4px 0 18px;}
+.hello h2{margin:0;color:var(--forest);font-size:1.5rem;}
+.hello p{margin:0;color:var(--ink-soft);font-weight:700;}
+
+/* tool cards */
+.tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
+.tool{display:flex;flex-direction:column;gap:10px;background:var(--paper);border:1px solid var(--line);
+  border-radius:var(--r);padding:18px;box-shadow:var(--shadow);color:inherit;text-decoration:none;
+  transition:transform .15s,box-shadow .15s,border-color .15s;}
+.tool:hover,.tool:focus-visible{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:var(--c);outline:none;}
+.tool .ico{width:54px;height:54px;border-radius:16px;display:grid;place-items:center;font-size:1.8rem;background:var(--bg);}
+.tool h3{margin:0;color:var(--forest);font-size:1.2rem;}
+.tool p{margin:0;color:var(--ink-soft);font-size:.92rem;line-height:1.4;flex:1;}
+.tool .go{font-weight:800;font-size:.88rem;color:var(--c);}
+.tool.soon{border-style:dashed;box-shadow:none;background:transparent;justify-content:center;align-items:center;
+  text-align:center;min-height:180px;}
+.tool.soon:hover{transform:none;box-shadow:none;border-color:var(--line);}
+.c-meadow {--c:var(--meadow-deep); --bg:#e3f1df;}
+.c-sky    {--c:#5aa3b5;            --bg:#e2f1f4;}
+.c-peach  {--c:var(--peach-deep);  --bg:#fdeede;}
+.c-blossom{--c:var(--blossom-deep);--bg:#fbe4ec;}
+.c-sun    {--c:var(--sun-deep);    --bg:#fcf3d2;}
+</style>
+</head>
+<body>
+
+<header class="scene">
+  <svg viewBox="0 0 900 230" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+    <circle cx="730" cy="70" r="36" fill="#f7d877"/>
+    <circle cx="730" cy="70" r="50" fill="#f7d877" opacity="0.25"/>
+    <path d="M0 172 L150 92 L260 162 L380 82 L520 167 L650 102 L780 162 L900 112 L900 230 L0 230 Z" fill="#9ec7c9"/>
+    <path d="M150 92 L178 113 L165 115 L150 106 L135 116 L122 113 Z" fill="#fff" opacity=".9"/>
+    <path d="M380 82 L408 104 L394 105 L380 95 L366 106 L352 103 Z" fill="#fff" opacity=".9"/>
+    <path d="M0 192 C140 137 230 192 360 162 C480 134 600 192 740 160 C820 142 880 172 900 162 L900 230 L0 230 Z" fill="#7fa874"/>
+    <path d="M0 230 C120 182 250 220 400 192 C560 162 700 222 900 192 L900 230 Z" fill="#5d8a5f"/>
+    <g fill="#3f5e44">
+      <path d="M70 192 l10 22 l-20 0 Z"/><path d="M70 182 l9 18 l-18 0 Z"/>
+      <path d="M300 200 l11 24 l-22 0 Z"/><path d="M300 189 l10 20 l-20 0 Z"/>
+      <path d="M560 194 l10 22 l-20 0 Z"/><path d="M560 184 l9 18 l-18 0 Z"/>
+    </g>
+    <g class="cloud" fill="#fff" opacity=".85">
+      <ellipse cx="120" cy="48" rx="34" ry="14"/><ellipse cx="150" cy="42" rx="26" ry="13"/><ellipse cx="92" cy="52" rx="22" ry="11"/>
+    </g>
+    <g class="cloud b" fill="#fff" opacity=".7">
+      <ellipse cx="430" cy="74" rx="30" ry="12"/><ellipse cx="458" cy="68" rx="22" ry="11"/>
+    </g>
+  </svg>
+  <div class="title-wrap">
+    <h1 id="siteName">🏔️ Family</h1>
+    <p class="sub" id="siteTag"></p>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hello">
+    <h2 id="greeting">Welcome home 🌿</h2>
+    <p id="today"></p>
+  </div>
+  <div class="tools" id="tools"></div>
+  <div class="foot">Made with <span class="heart">♥</span> for the family</div>
+</main>
+
+<script src="site.js"></script>
+<script src="shared/family.js"></script>
+<script>
+const { site, esc } = Family;
+document.title = site.name;
+document.getElementById('siteName').textContent = '🏔️ ' + site.name + ' 🌸';
+document.getElementById('siteTag').textContent = site.tagline || '';
+
+const h = new Date().getHours();
+const part = h < 5 ? 'Late night' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : h < 22 ? 'Good evening' : 'Late night';
+const people = site.people || [];
+document.getElementById('greeting').textContent = people.length ? `${part}, ${people.join(' & ')} 🌿` : `${part} 🌿`;
+document.getElementById('today').textContent =
+  new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+
+const COLORS = ['meadow', 'sky', 'peach', 'blossom', 'sun'];
+const grid = document.getElementById('tools');
+grid.innerHTML = site.tools.filter(t => !t.hidden).map((t, i) => {
+  const c = COLORS.includes(t.color) ? t.color : COLORS[i % COLORS.length];
+  return `<a class="tool c-${c}" href="tools/${encodeURIComponent(t.id)}/">
+      <div class="ico">${esc(t.emoji || '🧩')}</div>
+      <h3>${esc(t.name)}</h3>
+      <p>${esc(t.description || '')}</p>
+      <span class="go">Open →</span>
+    </a>`;
+}).join('') + `<div class="tool soon"><div class="ico" style="background:#eef0e8">🌱</div>
+    <p style="flex:0">More tools on the way…</p></div>`;
+</script>
+</body>
+</html>

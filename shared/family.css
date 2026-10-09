@@ -1,0 +1,86 @@
+/* ════════════════════════════════════════════════════════════════
+   FAMILY STYLES — the shared look for every page.
+   <link rel="stylesheet" href="../../shared/family.css">
+   Building blocks: .wrap .page-head .hint .card .grid2 .addrow .btn
+                    .list .item .check .del .who-pill .empty .tag
+═════════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap');
+
+:root{
+  --meadow:#7fa874;   --meadow-deep:#5d8a5f;  --forest:#3f5e44;
+  --sky:#bfe0e6;      --sky-deep:#8ec6d4;
+  --peach:#f3b894;    --peach-deep:#e89b6f;
+  --blossom:#f2b6c6;  --blossom-deep:#e592ac;
+  --sun:#f7d877;      --sun-deep:#d9b43f;
+  --cream:#fbf7ee;    --paper:#fffdf7;
+  --ink:#3c4138;      --ink-soft:#6f7468;     --line:#e9e2d2;
+  --shadow:0 6px 20px rgba(80,90,60,.10);
+  --shadow-lg:0 14px 40px rgba(80,90,60,.16);
+  --r:18px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{font-family:'Nunito',system-ui,sans-serif;color:var(--ink);background:var(--cream);
+  -webkit-font-smoothing:antialiased;min-height:100vh;}
+h1,h2,h3,.fred{font-family:'Fredoka',sans-serif;font-weight:600;}
+button{font-family:inherit;cursor:pointer;}
+input,textarea,select{font-family:inherit;font-size:1rem;color:var(--ink);}
+a{color:var(--meadow-deep);}
+
+/* layout */
+.wrap{max-width:980px;margin:0 auto;padding:22px 16px 80px;}
+.page-head{display:flex;align-items:center;gap:10px;margin:2px 0 16px;}
+.page-head h1,.page-head h2{margin:0;font-size:1.65rem;color:var(--forest);}
+.page-head .emoji{font-size:1.7rem;}
+.hint{color:var(--ink-soft);font-size:.92rem;margin:-8px 0 16px;}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);
+  padding:18px;box-shadow:var(--shadow);margin-bottom:18px;}
+.card h3{margin:0 0 12px;color:var(--forest);font-size:1.15rem;display:flex;align-items:center;gap:8px;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+@media(max-width:760px){.grid2{grid-template-columns:1fr;}}
+
+/* inputs & buttons */
+.addrow{display:flex;gap:8px;margin-bottom:14px;}
+.addrow input,.addrow select,.field{flex:1;min-width:0;border:2px solid var(--line);background:#fff;
+  border-radius:12px;padding:10px 12px;outline:none;transition:.15s;}
+.addrow input:focus,.addrow select:focus,.field:focus{border-color:var(--meadow);}
+.btn{border:none;border-radius:12px;padding:10px 16px;font-weight:700;color:#fff;
+  background:var(--meadow);transition:.15s;white-space:nowrap;}
+.btn:hover{background:var(--meadow-deep);}
+.btn:active{transform:scale(.97);}
+.btn.pink{background:var(--blossom-deep);}
+.btn.peach{background:var(--peach-deep);}
+.btn.sky{background:var(--sky-deep);}
+.btn.pink:hover,.btn.peach:hover,.btn.sky:hover{filter:brightness(.95);}
+.btn.ghost{background:#fff;color:var(--forest);border:2px solid var(--line);}
+.btn.ghost:hover{border-color:var(--meadow);background:#fff;}
+.btn.sm{padding:6px 12px;font-size:.85rem;}
+
+/* checklists */
+ul.list{list-style:none;margin:0;padding:0;}
+.item{display:flex;align-items:flex-start;gap:11px;padding:11px 4px;border-bottom:1px dashed var(--line);}
+.item:last-child{border-bottom:none;}
+.item .txt{flex:1;min-width:0;line-height:1.3;word-break:break-word;}
+.item.done .txt{text-decoration:line-through;color:var(--ink-soft);}
+.check{flex:0 0 auto;width:24px;height:24px;border-radius:8px;border:2px solid var(--meadow);
+  background:#fff;cursor:pointer;display:grid;place-items:center;margin-top:1px;transition:.15s;}
+.check:hover{background:#eef6ea;}
+.check.done{background:var(--meadow);border-color:var(--meadow);}
+.check.done::after{content:"✓";color:#fff;font-weight:800;font-size:.85rem;}
+.del{flex:0 0 auto;border:none;background:none;color:#c9b9a6;font-size:1.15rem;line-height:1;
+  padding:2px 4px;border-radius:8px;transition:.15s;}
+.del:hover{color:var(--blossom-deep);background:#fdeef2;}
+.meta{font-size:.74rem;color:var(--ink-soft);font-weight:700;}
+.who-pill{display:inline-block;font-size:.68rem;font-weight:800;padding:1px 7px;border-radius:999px;
+  margin-left:6px;vertical-align:middle;background:#eef0e8;color:var(--ink-soft);}
+.empty{text-align:center;color:var(--ink-soft);padding:22px 8px;font-style:italic;}
+.empty .big{font-size:2rem;display:block;margin-bottom:6px;font-style:normal;}
+.tag{font-size:.72rem;font-weight:800;padding:3px 9px;border-radius:999px;background:#e3f1df;color:var(--meadow-deep);}
+
+/* sync status badge — Family pages set .ok (cloud) or .local */
+.badge{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:.8rem;padding:6px 12px;border-radius:999px;}
+.badge.ok{background:#e3f1df;color:var(--meadow-deep);}
+.badge.local{background:#fdeede;color:var(--peach-deep);}
+
+.foot{text-align:center;color:var(--ink-soft);font-size:.82rem;padding:24px 12px 8px;}
+.foot .heart{color:var(--blossom-deep);}

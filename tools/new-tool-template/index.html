@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>New Tool</title>
+
+<!-- ════════════════════════════════════════════════════════════════
+     NEW TOOL TEMPLATE — copy this whole folder to start a new tool.
+
+       1. Copy  tools/new-tool-template/  →  tools/<your-tool-id>/
+       2. Set TOOL_ID below and data-tool on <body> to that same id.
+       3. Add the tool to the list in /site.js.
+
+     This page is a tiny working example (a shared checklist) showing
+     how to save data that syncs between everyone's devices.
+═════════════════════════════════════════════════════════════════ -->
+
+<link rel="stylesheet" href="../../shared/family.css">
+<style>
+/* styles just for this tool go here */
+</style>
+</head>
+<body data-tool="new-tool-template">
+
+<main class="wrap">
+  <div class="page-head">
+    <span class="emoji">🧪</span><h1>New Tool</h1>
+    <span style="flex:1"></span>
+    <span id="sync" class="badge local">…</span>
+  </div>
+  <p class="hint">A starter page. Replace this with your tool!</p>
+
+  <div class="card">
+    <h3>📝 Shared checklist</h3>
+    <div class="addrow">
+      <input id="newItem" placeholder="Add something…" />
+      <button class="btn" id="addBtn">Add</button>
+    </div>
+    <ul class="list" id="list"></ul>
+  </div>
+</main>
+
+<script src="../../site.js"></script>
+<script src="../../shared/family.js"></script>
+<script>
+const TOOL_ID = 'new-tool-template';        // ← change to your folder name
+const store = Family.store(TOOL_ID);        // this tool's own saved data
+const $ = s => document.querySelector(s);
+
+// Show whether we're syncing between devices or saving on this one only.
+store.ready.then(() => {
+  const cloud = store.mode === 'cloud';
+  $('#sync').className = 'badge ' + (cloud ? 'ok' : 'local');
+  $('#sync').textContent = cloud ? '☁️ Synced' : '📴 This device only';
+});
+
+// Re-draw the list whenever anyone changes it, on any device.
+store.watch('items', items => {
+  const ul = $('#list');
+  const rows = Family.entries(items);        // [id, item] pairs, oldest first
+  if (!rows.length) { ul.innerHTML = '<div class="empty"><span class="big">🌱</span>Nothing here yet.</div>'; return; }
+  ul.innerHTML = rows.map(([id, it]) => `
+    <li class="item${it.done ? ' done' : ''}" data-id="${id}">
+      <div class="check${it.done ? ' done' : ''}"></div>
+      <div class="txt">${Family.esc(it.text)}<span class="who-pill">${Family.esc(it.by)}</span></div>
+      <button class="del" title="Remove">🗑</button>
+    </li>`).join('');
+  ul.querySelectorAll('.item').forEach(li => {
+    const id = li.dataset.id;
+    li.querySelector('.check').onclick = () => store.update('items', id, { done: !items[id].done });
+    li.querySelector('.del').onclick = () => store.remove('items', id);
+  });
+});
+
+function addItem() {
+  const text = $('#newItem').value.trim();
+  if (!text) return;
+  store.add('items', { text, done: false });   // adds ts + by automatically
+  $('#newItem').value = '';
+  $('#newItem').focus();
+}
+$('#addBtn').onclick = addItem;
+$('#newItem').addEventListener('keydown', e => { if (e.key === 'Enter') addItem(); });
+</script>
+</body>
+</html>

@@ -658,7 +658,7 @@ function wireEvents() {
       case 'disconnect': await api('disconnect', { method: 'POST' }); closeSheet(); return sync();
       case 'connect-rwgps': {
         t.disabled = true;
-        try { location.href = (await api('authorize', { method: 'POST' })).url; }
+        try { location.href = (await api('authorize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ returnTo: location.origin + location.pathname }) })).url; }
         catch (err) { t.disabled = false; toast(`Couldn’t start Ride with GPS sign-in: ${err.message}`); }
         return;
       }

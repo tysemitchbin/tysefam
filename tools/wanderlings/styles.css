@@ -37,6 +37,7 @@ p { margin: .4em 0; }
 .top-actions { display: flex; gap: 6px; }
 .icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--card); box-shadow: var(--shadow); font-size: 18px; }
 .icon-btn.spinning { animation: spin 1s linear infinite; }
+a.icon-btn { display: grid; place-items: center; text-decoration: none; }
 .demo-banner { margin: 0 16px 8px; padding: 8px 12px; border-radius: 12px; background: #fff3d0; font-size: 14px; }
 .link { background: none; border: 0; padding: 0; text-decoration: underline; font-weight: 700; }
 

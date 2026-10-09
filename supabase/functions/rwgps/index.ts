@@ -143,13 +143,28 @@ async function canView(viewer: { email?: string }, owner: string) {
   return Boolean(share);
 }
 
-function allowedReturn(origin: string | null) {
+// Where to send the browser back to after Ride with GPS. The app may say which
+// page it's on (e.g. /tysefam/tools/wanderlings/); it must be on the calling site.
+function allowedReturn(origin: string | null, page?: unknown) {
   if (!origin) return null;
   try {
     const u = new URL(origin);
-    if (u.protocol === 'https:' || u.hostname === 'localhost' || u.hostname === '127.0.0.1') return u.origin;
+    if (u.protocol !== 'https:' && u.hostname !== 'localhost' && u.hostname !== '127.0.0.1') return null;
+    if (typeof page === 'string' && URL.canParse(page)) {
+      const p = new URL(page);
+      if (p.origin === u.origin) return p.origin + p.pathname;
+    }
+    return u.origin;
   } catch { /* fall through */ }
   return null;
+}
+
+// Back to the app, with ?rwgps=<result> so it can say what happened.
+function backTo(returnTo: string, result: string) {
+  const u = new URL(returnTo);
+  u.search = '';
+  u.searchParams.set('rwgps', result);
+  return redirect(u.href);
 }
 
 Deno.serve(async (req) => {
@@ -165,13 +180,13 @@ Deno.serve(async (req) => {
       if (!s || Date.now() - new Date(s.created_at).getTime() > 15 * 60e3) {
         return new Response('This sign-in link has expired. Please go back to Wanderlings and connect again.', { status: 400 });
       }
-      if (url.searchParams.get('error') || !url.searchParams.get('code')) return redirect(`${s.return_to}/?rwgps=denied`);
+      if (url.searchParams.get('error') || !url.searchParams.get('code')) return backTo(s.return_to, 'denied');
       const t = await tokenRequest({ grant_type: 'authorization_code', code: url.searchParams.get('code')!, redirect_uri: REDIRECT_URI });
       await db.from('rwgps_tokens').upsert({
         user_id: s.user_id, access_token: t.access_token, refresh_token: t.refresh_token ?? null,
         expires_at: expiresAt(t), rwgps_user_id: t.user_id ?? null, updated_at: new Date().toISOString(),
       });
-      return redirect(`${s.return_to}/?rwgps=connected`);
+      return backTo(s.return_to, 'connected');
     }
 
     const user = await currentUser(req);
@@ -185,7 +200,8 @@ Deno.serve(async (req) => {
 
     if (route === 'authorize' && req.method === 'POST') {
       if (!configured) return json({ error: 'not_configured' }, 500);
-      const returnTo = allowedReturn(req.headers.get('Origin'));
+      const body = await req.json().catch(() => null);
+      const returnTo = allowedReturn(req.headers.get('Origin'), body?.returnTo);
       if (!returnTo) return json({ error: 'bad_origin' }, 400);
       const state = crypto.randomUUID();
       await db.from('oauth_states').delete().lt('created_at', new Date(Date.now() - 3600e3).toISOString());

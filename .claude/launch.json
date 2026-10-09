@@ -2,9 +2,11 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "wanderlings",
+      "name": "tysefam",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["dev-server.js"],
+      "runtimeArgs": [
+        "dev-server.js"
+      ],
       "port": 3000
     }
   ]
