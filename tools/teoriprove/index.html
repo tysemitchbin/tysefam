@@ -308,7 +308,8 @@ const CHEAT=[
   ["÷ 3,6","km/t → meter per sekund (reaksjonslengde på 1 sek)","km/h → metres per second (reaction distance in 1 s)"],
   ["2× fart = 4×","bremselengde og bevegelsesenergi","braking distance and kinetic energy"],
   ["5 m","ikke stans nærmere kryss, planovergang eller foran gangfelt","no stopping closer to junctions, level crossings or before crossings"],
-  ["20 m","ikke parker nærmere skiltet for bussholdeplass","no parking closer to a bus stop sign"],
+  ["20 m","ikke stans nærmere skiltet for bussholdeplass (kort av- og påstigning er lov)","no stopping closer to a bus stop sign (quick drop-off allowed)"],
+  ["50 km/t","over dette: parkering forbudt på kjørebanen på forkjørsveg","above this: no parking on the carriageway of a priority road"],
   ["60 km/t","på slike veger har du vikeplikt for buss som kjører ut fra holdeplass","on roads up to this limit, give way to buses leaving a stop"],
   ["150 m","varseltrekant bak bilen, om mulig","warning triangle behind the car, if possible"],
   ["16 · 25 + 5","øvingskjøring fra 16 år · ledsager minst 25 år med 5 års førerkort","practice from 16 · supervisor at least 25 with 5 years' licence"],
@@ -354,7 +355,7 @@ function viewPlan(){
   h+='</section>';
   h+='<section class="scard"><div class="eyebrow">'+t("Huskeliste","Cheat sheet")+'</div><h3 style="font-size:1.3rem;margin:4px 0 12px">'+t("Tall som går igjen","Numbers worth knowing")+'</h3><div class="tbl-wrap"><table><thead><tr><th>'+t("Tall","Number")+'</th><th>'+t("Betyr","Means")+'</th></tr></thead><tbody>'+
     CHEAT.map(r=>'<tr><td class="k">'+r[0]+'</td><td>'+bi(r[1],r[2])+'</td></tr>').join("")+'</tbody></table></div></section>';
-  h+='<p class="foot">'+bi("Kilder: Statens vegvesens læreplan V851 (gyldig fra 1.2.2026) og vegtrafikkloven (fulltekst, sist endret 1.7.2026). Øvrige regler, som trafikkreglene og skiltforskriften, er sjekket mot Lovdata og vegvesen.no via søkemotor i oktober 2026, ikke lest i sin helhet. Laget for egen øving. Reglene kan endre seg, så sjekk alltid ","Sources: Statens vegvesen curriculum V851 (valid from 1 Feb 2026) and the Road Traffic Act (full text, last amended 1 Jul 2026). Other rules, such as the traffic rules and sign regulations, were checked against Lovdata and vegvesen.no via search engine in October 2026, not read in full. Made for personal study. Rules can change, so always check ")+
+  h+='<p class="foot">'+bi("Kilder: Statens vegvesens læreplan V851 (gyldig fra 1.2.2026) vegtrafikkloven (fulltekst, sist endret 1.7.2026) og trafikkreglene (fulltekst, sist endret 1.7.2022). Øvrige regler, som skiltforskriften, er sjekket mot Lovdata og vegvesen.no via søkemotor i oktober 2026, ikke lest i sin helhet. Laget for egen øving. Reglene kan endre seg, så sjekk alltid ","Sources: Statens vegvesen curriculum V851 (valid from 1 Feb 2026) the Road Traffic Act (full text, last amended 1 Jul 2026) and the traffic rules (full text, last amended 1 Jul 2022). Other rules, such as the sign regulations, were checked against Lovdata and vegvesen.no via search engine in October 2026, not read in full. Made for personal study. Rules can change, so always check ")+
     '<a href="https://www.vegvesen.no/" target="_blank" rel="noopener">vegvesen.no</a> '+t("og","and")+' <a href="https://lovdata.no/dokument/SF/forskrift/1986-03-21-747" target="_blank" rel="noopener">'+t("trafikkreglene på Lovdata","the traffic rules on Lovdata")+'</a>.</p>';
   return h;
 }
