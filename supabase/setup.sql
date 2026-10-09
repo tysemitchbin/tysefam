@@ -1,38 +1,68 @@
 -- ════════════════════════════════════════════════════════════════
---  TYSE FAM — Supabase setup. Run once in Supabase → SQL Editor.
---  Safe to run again: everything is "if not exists" / "or replace".
+--  TYSE FAM — Supabase setup for the family site's shared data.
+--  Run in Supabase → SQL Editor. Safe to run again.
 --
---  • family_members  who's allowed in (one row per family account)
+--  • allowed_emails  the family guest list (shared with Wanderlings).
+--                    Only these emails can create an account.
 --  • family_items    every tool's data: tool → collection → item (JSON)
---  Only signed-in family members can read or change anything.
+--  Only signed-in people on the guest list can read or change anything.
+--  Wanderlings' own tables (game_state, garden_shares, rwgps_*) are separate.
 -- ════════════════════════════════════════════════════════════════
 
--- Who's in the family. Rows point at real accounts (not just an email
--- string), so nobody can get in by signing up with someone else's address.
-create table if not exists public.family_members (
-  user_id  uuid primary key references auth.users(id) on delete cascade,
-  name     text not null,
-  added_at timestamptz not null default now()
+-- The guest list. (Wanderlings created it first; this only fills in what's missing.)
+create table if not exists public.allowed_emails (
+  email text primary key check (email = lower(email))
 );
-alter table public.family_members enable row level security;
+alter table public.allowed_emails add column if not exists display_name text;
+alter table public.allowed_emails enable row level security;
+-- no policies: only the SQL Editor / server code can read or change it
 
--- "Is the person making this request in the family?"  Used by every rule below.
--- security definer so it can read family_members without tripping its own rules.
+-- Block sign-ups from anyone not on the guest list (skipped if it already exists).
+do $$ begin
+  if not exists (select 1 from pg_proc where proname = 'enforce_email_allowlist' and pronamespace = 'public'::regnamespace) then
+    create function public.enforce_email_allowlist()
+    returns trigger language plpgsql security definer set search_path = '' as $f$
+    begin
+      if not exists (select 1 from public.allowed_emails a where a.email = lower(new.email)) then
+        raise exception 'This email is not invited';
+      end if;
+      return new;
+    end; $f$;
+    revoke execute on function public.enforce_email_allowlist() from public, anon, authenticated;
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = 'enforce_email_allowlist' and tgrelid = 'auth.users'::regclass) then
+    create trigger enforce_email_allowlist before insert on auth.users
+      for each row execute function public.enforce_email_allowlist();
+  end if;
+end $$;
+
+-- "Is the person making this request on the guest list?"  Used by every rule below.
+-- security definer so it can read allowed_emails, which signed-in users can't.
 create or replace function public.is_family()
 returns boolean
 language sql stable security definer
 set search_path = ''
 as $$
-  select exists (select 1 from public.family_members where user_id = (select auth.uid()));
+  select exists (
+    select 1 from public.allowed_emails
+    where email = lower((select auth.jwt() ->> 'email'))
+  );
 $$;
 revoke all on function public.is_family() from public, anon;
 grant execute on function public.is_family() to authenticated;
 
-drop policy if exists "family sees family" on public.family_members;
-create policy "family sees family" on public.family_members
-  for select to authenticated
-  using (user_id = (select auth.uid()) or (select public.is_family()));
--- No insert/update/delete policies: members are added by you in the SQL Editor (see bottom).
+-- The signed-in person's name on the site (null if they're not on the guest list).
+create or replace function public.family_whoami()
+returns text
+language sql stable security definer
+set search_path = ''
+as $$
+  select coalesce(display_name, split_part(email, '@', 1))
+  from public.allowed_emails
+  where email = lower((select auth.jwt() ->> 'email'));
+$$;
+revoke all on function public.family_whoami() from public, anon;
+grant execute on function public.family_whoami() to authenticated;
 
 -- Every tool's saved data.
 create table if not exists public.family_items (
@@ -71,13 +101,11 @@ exception when duplicate_object then null; end $$;
 
 
 -- ════════════════════════════════════════════════════════════════
---  ADDING A FAMILY MEMBER  (run this part separately, any time)
---  1. They open any tool on the site → "First time? Create account".
---  2. You run this, with their email and the name to show on the site:
+--  ADDING A FAMILY MEMBER  (run this part on its own, any time)
 --
---  insert into public.family_members (user_id, name)
---  select id, 'Mitch' from auth.users where email = 'their@email.com'
---  on conflict (user_id) do update set name = excluded.name;
+--  insert into public.allowed_emails (email, display_name)
+--  values ('their@email.com', 'Their name')
+--  on conflict (email) do update set display_name = excluded.display_name;
 --
---  3. They tap "I've been added". Done.
+--  Then they open any tool → "First time? Create a password".
 -- ════════════════════════════════════════════════════════════════

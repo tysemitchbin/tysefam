@@ -1,8 +1,8 @@
 # Tyse Fam: notes for Claude
 
-Family website on GitHub Pages: a hub page plus one folder per tool. Static files only, with no
-build step, bundler or npm. The owner edits files directly, so keep code readable and commented
-for a non-expert.
+Family website: a hub page plus one folder per tool. Static files only, with no build step or
+bundler (npm is only for the local preview server and `wrangler deploy` to Cloudflare). The owner
+edits files directly, so keep code readable and commented for a non-expert.
 
 ## Layout
 - `site.js`: `window.SITE`: site name, `people`, `supabase {url,key}`, and the `tools` registry.
@@ -12,8 +12,19 @@ for a non-expert.
 - `shared/family.css`: design tokens (`--meadow`, `--forest`, `--cream`…) and components
   (`.wrap .card .addrow .btn .list .item .check .del .who-pill .empty .badge`).
 - `tools/<id>/index.html`: each tool is self-contained. Start from `tools/new-tool-template/`.
-- `supabase/setup.sql`: idempotent schema: `family_members` (allowlist by `user_id`) and
-  `family_items(tool, collection, data jsonb)` with RLS via `public.is_family()`, plus realtime.
+- `supabase/setup.sql`: idempotent schema: the guest list `allowed_emails(email, display_name)`
+  (sign-ups are blocked for emails not on it), `family_items(tool, collection, data jsonb)` with RLS
+  via `public.is_family()`, `family_whoami()` for the display name, plus realtime.
+- `tools/wanderlings/`: the walking game. It has its own Supabase code (`backend.js`) and tables
+  (`game_state`, `garden_shares`, `rwgps_*`) and the `rwgps` edge function in
+  `supabase/functions/rwgps/`. It shares the sign-in session with the rest of the site (same
+  project, same origin).
+
+## Hosting
+- Cloudflare: `npm run deploy` publishes the repo root; `.assetsignore` lists what must NOT be
+  published. Add new non-website files (scripts, notes, SQL) there.
+- Supabase project ref `bhjyybdztvmpyzynkvje` also holds the Zip Phrasers to Krill leaderboard in its
+  own `zip` schema. Leave that schema alone.
 
 ## Adding a tool
 1. Copy the template folder; set `TOOL_ID` and `data-tool` to the folder name.
@@ -21,8 +32,8 @@ for a non-expert.
 3. Use `Family.store(TOOL_ID)` for data: `watch/add/update/set/remove/get(collection, …)`.
    Items are plain JSON objects; `add` stamps `ts` and `by`. Always `Family.esc()` user text
    before putting it in `innerHTML`.
-4. Link shared files relatively (`../../site.js`, `../../shared/…`). The site is served from a
-   sub-path (`/tysefam/`), so never use root-absolute `/…` URLs.
+4. Link shared files relatively (`../../site.js`, `../../shared/…`). The site may be served from a
+   sub-path (e.g. GitHub Pages' `/tysefam/`), so never use root-absolute `/…` URLs.
 
 ## Conventions
 - Match the existing look: Fredoka headings, Nunito body, soft cards, emoji icons, works at phone width.

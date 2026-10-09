@@ -1,0 +1,16 @@
+# Files Cloudflare should NOT publish (everything else in the repo is the website).
+.git
+.github
+.claude
+.wrangler
+node_modules
+supabase
+package.json
+package-lock.json
+wrangler.jsonc
+dev-server.js
+.gitignore
+.nojekyll
+.dev.vars*
+.env*
+*.md

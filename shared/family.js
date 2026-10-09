@@ -66,11 +66,23 @@
     return clientPromise;
   }
 
+  /* Who's signed in, and are they on the family guest list (public.allowed_emails)? */
   async function lookupMember(sb) {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
-    const { data } = await sb.from('family_members').select('user_id,name').eq('user_id', user.id).maybeSingle();
-    return data ? data : { notMember: true, email: user.email, id: user.id };
+    const { data: name, error } = await sb.rpc('family_whoami');
+    if (error) console.error('Family: could not check the guest list', error);
+    return name ? { user_id: user.id, name } : { notMember: true, email: user.email, id: user.id };
+  }
+  // Supabase's error messages, in plain words.
+  function friendly(err) {
+    const m = String((err && err.message) || err);
+    return /database error|not invited/i.test(m) ? 'That email isn\u2019t on the family guest list yet.'
+      : /already registered/i.test(m) ? 'You already have an account. Sign in instead.'
+      : /invalid login/i.test(m) ? 'Email or password didn\u2019t match.'
+      : /password should be/i.test(m) ? 'Please use at least 6 characters.'
+      : /rate|too many/i.test(m) ? 'Too many tries. Wait a minute and try again.'
+      : m;
   }
 
   /* Shows the sign-in card until a family member is signed in. */
@@ -82,8 +94,8 @@
       const showNotMember = m => {
         ui.box.innerHTML = `
           <h2>Almost there 🌱</h2>
-          <p>You're signed in as <b>${esc(m.email)}</b>, but this account isn't on the family list yet.</p>
-          <p>Ask whoever runs the site to add you. They'll need this:</p>
+          <p>You're signed in as <b>${esc(m.email)}</b>, but this email isn't on the family guest list.</p>
+          <p>Ask whoever runs the site to add it. They'll need this:</p>
           <code>${esc(m.email)}</code>
           <div class="fam-acts"><button class="fam-btn ghost" data-act="retry">I've been added</button>
           <button class="fam-btn ghost" data-act="out">Sign out</button></div>`;
@@ -99,31 +111,32 @@
       const showForm = (msg = '') => {
         ui.box.innerHTML = `
           <h2>🏔️ ${esc(SITE.name)}</h2>
-          <p>Sign in to see the family's stuff. You'll only need to do this once on each device.</p>
+          <p>Sign in to see the family's stuff. It's the same email and password as Wanderlings, and you only need to do it once on each device.</p>
           <form>
             <label>Email<input type="email" name="email" autocomplete="email" required></label>
             <label>Password<input type="password" name="password" autocomplete="current-password" required minlength="6"></label>
             <p class="fam-msg">${msg}</p>
             <div class="fam-acts">
               <button class="fam-btn" type="submit">Sign in</button>
-              <button class="fam-btn ghost" type="button" data-act="new">First time? Create account</button>
+              <button class="fam-btn ghost" type="button" data-act="new">First time? Create a password</button>
             </div>
           </form>`;
         const f = ui.box.querySelector('form');
         const say = t => { f.querySelector('.fam-msg').textContent = t; };
+        const email = () => f.email.value.trim().toLowerCase();
         f.onsubmit = async e => {
           e.preventDefault();
           say('Signing in…');
-          const { error } = await sb.auth.signInWithPassword({ email: f.email.value.trim(), password: f.password.value });
-          if (error) return say(error.message);
+          const { error } = await sb.auth.signInWithPassword({ email: email(), password: f.password.value });
+          if (error) return say(friendly(error));
           check();
         };
         f.querySelector('[data-act=new]').onclick = async () => {
           if (!f.reportValidity()) return;
           say('Creating your account…');
-          const { data, error } = await sb.auth.signUp({ email: f.email.value.trim(), password: f.password.value });
-          if (error) return say(error.message);
-          if (!data.session) return say('Check your email to confirm your account, then sign in here.');
+          const { data, error } = await sb.auth.signUp({ email: email(), password: f.password.value });
+          if (error) return say(friendly(error));
+          if (!data.session) return say('Almost! "Confirm email" is still switched on in Supabase (see README).');
           check();
         };
       };

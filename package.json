@@ -1,0 +1,13 @@
+{
+  "name": "tysefam",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Tyse Fam: the family website and its tools (Wanderlings and more).",
+  "scripts": {
+    "dev": "node dev-server.js",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.149.0"
+  }
+}

@@ -13,13 +13,12 @@ window.SITE = {
   // Used for the greeting on the home page.
   people: ['Mitch', 'Ellie'],
 
-  /* Where family data is saved. Leave blank to save in each browser only.
-     To connect: see "Connecting Supabase" in README.md. Both values come from
-     Supabase → Project Settings → API. The publishable (anon) key is meant to be
-     public; the family sign-in + database rules are what keep data private. */
+  /* Where family data is saved (Supabase project "Tyse Fam"). Shared by every tool.
+     Both values are meant to be public: the guest list + database rules are what
+     keep data private. Blank them out to save in each browser only. */
   supabase: {
-    url: '',   // e.g. 'https://abcdefgh.supabase.co'
-    key: ''    // e.g. 'sb_publishable_…'
+    url: 'https://bhjyybdztvmpyzynkvje.supabase.co',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoanl5YmR6dHZtcHl6eW5rdmplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1MzQ3MTcsImV4cCI6MjEwNzExMDcxN30.qjm845xs5RRwTN_wYzSVp4WOsyMBns0F20oxT64-1oc'
   },
 
   /* Every tool on the site, in the order they appear on the home page.
@@ -30,6 +29,13 @@ window.SITE = {
        color       meadow | sky | peach | blossom | sun
        hidden      true = keep it off the home page (e.g. while building it) */
   tools: [
+    {
+      id: 'wanderlings',
+      name: 'Wanderlings',
+      emoji: '🥚',
+      description: 'Every walk hatches an egg. Collect creatures, grow a garden, and wander a little further.',
+      color: 'blossom'
+    },
     {
       id: 'new-tool-template',
       name: 'New Tool Template',
