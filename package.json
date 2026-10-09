@@ -1,0 +1,14 @@
+{
+  "name": "wanderlings",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Collect cute creatures by going for walks (Strava-powered).",
+  "scripts": {
+    "dev": "node dev-server.js",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "^4.149.0"
+  }
+}
