@@ -301,7 +301,8 @@ const DAYS=[
 const CHEAT=[
   ["45 · 90 · 7","spørsmål · minutter · høyst feil på teoriprøven","questions · minutes · max mistakes on the theory test"],
   ["50 / 80","km/t i / utenfor tettbygd strøk når ikke annet er skiltet","km/h inside / outside built-up areas unless signed"],
-  ["0,2","promillegrense","blood alcohol limit (per mille)"],
+  ["0,2 / 0,1","promillegrense i blodet / mg per liter utåndingsluft","alcohol limit: per mille in blood / mg per litre of breath"],
+  ["0,5 · 1,2","promille: over 0,5 = fengsel mulig og minst 1 års tap av førerrett · over 1,2 = ubetinget fengsel","per mille: over 0.5 = possible prison and at least 1 year without a licence · over 1.2 = actual prison"],
   ["6 timer","ingen alkohol etter kjøring hvis du kan regne med politietterforskning","no alcohol after driving if you can expect a police investigation"],
   ["3 sek","minste avstand til bilen foran i gode forhold","minimum gap to the car ahead in good conditions"],
   ["÷ 3,6","km/t → meter per sekund (reaksjonslengde på 1 sek)","km/h → metres per second (reaction distance in 1 s)"],
@@ -353,7 +354,7 @@ function viewPlan(){
   h+='</section>';
   h+='<section class="scard"><div class="eyebrow">'+t("Huskeliste","Cheat sheet")+'</div><h3 style="font-size:1.3rem;margin:4px 0 12px">'+t("Tall som går igjen","Numbers worth knowing")+'</h3><div class="tbl-wrap"><table><thead><tr><th>'+t("Tall","Number")+'</th><th>'+t("Betyr","Means")+'</th></tr></thead><tbody>'+
     CHEAT.map(r=>'<tr><td class="k">'+r[0]+'</td><td>'+bi(r[1],r[2])+'</td></tr>').join("")+'</tbody></table></div></section>';
-  h+='<p class="foot">'+bi("Kilder: Statens vegvesens læreplan V851 (gyldig fra 1.2.2026). Reglene er sjekket mot Lovdata og vegvesen.no via søkemotor i oktober 2026, ikke lest i sin helhet. Laget for egen øving. Reglene kan endre seg, så sjekk alltid ","Sources: Statens vegvesen curriculum V851 (valid from 1 Feb 2026). The rules were checked against Lovdata and vegvesen.no via search engine in October 2026, not read in full. Made for personal study. Rules can change, so always check ")+
+  h+='<p class="foot">'+bi("Kilder: Statens vegvesens læreplan V851 (gyldig fra 1.2.2026) og vegtrafikkloven (fulltekst, sist endret 1.7.2026). Øvrige regler, som trafikkreglene og skiltforskriften, er sjekket mot Lovdata og vegvesen.no via søkemotor i oktober 2026, ikke lest i sin helhet. Laget for egen øving. Reglene kan endre seg, så sjekk alltid ","Sources: Statens vegvesen curriculum V851 (valid from 1 Feb 2026) and the Road Traffic Act (full text, last amended 1 Jul 2026). Other rules, such as the traffic rules and sign regulations, were checked against Lovdata and vegvesen.no via search engine in October 2026, not read in full. Made for personal study. Rules can change, so always check ")+
     '<a href="https://www.vegvesen.no/" target="_blank" rel="noopener">vegvesen.no</a> '+t("og","and")+' <a href="https://lovdata.no/dokument/SF/forskrift/1986-03-21-747" target="_blank" rel="noopener">'+t("trafikkreglene på Lovdata","the traffic rules on Lovdata")+'</a>.</p>';
   return h;
 }
