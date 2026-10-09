@@ -28,8 +28,12 @@ const niceDate = s => parseLocal(s).toLocaleDateString(undefined, { weekday: 'sh
 let saved = { settings: { unit: 'mi', weeklyGoal: 2 }, buckets: {} };
 let saveTimer;
 async function loadSaved() {
-  try { const s = await loadState(); if (s?.settings) return saved = s; } catch {}
-  try { const s = JSON.parse(localStorage.getItem('wanderlings') || 'null'); if (s?.settings) saved = s; } catch {}
+  let s = null;
+  try { s = await loadState(); } catch {}
+  if (!s?.settings) try { s = JSON.parse(localStorage.getItem('wanderlings') || 'null'); } catch {}
+  if (s?.settings) saved = s;
+  // Older versions had a pretend "demo" garden. It's gone now, so forget its progress.
+  if (saved.buckets?.demo) { delete saved.buckets.demo; persist(); }
 }
 function persist() {
   if (app.viewing) return; // someone else's garden: look, don't touch
@@ -37,8 +41,10 @@ function persist() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => saveState(saved).catch(err => console.warn('save failed', err)), 400);
 }
+// Her progress: names, hatched eggs, companions, map eggs. There's only one
+// garden, built from her real Ride with GPS walks.
 function prog() {
-  return saved.buckets[app.mode] ||= { names: {}, love: {}, seen: [], companions: [], mapEggs: [], home: null, extraWalks: [], initialized: false };
+  return saved.buckets.live ||= { names: {}, love: {}, seen: [], companions: [], mapEggs: [], home: null, initialized: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -49,26 +55,6 @@ function fmtDist(km, unit = saved.settings.unit) {
   return `${v < 10 ? v.toFixed(1).replace(/\.0$/, '') : Math.round(v)} ${unit}`;
 }
 const fmtMin = m => m < 60 ? `${Math.round(m)} min` : `${Math.floor(m / 60)}h ${pad(Math.round(m % 60))}m`;
-
-// ---------------------------------------------------------------------------
-// Demo data so the app is explorable before Ride with GPS is connected.
-
-const DEMO_HOME = [45.5212, -122.6268];
-function demoWalks() {
-  const spec = [
-    [40, 9, 0.8, 18, 5, 'First walk with the stroller'], [37, 13, 1.0, 22, 8], [34, 18, 1.1, 25, 12], [30, 7, 1.3, 28, 10],
-    [27, 12, 1.2, 26, 30], [24, 10, 1.6, 34, 14], [22, 19, 1.5, 32, 6], [20, 11, 1.8, 38, 20], [16, 8, 2.0, 42, 18, 'Stroller loop round the park'],
-    [13, 12, 2.2, 47, 35], [10, 17, 2.1, 44, 12], [6, 9, 2.6, 52, 28], [3, 12, 2.4, 50, 15], [1, 18, 2.9, 58, 40],
-  ];
-  const label = h => h < 12 ? 'Morning Walk' : h < 17 ? 'Afternoon Walk' : h < 20 ? 'Evening Walk' : 'Night Walk';
-  return spec.map(([ago, hour, km, min, elev, name], i) => {
-    const d = new Date(); d.setDate(d.getDate() - ago); d.setHours(hour, (i * 17) % 60, 0, 0);
-    // a wobbly loop that starts and ends at home
-    const r = km / (2 * Math.PI), dir = i * 2.1, centre = offset(DEMO_HOME, r, dir);
-    const points = Array.from({ length: 25 }, (_, k) => offset(centre, r * (1 + 0.15 * Math.sin(k * 1.7 + i)), dir + Math.PI + (k / 24) * Math.PI * 2));
-    return { id: `demo-${i}`, name: name || label(hour), start: localISO(d), distance: km * 1000, movingTime: min * 60, elevation: elev, points };
-  });
-}
 
 // ---------------------------------------------------------------------------
 // The game is *derived* from her walk history every time, so it's always
@@ -139,14 +125,15 @@ function buildGame(rawWalks, p) {
     totalMin: walks.reduce((a, w) => a + w.min, 0),
     nextStretch: stretchTarget(kms),
     recentAvg: kms.length ? kms.slice(-5).reduce((a, b) => a + b, 0) / Math.min(5, kms.length) : 0,
-    home: p.home || inferHome(walks) || (app.mode === 'demo' ? DEMO_HOME : null),
+    home: p.home || inferHome(walks),
   };
 }
 
 // ---------------------------------------------------------------------------
 // App
 
-const app = { mode: 'demo', athlete: null, configured: false, raw: [], game: null, tab: 'home', map: null, shared: [], viewing: null, mySaved: null };
+// mode is 'live' once Ride with GPS is connected, 'off' until then (no walks shown).
+const app = { mode: 'off', athlete: null, configured: false, raw: [], game: null, tab: 'home', map: null, shared: [], viewing: null, mySaved: null };
 let garden;
 
 async function init() {
@@ -204,16 +191,13 @@ async function sync() {
       app.mode = 'live';
       try { localStorage.setItem('wanderlings-walks', JSON.stringify(app.raw)); } catch {}
     } else {
-      app.mode = 'demo';
+      app.mode = 'off'; // not connected yet: an empty garden, never pretend walks
+      app.raw = [];
     }
   } catch (err) {
     const cached = (() => { try { return JSON.parse(localStorage.getItem('wanderlings-walks')); } catch { return null; } })();
     if (cached) { app.raw = cached; app.mode = 'live'; toast('Couldn’t reach Ride with GPS — showing your last sync.'); }
-    else app.mode = 'demo';
-  }
-  if (app.mode === 'demo') {
-    const p = prog();
-    app.raw = [...demoWalks(), ...p.extraWalks];
+    else { app.raw = []; app.mode = 'off'; toast('Couldn’t reach Ride with GPS. Try ↻ in a moment.'); }
   }
   $('#sync').classList.remove('spinning');
   refresh();
@@ -223,13 +207,10 @@ async function sync() {
 function refresh() {
   const p = prog();
   app.game = buildGame(app.raw, p);
-  if (!p.initialized && !app.viewing) {
-    // Demo starts with a couple of eggs waiting; a real account starts with
-    // every past walk as an egg to hatch.
-    if (app.mode === 'demo') p.seen = app.game.creatures.slice(0, -2).map(c => c.id);
+  if (!p.initialized && !app.viewing && app.mode === 'live') {
+    // A newly connected account starts with every past walk as an egg to hatch.
     p.initialized = true;
     persist();
-    app.game = buildGame(app.raw, p);
   }
   render();
 }
@@ -265,7 +246,7 @@ async function ensureEggs(force = false) {
 
 function render() {
   const g = app.game;
-  $('#demo-banner').hidden = app.mode !== 'demo' || Boolean(app.viewing);
+  $('#connect-banner').hidden = app.mode !== 'off' || Boolean(app.viewing);
   renderSwitcher();
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === app.tab));
   document.querySelectorAll('.view').forEach(v => v.hidden = v.id !== `view-${app.tab}`);
@@ -415,8 +396,7 @@ function renderMap(g) {
     const km = distM(g.home, [e.lat, e.lng]) / 1000;
     const daysLeft = Math.max(0, Math.ceil((parseLocal(e.expiresAt) - new Date()) / 864e5));
     const popup = done ? `<strong>${t.label}</strong><br>Collected! 🎉`
-      : `<strong>${t.label}</strong><br>About ${fmtDist(km)} from home (${fmtDist(km * 2)} there and back)<br><span class="muted">Here for ${daysLeft} more day${daysLeft === 1 ? '' : 's'}</span>
-         ${app.mode === 'demo' && !app.viewing ? `<br><button class="btn small" data-action="demo-walk" data-egg="${e.id}">Pretend I walked here</button>` : ''}`;
+      : `<strong>${t.label}</strong><br>About ${fmtDist(km)} from home (${fmtDist(km * 2)} there and back)<br><span class="muted">Here for ${daysLeft} more day${daysLeft === 1 ? '' : 's'}</span>`;
     L.marker([e.lat, e.lng], { icon }).bindPopup(popup).addTo(layer);
     if (!done) L.circle([e.lat, e.lng], { radius: EGG_REACH_M, color: t.color, weight: 1, fillOpacity: .08 }).addTo(layer);
   }
@@ -566,8 +546,8 @@ async function openSettings() {
       <span class="muted small">Keep it gentle. Missing it doesn't break anything.</span></label>
     ${app.viewing ? '' : `<div class="field">Ride with GPS
       ${app.mode === 'live' ? `<p>Connected. Walks you record in the Ride with GPS app show up here when you sync (↻).</p><button class="btn ghost" data-action="disconnect">Disconnect Ride with GPS</button>`
-        : app.configured ? `<p>You're exploring demo walks. Record walks with the free Ride with GPS app, then connect it here.</p><button class="btn rwgps" data-action="connect-rwgps">Connect Ride with GPS</button>`
-        : `<p class="muted">Ride with GPS isn't set up on the server yet (see README.md). Until then, demo walks are shown.</p>`}
+        : app.configured ? `<p>Record walks with the free Ride with GPS app, then connect it here. Each walk hatches an egg.</p><button class="btn rwgps" data-action="connect-rwgps">Connect Ride with GPS</button>`
+        : `<p class="muted">Ride with GPS isn't set up on the server yet (see README.md).</p>`}
     </div>`}
     <div class="field">Sharing
       <p class="muted">${shares.length ? 'These people can see your walks and garden (they can’t change anything):' : 'Nobody else can see your walks or garden.'}</p>
@@ -580,8 +560,7 @@ async function openSettings() {
     <div class="field">Account
       <p class="muted">Signed in as ${esc(userEmail() || '')}</p>
       <button class="btn ghost" data-action="sign-out">Sign out</button>
-    </div>
-    ${app.mode === 'demo' && !app.viewing ? `<button class="btn ghost small" data-action="reset-demo">Reset demo</button>` : ''}`);
+    </div>`);
 }
 
 // ---------------------------------------------------------------------------
@@ -646,15 +625,6 @@ function wireEvents() {
         await ensureEggs(true); app.mapFitted = false; refresh();
         return toast('Home moved, and fresh eggs are hidden around it.');
       }
-      case 'demo-walk': {
-        // Demo only: fake an out-and-back walk to an egg so the flow can be tried.
-        const egg = app.game.eggs.find(x => x.id === d.egg);
-        const home = app.game.home;
-        const km = distM(home, [egg.lat, egg.lng]) / 1000 * 2.2;
-        p.extraWalks.push({ id: `demo-x${Date.now()}`, name: 'Egg hunt walk', start: localISO(new Date()), distance: km * 1000, movingTime: km * 1200, elevation: 10, points: [home, [egg.lat, egg.lng], home] });
-        persist(); app.map.closePopup(); await sync();
-        return toast('Walk synced! You have new eggs to hatch. 🥚');
-      }
       case 'disconnect': await api('disconnect', { method: 'POST' }); closeSheet(); return sync();
       case 'connect-rwgps': {
         t.disabled = true;
@@ -668,7 +638,6 @@ function wireEvents() {
         catch (err) { toast(`Couldn’t stop sharing: ${err.message}`); }
         return openSettings();
       }
-      case 'reset-demo': delete saved.buckets.demo; persist(); closeSheet(); app.mapFitted = false; return sync();
     }
   });
 
