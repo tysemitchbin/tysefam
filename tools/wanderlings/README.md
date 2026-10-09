@@ -10,7 +10,7 @@ A gentle walking game. Every walk recorded in Ride with GPS hatches an egg with 
 
 | Piece | Where | What it does |
 |---|---|---|
-| Web app (this folder) | **Cloudflare**, with the rest of the family site → https://wanderlings.tysemitchbin.workers.dev/tools/wanderlings/ | The whole UI, a static site |
+| Web app (this folder) | **Cloudflare**, with the rest of the family site → https://tysefam.tysemitchbin.workers.dev/tools/wanderlings/ | The whole UI, a static site |
 | Sign-in | **Supabase Auth** (project Tyse Fam, ref `bhjyybdztvmpyzynkvje`; settings in `/site.js`) | Email + password (no emails sent). Only emails on the family guest list (`allowed_emails`) can sign up. The same login works across the family site. |
 | Saved game | Supabase table `game_state` | Names, companion, hatched eggs, map eggs. Row-level security: each user sees only their own row. |
 | Walk source | Supabase Edge Function `rwgps` | OAuth with Ride with GPS (the client secret lives only here), fetching walking trips + route shapes |

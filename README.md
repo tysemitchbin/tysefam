@@ -21,7 +21,7 @@ supabase/functions/rwgps/  Wanderlings' Ride with GPS bridge (server code)
 
 | Piece | Where |
 |---|---|
-| Website | **Cloudflare** (`npm run deploy`) → https://wanderlings.tysemitchbin.workers.dev. Also works on GitHub Pages as-is. `.assetsignore` keeps everything except the website files private. |
+| Website | **Cloudflare** (`npm run deploy`) → https://tysefam.tysemitchbin.workers.dev. Also works on GitHub Pages as-is. `.assetsignore` keeps everything except the website files private. |
 | Sign-in, data | **Supabase** project `bhjyybdztvmpyzynkvje` (Tyse Fam). One email + password works in every tool. |
 | Who's allowed in | The guest list, table `allowed_emails`. Only those emails can create an account. |
 | Shared tool data | Table `family_items` (via `Family.store`). Wanderlings keeps its own tables. |
