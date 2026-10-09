@@ -306,14 +306,17 @@ const CHEAT=[
   ["3 sek","minste avstand til bilen foran i gode forhold","minimum gap to the car ahead in good conditions"],
   ["÷ 3,6","km/t → meter per sekund (reaksjonslengde på 1 sek)","km/h → metres per second (reaction distance in 1 s)"],
   ["2× fart = 4×","bremselengde og bevegelsesenergi","braking distance and kinetic energy"],
-  ["5 m","ikke stans nærmere kryss eller foran gangfelt","no stopping closer to junctions or before crossings"],
+  ["5 m","ikke stans nærmere kryss, planovergang eller foran gangfelt","no stopping closer to junctions, level crossings or before crossings"],
+  ["20 m","ikke parker nærmere skiltet for bussholdeplass","no parking closer to a bus stop sign"],
+  ["60 km/t","på slike veger har du vikeplikt for buss som kjører ut fra holdeplass","on roads up to this limit, give way to buses leaving a stop"],
+  ["150 m","varseltrekant bak bilen, om mulig","warning triangle behind the car, if possible"],
   ["16 · 25 + 5","øvingskjøring fra 16 år · ledsager minst 25 år med 5 års førerkort","practice from 16 · supervisor at least 25 with 5 years' licence"],
   ["17 · 4 · 13","timer: trafikalt grunnkurs · sikkerhetskurs bane · sikkerhetskurs veg","hours: basic course · track safety course · road safety course"],
   ["2 år","prøvetid, prikker teller dobbelt","probation, points count double"],
   ["8 prikker / 3 år","tap av førerrett i 6 måneder","licence lost for 6 months"],
   ["1,6 / 3 mm","mønsterdybde sommer / vinter","tread depth summer / winter"],
   ["3500 / 750 kg","bil klasse B / tilhenger du alltid kan trekke","class B car / trailer you can always tow"],
-  ["80 / 60","km/t med tilhenger med brems / uten brems (over 300 kg)","km/h with braked / unbraked trailer (over 300 kg)"],
+  ["80","km/t med tilhenger, med eller uten brems","km/h with a trailer, braked or not"],
   ["135 cm","under dette: barnesikringsutstyr","below this: child restraint"],
   ["113 · 112 · 110","ambulanse · politi · brann","ambulance · police · fire"],
   ["30 : 2","hjerte-lunge-redning","CPR compressions : breaths"],
@@ -350,7 +353,7 @@ function viewPlan(){
   h+='</section>';
   h+='<section class="scard"><div class="eyebrow">'+t("Huskeliste","Cheat sheet")+'</div><h3 style="font-size:1.3rem;margin:4px 0 12px">'+t("Tall som går igjen","Numbers worth knowing")+'</h3><div class="tbl-wrap"><table><thead><tr><th>'+t("Tall","Number")+'</th><th>'+t("Betyr","Means")+'</th></tr></thead><tbody>'+
     CHEAT.map(r=>'<tr><td class="k">'+r[0]+'</td><td>'+bi(r[1],r[2])+'</td></tr>').join("")+'</tbody></table></div></section>';
-  h+='<p class="foot">'+bi("Kilder: Statens vegvesens læreplan V851 (gyldig fra 1.2.2026), trafikkreglene og vegtrafikkloven, lest oktober 2026. Reglene kan endre seg, så sjekk ","Sources: Statens vegvesen curriculum V851 (valid from 1 Feb 2026), the traffic rules and the Road Traffic Act, read October 2026. Rules can change, so check ")+
+  h+='<p class="foot">'+bi("Kilder: Statens vegvesens læreplan V851 (gyldig fra 1.2.2026). Reglene er sjekket mot Lovdata og vegvesen.no via søkemotor i oktober 2026, ikke lest i sin helhet. Laget for egen øving. Reglene kan endre seg, så sjekk alltid ","Sources: Statens vegvesen curriculum V851 (valid from 1 Feb 2026). The rules were checked against Lovdata and vegvesen.no via search engine in October 2026, not read in full. Made for personal study. Rules can change, so always check ")+
     '<a href="https://www.vegvesen.no/" target="_blank" rel="noopener">vegvesen.no</a> '+t("og","and")+' <a href="https://lovdata.no/dokument/SF/forskrift/1986-03-21-747" target="_blank" rel="noopener">'+t("trafikkreglene på Lovdata","the traffic rules on Lovdata")+'</a>.</p>';
   return h;
 }

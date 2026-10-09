@@ -2,8 +2,11 @@
    TEORIPRØVEN KLASSE B: notes, road signs and practice questions.
 
    Topics follow Statens vegvesen's curriculum V851 "Læreplan for førerkortklasse B,
-   B kode 96 og BE" (valid from 1 Feb 2026). The rules themselves come from the
-   Norwegian traffic rules (trafikkreglene, skiltforskriften, vegtrafikkloven), October 2026. Every text is a pair: [norsk, English].
+   B kode 96 og BE" (valid from 1 Feb 2026). The rules were written from general
+   knowledge of Norwegian traffic law, then checked in October 2026 against Lovdata and
+   vegvesen.no through search-engine copies (lovdata.no blocks direct access from the build
+   server). § references point to: trafikkreglene (FOR-1986-03-21-747), vegtrafikkloven
+   (LOV-1965-06-18-4) and skiltforskriften (FOR-2005-10-07-1219). Every text is a pair: [norsk, English].
 
    How to add a question (copy a line and change it):
      q("vi", "Norwegian question", "English question",
@@ -102,6 +105,7 @@ const NOTES = {
 fk:[
 ["#Om teoriprøven","About the theory test"],
 ["Teoriprøven for klasse B har 45 spørsmål. Du har 90 minutter, og du kan ha høyst 7 feil.","The class B theory test has 45 questions. You have 90 minutes and may get at most 7 wrong."],
+["Du kan ta teoriprøven tidligst 6 måneder før du fyller 18. Stryker du, må du vente 2 uker før neste forsøk, og du får bare vite hvilke temaer du svarte feil på. Prøven finnes også på engelsk.","You can take the theory test at the earliest 6 months before you turn 18. If you fail, you wait 2 weeks before trying again, and you only learn which topics you got wrong. The test is also offered in English."],
 ["Spørsmålene handler om trafikkregler, skilt, sikkerhet, mennesket, kjøretøyet og miljø. Mange har bilde av et skilt eller en trafikksituasjon.","Questions cover traffic rules, signs, safety, human factors, the vehicle and the environment. Many show a sign or traffic situation."],
 ["#Klasse B","Class B"],
 ["Klasse B gjelder bil med tillatt totalvekt inntil 3500 kg og plass til høyst 8 passasjerer i tillegg til føreren. Aldersgrensen er 18 år.","Class B covers cars up to 3500 kg permitted total weight with up to 8 passengers besides the driver. The minimum age is 18."],
@@ -129,7 +133,7 @@ me:[
 ["#Alkohol, rus og medisiner","Alcohol, drugs and medicines"],
 ["Promillegrensen i Norge er 0,2. Over den er det straffbart å kjøre. Jo høyere promille, jo strengere straff, med bot, tap av førerrett og fengsel.","The legal limit in Norway is 0.2 per mille. Driving above it is a crime. The higher the level, the harsher the penalty: fines, licence loss and prison."],
 ["Kroppen forbrenner ca. 0,1–0,15 promille i timen. Kaffe, kald dusj eller mat gjør deg ikke edru raskere.","The body burns off roughly 0.1–0.15 per mille per hour. Coffee, a cold shower or food will not sober you up faster."],
-["Har du kjørt og kan regne med politietterforskning (f.eks. etter en ulykke), kan du ikke drikke alkohol de første 6 timene etter kjøringen.","If you have driven and can expect a police investigation (e.g. after an accident), you may not drink alcohol for 6 hours after driving."],
+["Har du kjørt og kan regne med politietterforskning (f.eks. etter en ulykke), kan du ikke drikke alkohol eller ta andre rusmidler de første 6 timene etter kjøringen, med mindre prøve er tatt eller politiet har bestemt at det ikke skal tas prøve (vegtrafikkloven § 22).","If you have driven and can expect a police investigation (e.g. after an accident), you may not drink alcohol or take other intoxicants for 6 hours after driving, unless a test has been taken or the police have decided not to take one (Road Traffic Act § 22)."],
 ["Medisiner merket med rød trekant kan svekke evnen til å kjøre. Spør lege eller apotek.","Medicines marked with a red triangle can impair driving. Ask a doctor or pharmacist."],
 ["#Tretthet og oppmerksomhet","Tiredness and attention"],
 ["Trøtthet kan gi mikrosøvn: du sovner i noen sekunder uten å merke det. Det eneste som hjelper, er å stoppe og hvile eller sove.","Tiredness can cause micro-sleep: you nod off for seconds without noticing. The only cure is to stop and rest or sleep."],
@@ -160,20 +164,20 @@ kj:[
 ["#Kontroll av bilen","Checking the car"],
 ["Føreren har ansvar for at bilen er i forsvarlig stand: bremser, lys, dekk, ruter, speil og styring.","The driver is responsible for the car being roadworthy: brakes, lights, tyres, windows, mirrors and steering."],
 ["Minste mønsterdybde er 1,6 mm på sommerdekk og 3 mm på vinterdekk når det er vinterføre.","Minimum tread depth is 1.6 mm on summer tyres and 3 mm on winter tyres in winter conditions."],
-["Piggdekk er tillatt fra 1. november til første søndag etter 2. påskedag (lengre i Nord-Norge). Noen byer krever piggdekkgebyr.","Studded tyres are allowed from 1 November to the first Sunday after Easter Monday (longer in Northern Norway). Some cities charge a fee."],
+["Piggdekk er tillatt fra 1. november til første søndag etter 2. påskedag (i Nordland, Troms og Finnmark: 16. oktober–30. april). Når føret krever det, kan de brukes utenom perioden. Noen byer krever piggdekkgebyr.","Studded tyres are allowed from 1 November to the first Sunday after Easter Monday (Nordland, Troms and Finnmark: 16 October–30 April). They may be used outside the period when conditions require. Some cities charge a fee."],
 ["Rødt varsellys på dashbordet: stopp så snart det er trygt. Gult/oransje: sjekk snart.","Red warning light: stop as soon as it is safe. Yellow/orange: get it checked soon."],
 ["Bilen skal på EU-kontroll hvert annet år. En ny bil skal første gang innen 4 år.","Cars need an EU roadworthiness test every two years. A new car first within 4 years."],
 ["I bilen skal det være varseltrekant og refleksvest til føreren.","The car must carry a warning triangle and a hi-vis vest for the driver."],
 ["#Sikring","Restraints"],
 ["Alle skal bruke bilbelte. Føreren har ansvaret for at passasjerer under 15 år er sikret.","Everyone must wear a seatbelt. The driver is responsible for passengers under 15 being secured."],
-["Barn under 135 cm skal sikres i godkjent barnesikringsutstyr. Bakovervendt barnesete skal aldri stå foran en aktiv kollisjonspute.","Children under 135 cm must use an approved child restraint. A rear-facing child seat must never be in front of an active airbag."],
+["Barn under 135 cm skal alltid sikres i godkjent barnesikringsutstyr. Barn mellom 135 og 150 cm skal bruke det hvis det finnes i bilen, ellers vanlig bilbelte. Bakovervendt barnesete skal aldri stå foran en aktiv kollisjonspute.","Children under 135 cm must always use an approved child restraint. Children 135–150 cm must use one if the car has it, otherwise a normal seatbelt. A rear-facing child seat must never be in front of an active airbag."],
 ["Lasten skal sikres slik at den ikke kan forskyve seg eller falle av. Løse ting i bilen blir farlige prosjektiler i en kollisjon.","Load must be secured so it can't shift or fall off. Loose objects become dangerous projectiles in a crash."],
 ["Lasten må ikke hindre sikten eller skjule blinklys og bremselys.","The load must not block your view or hide indicators and brake lights."],
 ["Last sikres ved låsing, stenging, surring og dekking, med utstyr som fiberbånd, kjetting, nett og presenning.","Load is secured by locking, blocking, lashing and covering, using straps, chains, nets and tarpaulins."],
 ["Sjekk motorolje og drivstoff før du kjører. Går du tom, kan du bli stående på farlige steder, f.eks. i en tunnel.","Check engine oil and fuel before driving. Running out can leave you stranded somewhere dangerous, like a tunnel."],
 ["#Tilhenger","Trailer"],
 ["Med klasse B kan du trekke tilhenger med tillatt totalvekt opp til 750 kg, eller tyngre hvis bil og henger til sammen er høyst 3500 kg. Kode 96 utvider til 4250 kg.","With class B you may tow a trailer up to 750 kg, or heavier if car and trailer together are at most 3500 kg. Code 96 extends this to 4250 kg."],
-["Høyeste fart med tilhenger er 80 km/t. For tilhenger uten brems med totalvekt over 300 kg er den 60 km/t.","The top speed with a trailer is 80 km/h. For an unbraked trailer over 300 kg total weight it is 60 km/h."]
+["Høyeste fart med tilhenger er 80 km/t, også for tilhenger uten brems. Den gamle grensen på 60 km/t for tunge hengere uten brems ble fjernet i 2022. Noen hengere kan etter særskilt godkjenning kjøres i 100 km/t.","The top speed with a trailer is 80 km/h, braked or not. The old 60 km/h limit for heavy unbraked trailers was removed in 2022. Some trailers can be approved for 100 km/h."]
 ],
 mi:[
 ["#Kjør økonomisk","Drive economically"],
@@ -200,7 +204,7 @@ vi:[
 ["#Spesielle situasjoner","Special situations"],
 ["Rundkjøring: du har vikeplikt for dem som allerede er i rundkjøringen. Gi tegn til høyre før du kjører ut.","Roundabout: give way to those already in it. Signal right before you exit."],
 ["Utrykningskjøretøy med blålys og sirene skal slippes fram. Gjør plass, men pass på at du ikke lager farlige situasjoner.","Emergency vehicles with blue lights and siren must be let through. Make room without creating danger."],
-["I tettbygd strøk med fartsgrense 60 km/t eller lavere skal du la bussen kjøre ut fra holdeplassen når den gir tegn.","In built-up areas with a limit of 60 km/h or less, let a bus pull out from its stop when it signals."],
+["På veg med fartsgrense 60 km/t eller lavere har du vikeplikt for buss som gir tegn om at den skal kjøre ut fra holdeplassen (trafikkreglene § 7).","On roads with a limit of 60 km/h or less, you must give way to a bus signalling to pull out from its stop (traffic rules § 7)."],
 ["Når to felt går sammen til ett uten oppmerking eller vikeplikt, gjelder fletting (glidelås): én og én fra hvert felt.","When two lanes merge with no markings or give-way rules, merge in turn like a zipper: one from each lane."]
 ],
 sk:[
@@ -213,7 +217,7 @@ sk:[
 ["Politiets tegn går foran lyssignal, lyssignal går foran skilt, og skilt går foran de vanlige trafikkreglene.","Police signals override traffic lights, lights override signs, and signs override the general traffic rules."],
 ["#Viktige detaljer","Important details"],
 ["Fartsgrenseskilt gjelder til et nytt skilt opphever det.","A speed limit sign applies until another sign ends it."],
-["Forbudsskilt gjelder som hovedregel fra skiltet og fram til neste kryss, hvis ikke annet er skiltet.","Prohibition signs generally apply from the sign up to the next junction, unless signed otherwise."]
+["Forbudsskilt gjelder som hovedregel fra skiltet og fram til nærmeste vegkryss (skiltforskriften § 7). Unntak: Forbikjøring forbudt gjelder til skiltet «Slutt på forbikjøringsforbud», også gjennom kryss.","Prohibition signs generally apply from the sign up to the next junction (sign regulations § 7). Exception: No overtaking lasts until the 'End of no overtaking' sign, even through junctions."]
 ],
 op:[
 ["#Linjer","Lines"],
@@ -238,8 +242,8 @@ pl:[
 ["Feltskifte: speil, blindsone, tegn, og skift bare når det er plass.","Lane change: mirror, blind spot, signal, and move only when there is room."],
 ["#Forbikjøring","Overtaking"],
 ["Forbikjøring skjer på venstre side. Du må ha god sikt og plass til å fullføre uten å hindre møtende.","Overtake on the left. You need a clear view and room to finish without hindering oncoming traffic."],
-["Du kan kjøre forbi på høyre side når den foran svinger til venstre, og der det er to eller flere felt i samme retning i tettbygd strøk.","You may pass on the right when the vehicle ahead is turning left, and where there are two or more lanes in your direction in built-up areas."],
-["Ikke kjør forbi foran bakketopper, i uoversiktlige svinger, i kryss eller ved planoverganger.","Don't overtake before hilltops, in blind bends, in junctions or at level crossings."],
+["Du kan kjøre forbi på høyre side når den foran svinger til venstre, og i tett trafikk der alle feltene i samme retning er fylt med kø (trafikkreglene § 12).","You may pass on the right when the vehicle ahead is turning left, and in dense traffic where every lane in your direction is queued (traffic rules § 12)."],
+["Forbikjøring er forbudt der sikten er hindret av bakketopp eller sving, like foran eller i vegkryss (unntatt der det er to eller flere felt i din retning, lysregulering, eller vikeplikt for kryssende veg), og ved gangfelt der et kjøretøy skjuler gangfeltet.","Overtaking is banned where a crest or bend blocks the view, just before or in junctions (except with two or more lanes your way, traffic lights, or a give-way rule for the crossing road), and at crossings where a vehicle hides the crossing."],
 ["Står et kjøretøy stille foran et gangfelt, kan en gående være skjult. Senk farten og vær klar til å stanse.","If a vehicle has stopped before a crossing, a pedestrian may be hidden. Slow down and be ready to stop."],
 ["Når noen kjører forbi deg, skal du holde til høyre og ikke øke farten.","When being overtaken, keep right and don't speed up."],
 ["#Rygging og vending","Reversing and turning round"],
@@ -250,7 +254,8 @@ ps:[
 ["Stans og parkering skal skje på høyre side i kjøreretningen. I envegskjørt gate kan du også stanse på venstre side.","Stop and park on the right in your direction of travel. In one-way streets also on the left."],
 ["Stans er forbudt i kryss og nærmere enn 5 meter fra kryss, i gangfelt og nærmere enn 5 meter foran gangfelt.","Stopping is banned in junctions and within 5 metres of them, on crossings and within 5 metres before them."],
 ["Stans er også forbudt der du hindrer sikten eller trafikken, f.eks. i uoversiktlige svinger, på bakketopper, i tunneler og i sykkelfelt.","Stopping is also banned where you block view or traffic, e.g. blind bends, hilltops, tunnels and cycle lanes."],
-["Parkering er forbudt på forkjørsveg utenfor tettbygd strøk, og foran innkjørsler.","Parking is banned on priority roads outside built-up areas and in front of driveways."],
+["Stans er også forbudt nærmere enn 5 meter fra planovergang, i kollektivfelt, sambruksfelt og sykkelfelt, og på motorveg og motortrafikkveg (trafikkreglene § 17).","Stopping is also banned within 5 metres of a level crossing, in bus lanes, shared lanes and cycle lanes, and on motorways and expressways (traffic rules § 17)."],
+["Parkering er forbudt foran inn- eller utkjørsel, og nærmere enn 20 meter fra skiltet for en bussholdeplass (av- og påstigning som ikke hindrer bussen, er lov).","Parking is banned in front of a driveway, and within 20 metres of a bus stop sign (dropping off without blocking the bus is allowed)."],
 ["#Skiltene","The signs"],
 ["Parkering forbudt (én rød skråstrek): du kan stanse kort for av- og påstigning og av- og pålessing.","No parking (one red stripe): you may stop briefly to let people in or out and to load."],
 ["Stans forbudt (rødt kryss): ikke stans i det hele tatt.","No stopping (red cross): don't stop at all."],
@@ -298,6 +303,7 @@ ul:[
 ["#Ved en ulykke","At an accident"],
 ["Alle som er innblandet i en ulykke, har plikt til å stanse og hjelpe. Alle har også hjelpeplikt når noen er i fare.","Everyone involved in an accident must stop and help. Everyone also has a duty to help when someone is in danger."],
 ["Rekkefølge: skaff oversikt, sikre stedet (nødblink, refleksvest, varseltrekant), varsle, og gi førstehjelp.","Order: get an overview, secure the scene (hazard lights, hi-vis vest, warning triangle), call for help, give first aid."],
+["Står bilen til fare eller hinder, skal varseltrekanten settes ut i god avstand, om mulig minst 150 meter fra bilen.","If the car is a danger or obstruction, place the warning triangle well back, if possible at least 150 metres away."],
 ["Nødnumre: 113 ambulanse, 112 politi, 110 brann.","Emergency numbers: 113 ambulance, 112 police, 110 fire."],
 ["Ved mindre skader på bilene fyller dere ut et felles skademeldingsskjema.","With minor damage to the cars, fill in a joint accident report form together."],
 ["Plikten til å stanse og hjelpe gjelder også dyr som er skadet, og du har meldeplikt hvis du skader et dyr.","The duty to stop and help also covers injured animals, and you must report it if you injure an animal."],
@@ -336,6 +342,9 @@ q("fk","Hva øver du på i sikkerhetskurs på øvingsbane?","What do you practis
 q("fk","Hvor mange timer er sikkerhetskurs på veg for klasse B?","How many hours is the class B road safety course?",["13 timer","13 hours"],["4 timer","4 hours"],["17 timer","17 hours"],"Bilkjøringens risiko 2 t, landeveg 5 t, variert trafikkmiljø 4 t, refleksjon 2 t.","Risks of driving 2 h, country road 5 h, varied traffic 4 h, reflection 2 h.");
 q("fk","Hvor mange timer av trafikalt grunnkurs handler om å være trafikant i mørket?","How many hours of the basic course are about being a road user in the dark?",["3 timer","3 hours"],["1 time","1 hour"],["6 timer","6 hours"]);
 q("fk","Hva er mengdetrening?","What is 'mengdetrening'?",["Å øve mye på noe du allerede har fått opplæring i","Practising a lot at something you've already been taught"],["Å kjøre med tung last","Driving with a heavy load"],["Å ta mange kjøretimer på én dag","Taking many lessons in one day"]);
+
+q("fk","Hvor lenge må du vente før du kan ta teoriprøven på nytt hvis du stryker?","How long must you wait to retake the theory test if you fail?",["2 uker","2 weeks"],["1 dag","1 day"],["3 måneder","3 months"]);
+q("fk","Hvor tidlig kan du ta teoriprøven for klasse B?","How early can you take the class B theory test?",["6 måneder før du fyller 18","6 months before you turn 18"],["Når du fyller 16","When you turn 16"],["Først etter at du har fylt 18","Only after you turn 18"]);
 
 /* ---------- Mennesket bak rattet ---------- */
 q("me","Hva er promillegrensen for bilførere i Norge?","What is the blood alcohol limit for drivers in Norway?",["0,2 promille","0.2 per mille"],["0,5 promille","0.5 per mille"],["0,8 promille","0.8 per mille"]);
@@ -376,11 +385,11 @@ q("kj","Et rødt varsellys tennes på dashbordet. Hva gjør du?","A red warning 
 q("kj","Hvem har ansvaret for at bilen er i forsvarlig stand når du kjører?","Who is responsible for the car being roadworthy when you drive?",["Føreren","The driver"],["Eieren alene","The owner alone"],["Verkstedet","The garage"]);
 q("kj","Hvem har ansvaret for at en passasjer på 12 år bruker bilbelte?","Who is responsible for a 12-year-old passenger wearing a seatbelt?",["Føreren","The driver"],["Barnet selv","The child"],["Foreldrene, selv om de ikke er med","The parents, even if absent"],"Føreren har ansvar for at passasjerer under 15 år er sikret.","The driver is responsible for passengers under 15 being secured.");
 q("kj","Hvor kan et bakovervendt barnesete IKKE plasseres?","Where must a rear-facing child seat NOT be placed?",["Foran en aktiv kollisjonspute","In front of an active airbag"],["I baksetet","In the back seat"],["Bak føreren","Behind the driver"]);
-q("kj","Barn under hvilken høyde skal bruke godkjent barnesikringsutstyr?","Children under what height must use an approved child restraint?",["135 cm","135 cm"],["120 cm","120 cm"],["150 cm","150 cm"]);
+q("kj","Barn under hvilken høyde skal bruke godkjent barnesikringsutstyr?","Children under what height must use an approved child restraint?",["135 cm","135 cm"],["120 cm","120 cm"],["150 cm","150 cm"],"Mellom 135 og 150 cm skal barnet bruke sikringsutstyr hvis det finnes i bilen.","Between 135 and 150 cm the child must use a restraint if the car has one.");
 q("kj","Hva skal alltid ligge i bilen?","What must always be in the car?",["Varseltrekant og refleksvest til føreren","A warning triangle and a hi-vis vest for the driver"],["Brannslukker og førstehjelpsskrin","A fire extinguisher and first-aid kit"],["Reservehjul og snøkjetting","A spare wheel and snow chains"]);
 q("kj","Hvor ofte skal en vanlig personbil på EU-kontroll?","How often must a normal car have an EU roadworthiness test?",["Hvert annet år (første gang innen 4 år)","Every two years (first within 4 years)"],["Hvert år","Every year"],["Hvert femte år","Every five years"]);
 q("kj","Hvor tung tilhenger kan du alltid trekke med klasse B, uansett vekten på bilen?","How heavy a trailer may you always tow with class B, whatever the car weighs?",["750 kg tillatt totalvekt","750 kg permitted total weight"],["1500 kg","1500 kg"],["3500 kg","3500 kg"]);
-q("kj","Hva er høyeste tillatte fart med tilhenger med brems?","What is the top speed with a braked trailer?",["80 km/t","80 km/h"],["60 km/t","60 km/h"],["90 km/t","90 km/h"]);
+q("kj","Hva er normalt høyeste tillatte fart med tilhenger?","What is the normal top speed with a trailer?",["80 km/t","80 km/h"],["60 km/t","60 km/h"],["90 km/t","90 km/h"],"Gjelder også hengere uten brems. 60 km/t-grensen for dem ble fjernet i 2022.","Also for unbraked trailers. Their 60 km/h limit was removed in 2022.");
 q("kj","Hvorfor skal løse gjenstander i bilen sikres?","Why must loose objects in the car be secured?",["I en kollisjon blir de farlige prosjektiler","In a crash they become dangerous projectiles"],["Fordi det er stygt","Because it looks untidy"],["Fordi de gjør bilen tyngre","Because they make the car heavier"]);
 
 q("kj","Hvordan kan last i bilen gjøre det vanskelig for andre trafikanter?","How can load in the car cause problems for other road users?",["Den kan skjule blinklys og bremselys eller hindre sikten","It can hide indicators and brake lights or block the view"],["Den gjør bilen roligere","It makes the car calmer"],["Det kan den ikke","It can't"]);
@@ -410,7 +419,7 @@ q("vi","Du svinger til høyre over et sykkelfelt der en syklist kjører rett fra
 q("vi","Hvem har vikeplikt i en rundkjøring?","Who must give way at a roundabout?",["De som skal inn, for dem som allerede er i rundkjøringen","Those entering, for those already in it"],["De som er i rundkjøringen, for dem som skal inn","Those in it, for those entering"],["Den som kommer fra høyre","Whoever comes from the right"]);
 q("vi","Når skal du gi tegn i en rundkjøring?","When must you signal in a roundabout?",["Til høyre før du kjører ut","Right, before you exit"],["Aldri","Never"],["Bare når du kjører inn","Only when entering"]);
 q("vi","Du hører sirene og ser blålys bak deg. Hva gjør du?","You hear a siren and see blue lights behind you. What do you do?",["Gjør plass så fort det er trygt, f.eks. ved å kjøre til siden","Make room as soon as it's safe, e.g. by pulling over"],["Bråbremser midt i feltet","Brake hard in the middle of the lane"],["Kjører over på rødt for å komme unna uansett","Drive through a red light whatever happens"]);
-q("vi","En buss gir tegn for å kjøre ut fra holdeplassen. Fartsgrensen er 50 km/t i tettbygd strøk. Hva gjør du?","A bus signals to pull out from its stop. The limit is 50 km/h in a built-up area. What do you do?",["Slipper bussen ut","Let the bus out"],["Kjører forbi, du har forkjørsrett","Pass it, you have priority"],["Tuter så bussen venter","Honk so the bus waits"]);
+q("vi","En buss gir tegn for å kjøre ut fra holdeplassen. Fartsgrensen er 50 km/t. Hva gjør du?","A bus signals to pull out from its stop. The limit is 50 km/h. What do you do?",["Slipper bussen ut, du har vikeplikt","Let the bus out, you must give way"],["Kjører forbi, du har forkjørsrett","Pass it, you have priority"],["Tuter så bussen venter","Honk so the bus waits"],"Vikeplikten gjelder på veg med fartsgrense 60 km/t eller lavere.","This applies on roads with a limit of 60 km/h or less.");
 q("vi","To felt går sammen til ett uten oppmerking. Hvordan skal dere flette?","Two lanes merge into one with no markings. How should you merge?",["Én og én fra hvert felt (glidelås)","One from each lane in turn (zipper)"],["Bilene i venstre felt kjører først","Cars in the left lane go first"],["Den som kjører fortest, kjører først","Whoever is fastest goes first"]);
 qi("sluttForkjorsveg","vi","Du passerer dette skiltet. Hva gjelder fra nå i kryss uten andre skilt?","You pass this sign. What applies now at junctions with no other signs?",["Høyreregelen","The right-hand rule"],["Du har fortsatt forkjørsrett","You still have priority"],["Du har vikeplikt for alle","You must give way to everyone"]);
 q("vi","Du kjører ut fra en gang- og sykkelveg og inn på en bilveg. Hva gjelder?","You drive from a footpath/cycle path onto a road. What applies?",["Du har vikeplikt for alle","You must give way to everyone"],["Høyreregelen","The right-hand rule"],["Du har forkjørsrett","You have priority"]);
@@ -465,11 +474,12 @@ q("pl","Du kjører forbi en syklist og møtende trafikk kommer. Det er ikke plas
 q("ps","På hvilken side av vegen skal du parkere?","Which side of the road should you park on?",["Høyre side i kjøreretningen (begge sider i envegskjørt gate)","The right in your direction of travel (either side in a one-way street)"],["Hvilken som helst side","Either side"],["Venstre side","The left"]);
 q("ps","Hvor nær et gangfelt kan du stanse?","How close to a crossing may you stop?",["Ikke nærmere enn 5 meter foran gangfeltet","No closer than 5 metres before it"],["Helt inntil gangfeltet","Right up to it"],["Ikke nærmere enn 20 meter","No closer than 20 metres"]);
 q("ps","Hvor nær et kryss kan du stanse?","How close to a junction may you stop?",["Ikke nærmere enn 5 meter fra krysset","No closer than 5 metres from it"],["Inntil krysset","Right at it"],["Ikke nærmere enn 50 meter","No closer than 50 metres"]);
-q("ps","Kan du parkere på en forkjørsveg utenfor tettbygd strøk?","May you park on a priority road outside a built-up area?",["Nei, det er forbudt","No, it's banned"],["Ja, hvis du har nødblink på","Yes, with hazard lights on"],["Ja, i inntil 30 minutter","Yes, for up to 30 minutes"]);
+q("ps","Hvor nær skiltet for en bussholdeplass kan du parkere?","How close to a bus stop sign may you park?",["Ikke nærmere enn 20 meter","No closer than 20 metres"],["Helt inntil skiltet","Right next to the sign"],["Ikke nærmere enn 5 meter","No closer than 5 metres"]);
+q("ps","Hvor nær en planovergang kan du stanse?","How close to a level crossing may you stop?",["Ikke nærmere enn 5 meter","No closer than 5 metres"],["Inntil bommen","Right up to the barrier"],["Ikke nærmere enn 50 meter","No closer than 50 metres"]);
 q("ps","Hvor er stans forbudt?","Where is stopping banned?",["I uoversiktlige svinger og på bakketopper","In blind bends and on hilltops"],["På parkeringsplasser","In car parks"],["Langs fortauet i boligområder","Along the kerb in residential areas"]);
 q("ps","Du har parkert i en gate. Hva gjør du før du åpner døra?","You've parked in a street. What do you do before opening the door?",["Ser bakover etter syklister og biler","Look back for cyclists and cars"],["Åpner raskt så du ikke hindrer trafikken","Open quickly so you don't block traffic"],["Tuter for å varsle","Sound the horn"]);
 q("ps","Du parkerer i en nedoverbakke med fortauskant. Hvordan vrir du hjulene?","You park facing downhill with a kerb. How do you turn the wheels?",["Mot fortauskanten","Toward the kerb"],["Rett fram","Straight"],["Ut mot vegen","Out toward the road"]);
-q("ps","Kan du stanse i et sykkelfelt for å slippe av en passasjer?","May you stop in a cycle lane to drop off a passenger?",["Nei","No"],["Ja, i inntil 2 minutter","Yes, for up to 2 minutes"],["Ja, med nødblink","Yes, with hazard lights"]);
+q("ps","Kan du stanse i et sykkelfelt for å slippe av en passasjer?","May you stop in a cycle lane to drop off a passenger?",["Nei","No"],["Ja, i inntil 2 minutter","Yes, for up to 2 minutes"],["Ja, med nødblink","Yes, with hazard lights"],"Stans er forbudt i sykkelfelt, kollektivfelt og sambruksfelt (trafikkreglene § 17).","Stopping is banned in cycle, bus and shared lanes (traffic rules § 17).");
 q("ps","Er det lov å parkere foran en innkjørsel?","May you park in front of a driveway?",["Nei","No"],["Ja, hvis det er din egen","Yes, if it's your own"],["Ja, om natten","Yes, at night"]);
 
 /* ---------- Myke trafikanter ---------- */
@@ -504,7 +514,7 @@ q("ut","Hvorfor er det farlig å bruke fjernlys i tåke?","Why is high beam dang
 /* ---------- Ulykker og førstehjelp ---------- */
 q("ul","Du kommer først til en trafikkulykke. Hva gjør du først?","You're first at a road accident. What do you do first?",["Skaffer oversikt og sikrer stedet","Get an overview and secure the scene"],["Flytter alle skadde ut av bilene","Pull all injured people out"],["Tar bilder av skadene","Take photos of the damage"]);
 q("ul","Hvilket nummer ringer du for ambulanse?","Which number do you call for an ambulance?",["113","113"],["112","112"],["110","110"],"113 ambulanse, 112 politi, 110 brann.","113 ambulance, 112 police, 110 fire.");
-q("ul","Hvordan sikrer du et ulykkessted?","How do you secure an accident scene?",["Nødblink, refleksvest og varseltrekant i god avstand","Hazard lights, hi-vis vest and a warning triangle well back"],["Ved å stå midt i vegen og vinke","By standing in the road and waving"],["Det er politiets jobb","That's the police's job"]);
+q("ul","Hvordan sikrer du et ulykkessted?","How do you secure an accident scene?",["Nødblink, refleksvest og varseltrekant i god avstand (om mulig minst 150 m)","Hazard lights, hi-vis vest and a warning triangle well back (if possible at least 150 m)"],["Ved å stå midt i vegen og vinke","By standing in the road and waving"],["Det er politiets jobb","That's the police's job"]);
 q("ul","En skadet person er bevisstløs, men puster normalt. Hva gjør du?","An injured person is unconscious but breathing normally. What do you do?",["Legger personen i stabilt sideleie","Put them in the recovery position"],["Starter hjerte-lunge-redning","Start CPR"],["Gir personen vann","Give them water"]);
 q("ul","En person puster ikke normalt. Hva er riktig HLR-rytme?","A person isn't breathing normally. What's the right CPR rhythm?",["30 kompresjoner og 2 innblåsninger","30 compressions and 2 breaths"],["15 kompresjoner og 5 innblåsninger","15 compressions and 5 breaths"],["5 kompresjoner og 1 innblåsning","5 compressions and 1 breath"]);
 q("ul","En person blør kraftig fra armen. Hva gjør du?","Someone is bleeding heavily from the arm. What do you do?",["Trykker direkte på såret","Press directly on the wound"],["Venter på ambulansen","Wait for the ambulance"],["Gir personen noe å drikke","Give them a drink"]);
