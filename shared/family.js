@@ -10,8 +10,9 @@
      Family.entries(obj)      [id, item] pairs sorted oldest-first
      Family.esc(text)         make text safe to put in innerHTML
      Family.url('tools/x/')   link relative to the site root
-     Family.client()          the signed-in Supabase client (null when Supabase is off),
-                              e.g. to call an edge function as the signed-in person
+     Family.client()          the signed-in Supabase client (null when Supabase is off)
+     Family.peek()            the client only if someone is already signed in (no sign-in card)
+     Family.call(fn, route, body)  call an edge function as the signed-in person
      Family.signOut()
 
    Saving data:
@@ -41,7 +42,7 @@
   }
 
   /* ───────── Supabase connection + family sign-in ───────── */
-  let clientPromise = null;
+  let clientPromise = null, plainClient = null;
   function loadScript(src) {
     return new Promise((res, rej) => {
       const s = document.createElement('script');
@@ -49,23 +50,66 @@
       document.head.appendChild(s);
     });
   }
-  /* Resolves to a signed-in Supabase client, or null when the site runs on this device only. */
-  function connect() {
-    if (clientPromise) return clientPromise;
+  /* The Supabase client, without signing in. null when Supabase is off or won't load. */
+  function makeClient() {
+    if (plainClient) return plainClient;
     const cfg = SITE.supabase || {};
-    if (!cfg.url || !cfg.key) return (clientPromise = Promise.resolve(null));
-    clientPromise = (async () => {
+    if (!cfg.url || !cfg.key) return (plainClient = Promise.resolve(null));
+    return (plainClient = (async () => {
       try {
         if (!window.supabase) await loadScript(SUPABASE_JS);
       } catch (e) {
         console.warn('Could not load Supabase, saving on this device only.', e);
         return null;
       }
-      const sb = window.supabase.createClient(cfg.url, cfg.key);
-      await signIn(sb);
+      return window.supabase.createClient(cfg.url, cfg.key);
+    })());
+  }
+  /* Resolves to a signed-in Supabase client, or null when the site runs on this device only. */
+  function connect() {
+    if (clientPromise) return clientPromise;
+    clientPromise = (async () => {
+      const sb = await makeClient();
+      if (sb) await signIn(sb);
       return sb;
     })();
     return clientPromise;
+  }
+  /* The signed-in client if a family member is ALREADY signed in on this device, otherwise null.
+     Never shows the sign-in card: for extras like the home page's "Coming up" box. */
+  async function peek() {
+    const sb = await makeClient();
+    if (!sb) return null;
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return null;
+    if (!member) {
+      const m = await lookupMember(sb);
+      if (!m || m.notMember) return null;
+      member = m;
+    }
+    return sb;
+  }
+
+  /* Call one of the site's edge functions (supabase/functions/<name>) as the signed-in person.
+       await Family.call('calendar', 'events?days=14')            → GET
+       await Family.call('calendar', 'connect', { url, name })    → POST
+     Pass a client from Family.peek() as the last argument to skip the sign-in card. */
+  async function call(name, route, body, client) {
+    const sb = client || await connect();
+    if (!sb) throw new Error('This needs Supabase switched on in site.js.');
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${SITE.supabase.url}/functions/v1/${name}/${route}`, {
+      method: body ? 'POST' : 'GET',
+      headers: {
+        Authorization: `Bearer ${session?.access_token}`,
+        apikey: SITE.supabase.key,
+        'Content-Type': 'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(out.error || out.message || `Something went wrong (${res.status})`);
+    return out;
   }
 
   /* Who's signed in, and are they on the family guest list (public.allowed_emails)? */
@@ -341,5 +385,25 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectNav);
   else injectNav();
 
-  window.Family = { site: SITE, store, client: connect, me, entries, esc, uid, url, signOut };
+  /* ───────── the Tyse logo on the browser tab, and "install as an app" ─────────
+     The icons live in /icons/ and the app details in /manifest.webmanifest.
+     A page that sets its own icon (like Wanderlings' egg) keeps it. */
+  function addAppTags() {
+    const head = document.head;
+    const add = (tag, attrs) => {
+      const el = document.createElement(tag);
+      Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+      head.appendChild(el);
+    };
+    if (!head.querySelector('link[rel~="icon"]')) {
+      add('link', { rel: 'icon', type: 'image/svg+xml', href: url('icons/favicon.svg') });
+      add('link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: url('icons/favicon-32.png') });
+    }
+    if (!head.querySelector('link[rel="manifest"]')) add('link', { rel: 'manifest', href: url('manifest.webmanifest') });
+    if (!head.querySelector('link[rel="apple-touch-icon"]')) add('link', { rel: 'apple-touch-icon', href: url('icons/apple-touch-icon.png') });
+    if (!head.querySelector('meta[name="theme-color"]')) add('meta', { name: 'theme-color', content: '#3f5e44' });
+  }
+  addAppTags();
+
+  window.Family = { site: SITE, store, client: connect, peek, call, me, entries, esc, uid, url, signOut };
 })();

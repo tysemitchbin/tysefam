@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Calendar</title>
+
+<!-- ════════════════════════════════════════════════════════════════
+     CALENDAR: what's coming up, from our shared Google Calendar.
+
+     The page asks the `calendar` edge function (supabase/functions/calendar/)
+     for the events. Each calendar's private link is saved in the database
+     where only that function can read it, never in this page's code.
+     View only: add and change events in Google Calendar (or Notion) as usual.
+═════════════════════════════════════════════════════════════════ -->
+
+<link rel="stylesheet" href="../../shared/family.css">
+<style>
+.range{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px;}
+.chip{border:2px solid var(--line);background:#fff;color:var(--forest);border-radius:999px;padding:6px 12px;font-weight:800;font-size:.85rem;}
+.chip.on{background:var(--meadow);border-color:var(--meadow);color:#fff;}
+
+.problem{background:#fdeede;border:1px solid #f3c9a8;color:#8a4f2a;border-radius:14px;padding:10px 14px;margin:0 0 14px;font-weight:700;font-size:.9rem;}
+
+/* the list of days */
+.month{font-family:'Fredoka',sans-serif;color:var(--ink-soft);font-size:1rem;margin:18px 4px 8px;text-transform:uppercase;letter-spacing:.06em;}
+.month:first-child{margin-top:0;}
+.day{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line);}
+.day:last-child{border-bottom:none;}
+.date{flex:0 0 58px;text-align:center;line-height:1.1;}
+.date .dow{font-size:.72rem;font-weight:800;text-transform:uppercase;color:var(--ink-soft);letter-spacing:.05em;}
+.date .num{font-family:'Fredoka',sans-serif;font-size:1.6rem;color:var(--forest);}
+.date .rel{font-size:.7rem;font-weight:800;color:var(--meadow-deep);}
+.day.today .date .num{display:inline-grid;place-items:center;width:42px;height:42px;border-radius:50%;background:var(--meadow);color:#fff;}
+.evs{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;}
+.ev{display:flex;gap:10px;align-items:baseline;padding:8px 10px;border-radius:12px;background:var(--bg);border-left:4px solid var(--c);}
+.ev .time{flex:0 0 auto;font-weight:800;font-size:.85rem;color:var(--c);min-width:88px;}
+.ev .what{flex:1;min-width:0;word-break:break-word;}
+.ev .title{font-weight:700;}
+.ev .where{display:block;font-size:.8rem;color:var(--ink-soft);}
+.ev .cal{font-size:.68rem;font-weight:800;color:var(--ink-soft);white-space:nowrap;}
+.ev.past{opacity:.5;}
+@media(max-width:520px){ .ev{flex-wrap:wrap;} .ev .time{min-width:0;} .date{flex-basis:46px;} }
+
+.c-meadow {--c:var(--meadow-deep); --bg:#eef6ea;}
+.c-sky    {--c:#4b93a5;            --bg:#e8f4f6;}
+.c-peach  {--c:var(--peach-deep);  --bg:#fdf1e6;}
+.c-blossom{--c:var(--blossom-deep);--bg:#fcebf1;}
+.c-sun    {--c:#b8952a;            --bg:#fcf5da;}
+
+/* settings */
+details.card>summary{cursor:pointer;list-style:none;font-family:'Fredoka',sans-serif;font-weight:600;color:var(--forest);font-size:1.15rem;}
+details.card>summary::-webkit-details-marker{display:none;}
+details.card>summary::after{content:' ▸';color:var(--ink-soft);}
+details.card[open]>summary::after{content:' ▾';}
+.feed{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px dashed var(--line);}
+.feed .dot{width:14px;height:14px;border-radius:50%;background:var(--c);flex:0 0 auto;}
+.feed .nm{flex:1;font-weight:700;min-width:0;}
+.swatches{display:flex;gap:6px;}
+.sw{width:26px;height:26px;border-radius:50%;border:3px solid #fff;background:var(--c);box-shadow:0 0 0 1px var(--line);padding:0;}
+.sw.on{box-shadow:0 0 0 2px var(--forest);}
+.steps{margin:6px 0 14px;padding-left:20px;color:var(--ink-soft);font-size:.9rem;line-height:1.5;}
+.steps b{color:var(--ink);}
+.form{display:flex;flex-direction:column;gap:10px;margin-top:6px;}
+.form label{font-weight:800;font-size:.82rem;color:var(--ink-soft);display:flex;flex-direction:column;gap:5px;}
+.msg{font-weight:700;color:var(--peach-deep);min-height:1.2em;margin:0;}
+.small{font-size:.85rem;color:var(--ink-soft);}
+</style>
+</head>
+<body data-tool="calendar">
+
+<main class="wrap">
+  <div class="page-head">
+    <span class="emoji">📅</span><h1>Calendar</h1>
+    <span style="flex:1"></span>
+    <button class="btn ghost sm" id="refresh" title="Check Google for changes now">↻ Refresh</button>
+  </div>
+  <p class="hint">What's coming up, from our shared Google Calendar. Add or change events in Google Calendar or Notion as usual.</p>
+
+  <div class="range" id="range">
+    <button class="chip" data-days="14">2 weeks</button>
+    <button class="chip" data-days="60">2 months</button>
+    <button class="chip" data-days="183">6 months</button>
+  </div>
+
+  <div id="problems"></div>
+  <div class="card" id="agenda"><div class="empty"><span class="big">⏳</span>Fetching the calendar…</div></div>
+
+  <details class="card" id="setup">
+    <summary>⚙️ Calendars shown here</summary>
+    <ul class="list" id="feeds" style="margin-top:10px"></ul>
+
+    <h3 style="margin-top:18px">➕ Add a calendar</h3>
+    <p class="small" style="margin:0">Google gives every calendar a private link. Copy it once and this page keeps up by itself.
+      You need a computer for this (the Google Calendar phone app doesn't show the link).</p>
+    <ol class="steps">
+      <li>Open <a href="https://calendar.google.com/calendar/r/settings" target="_blank" rel="noopener">Google Calendar settings</a>.</li>
+      <li>On the left, under <b>Settings for my calendars</b>, click the shared calendar.</li>
+      <li>Scroll down to <b>Integrate calendar</b> and copy the <b>Secret address in iCal format</b>
+        (click the eye 👁 to show it, then copy).<br>
+        <i>Can't see it? Only the calendar's owner (or someone allowed to “make changes and manage sharing”) can.</i></li>
+      <li>Paste it below. It's saved somewhere only the site's server can read, never in the website's code.</li>
+    </ol>
+    <div class="form">
+      <label>Name<input class="field" id="fName" placeholder="e.g. Tyse Fam" maxlength="60"></label>
+      <label>Colour<div class="swatches" id="fColor"></div></label>
+      <label>Secret address<input class="field" id="fUrl" type="url" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" autocomplete="off" spellcheck="false"></label>
+      <p class="msg" id="fMsg"></p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" id="fAdd">Add calendar</button>
+        <button class="btn ghost" id="fHolidays" title="Google's public calendar of Norwegian holidays">🇳🇴 Add Norwegian holidays</button>
+      </div>
+    </div>
+  </details>
+</main>
+
+<script src="../../site.js"></script>
+<script src="../../shared/family.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const esc = Family.esc;
+const COLORS = ['meadow', 'sky', 'peach', 'blossom', 'sun'];
+// Google's own public calendar of Norwegian public holidays (anyone may use this link).
+const HOLIDAYS = 'https://calendar.google.com/calendar/ical/no.norwegian%23holiday%40group.v.calendar.google.com/public/basic.ics';
+
+// How far ahead to look. Remembered on this device only.
+let days = 60;
+try { days = Number(localStorage.getItem('calendar_days')) || 60; } catch (e) {}
+
+let feeds = [];      // [{ id, name, color }]
+let events = [];     // [{ title, start, end, allDay, location, feed }]
+
+/* ───────── dates, in the time on this device ───────── */
+const pad = n => String(n).padStart(2, '0');
+const dayKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;   // '2026-10-10'
+const fromKey = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (k, n) => { const d = fromKey(k); d.setDate(d.getDate() + n); return dayKey(d); };
+const hm = d => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+const todayKey = () => dayKey(new Date());
+
+// Spread each event over the days it covers: { '2026-10-10': [ {ev, label}, … ] }
+function byDay() {
+  const out = {};
+  const put = (k, item) => (out[k] = out[k] || []).push(item);
+  const first = todayKey(), last = addDays(first, days);
+  for (const ev of events) {
+    if (ev.allDay) {
+      // all-day: ev.end is the day after the last day
+      const total = Math.round((fromKey(ev.end) - fromKey(ev.start)) / 864e5) || 1;
+      for (let i = 0, k = ev.start; k < ev.end && i < 62; i++, k = addDays(k, 1)) {
+        if (k < first || k > last) continue;
+        put(k, { ev, sort: '', label: total > 1 ? `Day ${i + 1} of ${total}` : 'All day' });
+      }
+    } else {
+      const s = new Date(ev.start), e = new Date(ev.end);
+      const sk = dayKey(s), ek = dayKey(new Date(e - 1));
+      for (let i = 0, k = sk; k <= ek && i < 62; i++, k = addDays(k, 1)) {
+        if (k < first || k > last) continue;
+        const label = sk === ek ? (+e === +s ? hm(s) : `${hm(s)}–${hm(e)}`)
+          : k === sk ? `From ${hm(s)}` : k === ek ? `Until ${hm(e)}` : 'All day';
+        put(k, { ev, sort: k === sk ? hm(s) : '', label, past: e < new Date() });
+      }
+    }
+  }
+  Object.values(out).forEach(list => list.sort((a, b) => a.sort.localeCompare(b.sort)));
+  return out;
+}
+
+/* ───────── drawing ───────── */
+function drawAgenda() {
+  const box = $('#agenda');
+  if (!feeds.length) {
+    box.innerHTML = `<div class="empty"><span class="big">📅</span>No calendar added yet.<br>
+      Open <b>⚙️ Calendars shown here</b> below to add ours.</div>`;
+    $('#setup').open = true;
+    return;
+  }
+  const groups = byDay();
+  const keys = Object.keys(groups).sort();
+  if (!keys.length) { box.innerHTML = '<div class="empty"><span class="big">🌤️</span>Nothing on the calendar. Enjoy the quiet!</div>'; return; }
+
+  const colorOf = id => (feeds.find(f => f.id === id) || {}).color || 'meadow';
+  const nameOf = id => (feeds.find(f => f.id === id) || {}).name || '';
+  const today = todayKey(), tomorrow = addDays(today, 1);
+  let html = '', month = '';
+  for (const k of keys) {
+    const d = fromKey(k);
+    const m = d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    if (m !== month) { html += `<div class="month">${esc(m)}</div>`; month = m; }
+    const rel = k === today ? 'Today' : k === tomorrow ? 'Tomorrow' : '';
+    html += `<div class="day${k === today ? ' today' : ''}">
+      <div class="date"><div class="dow">${esc(d.toLocaleDateString('en-GB', { weekday: 'short' }))}</div>
+        <div class="num">${d.getDate()}</div>${rel ? `<div class="rel">${rel}</div>` : ''}</div>
+      <div class="evs">${groups[k].map(({ ev, label, past }) => `
+        <div class="ev c-${colorOf(ev.feed)}${past ? ' past' : ''}">
+          <span class="time">${esc(label)}</span>
+          <span class="what"><span class="title">${esc(ev.title)}</span>
+            ${ev.location ? `<span class="where">📍 ${esc(ev.location)}</span>` : ''}</span>
+          ${feeds.length > 1 ? `<span class="cal">${esc(nameOf(ev.feed))}</span>` : ''}
+        </div>`).join('')}</div>
+    </div>`;
+  }
+  box.innerHTML = html;
+}
+
+function drawFeeds() {
+  const ul = $('#feeds');
+  if (!feeds.length) { ul.innerHTML = '<div class="empty" style="padding:8px">None yet.</div>'; return; }
+  ul.innerHTML = feeds.map(f => `
+    <li class="feed c-${f.color}" data-id="${esc(f.id)}">
+      <span class="dot"></span><span class="nm">${esc(f.name)}</span>
+      <span class="swatches">${COLORS.map(c => `<button class="sw c-${c}${c === f.color ? ' on' : ''}" data-color="${c}" title="${c}"></button>`).join('')}</span>
+      <button class="del" title="Stop showing this calendar">🗑</button>
+    </li>`).join('');
+  ul.querySelectorAll('.feed').forEach(li => {
+    const f = feeds.find(x => x.id === li.dataset.id);
+    li.querySelectorAll('.sw').forEach(b => b.onclick = async () => {
+      f.color = b.dataset.color; drawFeeds(); drawAgenda();
+      await Family.call('calendar', 'update', { feed: f.id, color: f.color }).catch(e => alert(e.message));
+    });
+    li.querySelector('.del').onclick = async () => {
+      if (!confirm(`Stop showing “${f.name}” here? (Nothing changes in Google Calendar.)`)) return;
+      try { await Family.call('calendar', 'disconnect', { feed: f.id }); load(); }
+      catch (e) { alert(e.message); }
+    };
+  });
+}
+
+/* ───────── fetching ───────── */
+async function load(fresh = false) {
+  document.querySelectorAll('#range .chip').forEach(b => b.classList.toggle('on', Number(b.dataset.days) === days));
+  try {
+    const out = await Family.call('calendar', `events?days=${days}${fresh ? '&fresh=1' : ''}`);
+    feeds = out.feeds; events = out.events;
+    $('#problems').innerHTML = out.problems.map(p =>
+      `<div class="problem">⚠️ Couldn't read “${esc(p.name)}”: ${esc(p.error)}</div>`).join('');
+    drawFeeds(); drawAgenda();
+  } catch (e) {
+    $('#agenda').innerHTML = `<div class="empty"><span class="big">😕</span>${esc(e.message)}</div>`;
+  }
+}
+
+$('#range').onclick = e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  days = Number(b.dataset.days);
+  try { localStorage.setItem('calendar_days', days); } catch (err) {}
+  load();
+};
+$('#refresh').onclick = async () => { $('#refresh').disabled = true; await load(true); $('#refresh').disabled = false; };
+
+/* ───────── adding a calendar ───────── */
+let pickColor = 'meadow';
+function drawPicker() {
+  $('#fColor').innerHTML = COLORS.map(c => `<button type="button" class="sw c-${c}${c === pickColor ? ' on' : ''}" data-color="${c}" title="${c}"></button>`).join('');
+}
+$('#fColor').onclick = e => { const b = e.target.closest('.sw'); if (b) { pickColor = b.dataset.color; drawPicker(); } };
+drawPicker();
+
+async function addCalendar(url, name, color) {
+  const say = t => { $('#fMsg').textContent = t; };
+  say('Checking the link with Google…');
+  try {
+    await Family.call('calendar', 'connect', { url, name, color });
+    say(''); $('#fUrl').value = ''; $('#fName').value = '';
+    await load();
+  } catch (e) { say(e.message); }
+}
+$('#fAdd').onclick = () => addCalendar($('#fUrl').value, $('#fName').value, pickColor);
+$('#fHolidays').onclick = () => addCalendar(HOLIDAYS, 'Norwegian holidays', 'sun');
+
+load();
+</script>
+</body>
+</html>

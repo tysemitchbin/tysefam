@@ -10,20 +10,51 @@
      You shouldn't need to edit this file to add a tool; see README.
 ═════════════════════════════════════════════════════════════════ -->
 
+<link rel="icon" type="image/svg+xml" href="icons/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#3f5e44">
 <link rel="stylesheet" href="shared/family.css">
 <style>
 /* header scene */
-.scene{position:relative;height:230px;overflow:hidden;background:linear-gradient(#cfeef2 0%,#e7f5ec 60%,#f3f7e6 100%);}
+.scene{position:relative;height:260px;overflow:hidden;background:linear-gradient(#cfeef2 0%,#e7f5ec 60%,#f3f7e6 100%);}
 .scene svg{position:absolute;inset:0;width:100%;height:100%;}
 .cloud{animation:drift 60s linear infinite;}
 .cloud.b{animation-duration:90s;animation-delay:-30s;}
 @keyframes drift{from{transform:translateX(-120px);}to{transform:translateX(900px);}}
-.title-wrap{position:absolute;left:0;right:0;bottom:18px;text-align:center;z-index:2;padding:0 16px;}
+.title-wrap{position:absolute;left:0;right:0;bottom:62px;text-align:center;z-index:2;padding:0 16px;}
 .title-wrap h1{margin:0;font-size:2.4rem;font-weight:700;color:#fff;letter-spacing:.5px;
   text-shadow:0 2px 6px rgba(63,94,68,.35);}
 .title-wrap .sub{margin:2px 0 0;color:#fff;font-weight:700;font-size:.95rem;opacity:.95;
   text-shadow:0 1px 4px rgba(63,94,68,.4);}
 @media(prefers-reduced-motion:reduce){.cloud{animation:none;}}
+
+/* Wanderlings creatures strolling on the hills (drawn by tools/wanderlings/creatures.js) */
+.critter{position:absolute;left:0;z-index:3;cursor:pointer;will-change:transform;
+  -webkit-tap-highlight-color:transparent;}
+.critter .flip,.critter .hop{height:100%;}
+.critter .flip{transition:transform .25s;}
+.critter.left .flip{transform:scaleX(-1);}
+.critter .hop{animation:hop .5s ease-in-out infinite alternate;transform-origin:50% 100%;}
+.critter.resting .hop{animation:breathe 2.4s ease-in-out infinite alternate;}
+.critter svg{display:block;width:100%;height:100%;filter:drop-shadow(0 2px 2px rgba(40,60,40,.25));}
+@keyframes hop{from{transform:translateY(0) scaleY(1);}to{transform:translateY(-5px) scaleY(1.03);}}
+@keyframes breathe{from{transform:scaleY(1);}to{transform:scaleY(.96);}}
+.bubble{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);width:max-content;max-width:210px;
+  background:#fffdf7;color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:8px 11px;
+  box-shadow:var(--shadow);font-size:.8rem;line-height:1.35;text-align:center;pointer-events:none;}
+.bubble b{display:block;font-family:'Fredoka',sans-serif;color:var(--forest);font-size:.95rem;}
+@media(prefers-reduced-motion:reduce){.critter .hop,.critter.resting .hop{animation:none;}}
+
+/* "Coming up" from the shared calendar (only shown when signed in and a calendar is added) */
+.soon-card{margin:0 0 18px;}
+.soon-card h3 a{margin-left:auto;font-family:'Nunito',sans-serif;font-size:.85rem;font-weight:800;text-decoration:none;}
+.soon-row{display:flex;gap:12px;align-items:baseline;padding:8px 2px;border-bottom:1px dashed var(--line);}
+.soon-row:last-child{border-bottom:none;}
+.soon-row .when{flex:0 0 132px;font-weight:800;font-size:.85rem;color:var(--meadow-deep);}
+.soon-row .what{flex:1;min-width:0;word-break:break-word;font-weight:700;}
+@media(max-width:520px){.soon-row{flex-direction:column;gap:0;}.soon-row .when{flex:none;}}
 
 /* greeting */
 .hello{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:4px 0 18px;}
@@ -84,6 +115,7 @@
     <h2 id="greeting">Welcome home 🌿</h2>
     <p id="today"></p>
   </div>
+  <div id="comingUp"></div>
   <div class="tools" id="tools"></div>
   <div class="foot">Made with <span class="heart">♥</span> for the family</div>
 </main>
@@ -115,6 +147,124 @@ grid.innerHTML = site.tools.filter(t => !t.hidden).map((t, i) => {
     </a>`;
 }).join('') + `<div class="tool soon"><div class="ico" style="background:#eef0e8">🌱</div>
     <p style="flex:0">More tools on the way…</p></div>`;
+
+/* ───────── "Coming up": the next few things on the shared calendar ─────────
+   Only when someone's already signed in on this device and a calendar has been added
+   (on the Calendar page). Never asks anyone to sign in here. */
+(async function comingUp() {
+  try {
+    const sb = await Family.peek();
+    if (!sb) return;
+    const { feeds, events } = await Family.call('calendar', 'events?days=14', null, sb);
+    if (!feeds.length) return;
+    const pad = n => String(n).padStart(2, '0');
+    const key = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const now = new Date(), today = key(now);
+    const tmw = new Date(now); tmw.setDate(tmw.getDate() + 1);
+    const dayName = k => k === today ? 'Today' : k === key(tmw) ? 'Tomorrow'
+      : new Date(k + 'T12:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    const hm = d => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const next = events
+      .filter(e => e.allDay ? e.end > today : new Date(e.end) > now)
+      .map(e => {
+        if (e.allDay) {
+          const k = e.start < today ? today : e.start;     // started already? show it as today
+          return { sort: k + ' 00:00', when: dayName(k), title: e.title };
+        }
+        const s = new Date(e.start);
+        return { sort: key(s) + ' ' + hm(s), when: `${dayName(key(s))} · ${hm(s)}`, title: e.title };
+      })
+      .sort((a, b) => a.sort.localeCompare(b.sort))
+      .slice(0, 5);
+    document.getElementById('comingUp').innerHTML = `<div class="card soon-card">
+      <h3>📅 Coming up <a href="tools/calendar/">Calendar →</a></h3>
+      ${next.length ? next.map(e => `<div class="soon-row"><span class="when">${esc(e.when)}</span><span class="what">${esc(e.title)}</span></div>`).join('')
+        : '<div class="empty" style="padding:8px">Nothing in the next two weeks 🌤️</div>'}
+    </div>`;
+  } catch (e) { console.warn('Coming up: could not read the calendar', e); }
+})();
+</script>
+
+<!-- ───────── A few Wanderlings creatures out for a stroll on the hills ─────────
+     They're drawn by the game's own code, so they look just like they do in Wanderlings.
+     Tap one to say hello. -->
+<script type="module">
+import { SPECIES, creatureSVG } from './tools/wanderlings/creatures.js';
+
+const scene = document.querySelector('.scene');
+const HOW_MANY = window.innerWidth < 600 ? 3 : 5;
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// A different handful every visit.
+const pick = [...SPECIES].sort(() => Math.random() - .5).slice(0, HOW_MANY);
+
+const critters = pick.map((sp, i) => {
+  const el = document.createElement('div');
+  const depth = Math.random();                         // 0 = further up the hill, 1 = close to us
+  const size = Math.round(window.innerWidth < 600 ? 40 + depth * 16 : 50 + depth * 22);
+  const dir = Math.random() < .5 ? -1 : 1;              // which way it starts walking
+  el.className = 'critter' + (dir < 0 ? ' left' : '');   // facing that way from the start (no turn on load)
+  el.style.width = el.style.height = size + 'px';
+  el.style.bottom = Math.round(16 - depth * 14) + 'px';
+  el.style.zIndex = 3 + Math.round(depth * 10);
+  // creature art may point at art/<id>.png inside the game's folder
+  el.innerHTML = `<div class="flip"><div class="hop">${creatureSVG(sp).replace(/href="art\//g, 'href="tools/wanderlings/art/')}</div></div>`;
+  el.title = sp.name;
+  scene.appendChild(el);
+  const c = { el, sp, size,
+    x: (i + .5) / pick.length * scene.clientWidth + (Math.random() - .5) * 60,
+    dir,
+    speed: 14 + Math.random() * 16,                    // pixels a second: a gentle stroll
+    restUntil: 0, walkUntil: performance.now() + 2000 + Math.random() * 5000 };
+  el.onclick = e => { e.stopPropagation(); say(c); };
+  return c;
+});
+
+// Tap: a little speech bubble with its name and what it's like.
+let bubbleTimer;
+function say(c) {
+  document.querySelectorAll('.bubble').forEach(b => b.remove());
+  const b = document.createElement('div');
+  b.className = 'bubble';
+  b.innerHTML = `<b>${Family.esc(c.sp.name)}</b>${Family.esc(c.sp.flavor || '')}`;
+  c.el.appendChild(b);
+  c.restUntil = performance.now() + 4000;              // stops to chat
+  clearTimeout(bubbleTimer);
+  bubbleTimer = setTimeout(() => b.remove(), 4000);
+}
+document.addEventListener('click', () => document.querySelectorAll('.bubble').forEach(b => b.remove()));
+
+function place(c) {
+  c.el.style.transform = `translateX(${Math.round(c.x - c.size / 2)}px)`;
+  c.el.classList.toggle('left', c.dir < 0);
+}
+
+let last = performance.now();
+function step(now) {
+  const dt = Math.min(.1, (now - last) / 1000); last = now;
+  const w = scene.clientWidth;
+  for (const c of critters) {
+    const resting = now < c.restUntil;
+    c.el.classList.toggle('resting', resting);
+    if (!resting) {
+      c.x += c.dir * c.speed * dt;
+      // turn round at the edges
+      if (c.x < c.size / 2) { c.x = c.size / 2; c.dir = 1; }
+      if (c.x > w - c.size / 2) { c.x = w - c.size / 2; c.dir = -1; }
+      // every so often: stop for a sit, and maybe wander the other way
+      if (now > c.walkUntil) {
+        c.restUntil = now + 1500 + Math.random() * 3500;
+        c.walkUntil = c.restUntil + 3000 + Math.random() * 7000;
+        if (Math.random() < .5) c.dir *= -1;
+      }
+    }
+    place(c);
+  }
+  requestAnimationFrame(step);
+}
+critters.forEach(place);
+if (still) critters.forEach(c => c.el.classList.add('resting'));
+else requestAnimationFrame(step);
 </script>
 </body>
 </html>

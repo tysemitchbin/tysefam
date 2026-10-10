@@ -51,6 +51,20 @@ window.SITE = {
       color: 'peach'
     },
     {
+      id: 'calendar',
+      name: 'Calendar',
+      emoji: '📅',
+      description: 'What’s coming up, from our shared Google Calendar.',
+      color: 'meadow'
+    },
+    {
+      id: 'packing',
+      name: 'Packing',
+      emoji: '🧳',
+      description: 'Shared packing lists for weekends away, day trips and the other house, with baby things counted for you.',
+      color: 'peach'
+    },
+    {
       id: 'energy',
       name: 'Energy',
       emoji: '⚡',

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Packing</title>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PACKING: one shared checklist for trips, made with a baby in mind.
+
+     Saved in Family.store('packing'):
+       lists  → trip types:  { name, emoji }            (ids 'weekend', 'day', 'house' to start)
+       items  → things:      { text, who, lists: [ids], count, perDay, spare, lastMinute, packed }
+                  who        'baby', 'shared', or a name from SITE.people
+                  count      how many to pack (when it doesn't depend on the trip length)
+                  perDay     how many per day away, plus `spare` extra (e.g. nappies 8/day + 4)
+                  lastMinute true = goes in "Last minute" (milk from the fridge, the dummy…)
+       trip   → 'current':   { list, nights }  the trip being packed for right now
+     Ticks are shared live, so two people can pack at once.
+═════════════════════════════════════════════════════════════════ -->
+
+<link rel="stylesheet" href="../../shared/family.css">
+<style>
+.trips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+.chip{border:2px solid var(--line);background:#fff;color:var(--forest);border-radius:999px;padding:7px 13px;font-weight:800;font-size:.9rem;}
+.chip.on{background:var(--meadow);border-color:var(--meadow);color:#fff;}
+.chip.add{border-style:dashed;color:var(--ink-soft);}
+
+.tripbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.nights{display:flex;align-items:center;gap:8px;font-weight:800;color:var(--forest);}
+.nights button{width:34px;height:34px;border-radius:50%;border:2px solid var(--line);background:#fff;font-weight:800;font-size:1.1rem;color:var(--forest);}
+.nights button:hover{border-color:var(--meadow);}
+.nights .n{min-width:84px;text-align:center;}
+.progress{flex:1;min-width:180px;}
+.bar{height:12px;border-radius:999px;background:#eef0e8;overflow:hidden;}
+.bar>div{height:100%;background:linear-gradient(90deg,var(--meadow),var(--meadow-deep));border-radius:999px;transition:width .3s;}
+.progress .lbl{font-size:.82rem;font-weight:800;color:var(--ink-soft);margin-top:4px;}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+
+.sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:18px;align-items:start;}
+.sections .card{margin:0;}
+.card h3 .cnt{margin-left:auto;font-family:'Nunito',sans-serif;font-size:.8rem;font-weight:800;color:var(--ink-soft);}
+.card.last{background:#fffaf0;border-color:#f3dfb0;}
+.item .txt{cursor:pointer;}
+.qty{display:inline-block;font-size:.75rem;font-weight:800;padding:1px 8px;border-radius:999px;background:#e3f1df;color:var(--meadow-deep);margin-left:6px;vertical-align:middle;}
+.edit{flex:0 0 auto;border:none;background:none;color:#c9b9a6;font-size:1rem;padding:2px 4px;border-radius:8px;}
+.edit:hover{color:var(--forest);background:#eef6ea;}
+.all-done{text-align:center;font-family:'Fredoka',sans-serif;font-size:1.3rem;color:var(--meadow-deep);margin:4px 0 18px;}
+
+/* the edit box */
+dialog{border:none;border-radius:20px;padding:0;max-width:440px;width:calc(100% - 32px);box-shadow:var(--shadow-lg);background:var(--paper);color:var(--ink);}
+dialog::backdrop{background:rgba(60,65,56,.35);}
+dialog form{padding:20px;display:flex;flex-direction:column;gap:12px;}
+dialog h3{margin:0;color:var(--forest);}
+dialog label{font-weight:800;font-size:.82rem;color:var(--ink-soft);display:flex;flex-direction:column;gap:5px;}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.row input[type=number]{width:72px;}
+.checks{display:flex;gap:6px 14px;flex-wrap:wrap;font-weight:700;color:var(--ink);}
+.checks label{flex-direction:row;align-items:center;gap:6px;font-size:.92rem;color:var(--ink);}
+.howmany{display:flex;flex-direction:column;gap:8px;font-weight:700;color:var(--ink);font-size:.92rem;}
+.howmany label{flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-size:.92rem;flex-wrap:wrap;}
+.dlg-acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:4px;}
+.dlg-acts .btn.danger{background:#fff;color:var(--blossom-deep);border:2px solid #f6d3de;margin-right:auto;}
+</style>
+</head>
+<body data-tool="packing">
+
+<main class="wrap">
+  <div class="page-head">
+    <span class="emoji">🧳</span><h1>Packing</h1>
+    <span style="flex:1"></span>
+    <span id="sync" class="badge local">…</span>
+  </div>
+  <p class="hint">Pick the trip, set the nights, and tick things off as they go in the bag. Ticks show up on both phones straight away.</p>
+
+  <div class="card">
+    <div class="trips" id="trips"></div>
+    <div class="tripbar">
+      <div class="nights" id="nightsBox">
+        <button id="fewer" aria-label="One night fewer">−</button>
+        <span class="n" id="nights">2 nights</span>
+        <button id="more" aria-label="One night more">+</button>
+      </div>
+      <div class="progress">
+        <div class="bar"><div id="barFill" style="width:0"></div></div>
+        <div class="lbl" id="barLbl"></div>
+      </div>
+    </div>
+    <div class="acts">
+      <button class="btn ghost sm" id="reset">🔄 Start a new trip (untick all)</button>
+      <button class="btn ghost sm" id="hidePacked"></button>
+    </div>
+  </div>
+
+  <div id="done"></div>
+  <div class="sections" id="sections"></div>
+
+  <div class="card" style="margin-top:18px">
+    <h3>➕ Add something</h3>
+    <div class="addrow">
+      <input id="newText" placeholder="e.g. Sun hat" maxlength="80">
+      <select id="newWho" style="flex:0 0 auto;width:auto"></select>
+      <button class="btn" id="addBtn">Add</button>
+    </div>
+    <p class="hint" style="margin:0">It's added to the trip you're looking at. Tap ✏️ on any item to set how many, or which trips it's for.</p>
+  </div>
+</main>
+
+<!-- Edit one item -->
+<dialog id="dlg">
+  <form method="dialog" id="dlgForm">
+    <h3>✏️ Edit item</h3>
+    <label>What<input class="field" name="text" required maxlength="80"></label>
+    <label>Whose<select class="field" name="who"></select></label>
+    <div>
+      <div style="font-weight:800;font-size:.82rem;color:var(--ink-soft);margin-bottom:6px">How many</div>
+      <div class="howmany">
+        <label><input type="radio" name="mode" value="count"> Always
+          <input class="field" type="number" name="count" min="1" max="99" style="width:72px;flex:0 0 auto"></label>
+        <label><input type="radio" name="mode" value="perDay">
+          <input class="field" type="number" name="perDay" min="1" max="99" style="width:72px;flex:0 0 auto"> a day, plus
+          <input class="field" type="number" name="spare" min="0" max="99" style="width:72px;flex:0 0 auto"> spare</label>
+      </div>
+    </div>
+    <div>
+      <div style="font-weight:800;font-size:.82rem;color:var(--ink-soft);margin-bottom:6px">Pack it for</div>
+      <div class="checks" id="dlgLists"></div>
+    </div>
+    <div class="checks"><label><input type="checkbox" name="lastMinute"> ⏰ Last minute (can't pack it the night before)</label></div>
+    <div class="dlg-acts">
+      <button class="btn danger" type="button" id="dlgDelete">🗑 Delete</button>
+      <button class="btn ghost" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn" value="save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="../../site.js"></script>
+<script src="../../shared/family.js"></script>
+<script>
+const TOOL_ID = 'packing';
+const store = Family.store(TOOL_ID);
+const $ = s => document.querySelector(s);
+const esc = Family.esc;
+const people = Family.site.people || [];
+
+// Whose things: the baby, each grown-up from site.js, and shared stuff.
+const WHO = [['baby', '👶 Baby'], ...people.map(p => [p, `🧑 ${p}`]), ['shared', '🧺 Shared']];
+const whoLabel = w => (WHO.find(x => x[0] === w) || [w, w])[1];
+
+// The trip types we start with. Their ids are fixed so two phones can't make doubles.
+const DEFAULT_LISTS = {
+  weekend: { name: 'Weekend away', emoji: '🏕️', order: 1 },
+  day:     { name: 'Day trip',     emoji: '🚗', order: 2 },
+  house:   { name: 'Other house',  emoji: '🏡', order: 3 },
+};
+
+let lists = {}, items = {}, trip = { list: 'weekend', nights: 2 };
+let hidePacked = false;
+try { hidePacked = localStorage.getItem('packing_hide') === '1'; } catch (e) {}
+
+/* ───────── how many to pack ───────── */
+const daysAway = () => Math.max(1, trip.nights);
+function qty(it) {
+  if (it.perDay) return it.perDay * daysAway() + (it.spare || 0);
+  return it.count || 1;
+}
+function qtyHow(it) {
+  if (!it.perDay) return '';
+  return `${it.perDay} a day × ${daysAway()} day${daysAway() > 1 ? 's' : ''}${it.spare ? ` + ${it.spare} spare` : ''}`;
+}
+
+/* ───────── drawing ───────── */
+function draw() {
+  // trip chips
+  const listRows = Object.entries(lists).sort((a, b) => (a[1].order || 99) - (b[1].order || 99) || (a[1].ts || 0) - (b[1].ts || 0));
+  if (!lists[trip.list] && listRows.length) trip.list = listRows[0][0];
+  $('#trips').innerHTML = listRows.map(([id, l]) =>
+    `<button class="chip${id === trip.list ? ' on' : ''}" data-id="${esc(id)}">${esc(l.emoji || '🧳')} ${esc(l.name)}</button>`).join('')
+    + `<button class="chip add" id="newList" title="Add another kind of trip">＋ Trip type</button>`;
+  $('#nights').textContent = trip.nights === 0 ? 'Day trip' : `${trip.nights} night${trip.nights > 1 ? 's' : ''}`;
+  $('#hidePacked').textContent = hidePacked ? '👀 Show packed things' : '🙈 Hide packed things';
+
+  // the things for this trip
+  const mine = Family.entries(items).filter(([, it]) => (it.lists || []).includes(trip.list));
+  const packed = mine.filter(([, it]) => it.packed).length;
+  $('#barFill').style.width = mine.length ? `${Math.round(packed / mine.length * 100)}%` : '0';
+  $('#barLbl').textContent = mine.length ? `${packed} of ${mine.length} packed` : '';
+  $('#done').innerHTML = mine.length && packed === mine.length ? '<div class="all-done">🎉 All packed! Have a lovely trip.</div>' : '';
+
+  if (!Object.keys(items).length) {
+    $('#sections').innerHTML = `<div class="card" style="grid-column:1/-1"><div class="empty"><span class="big">🧳</span>
+      The list is empty.<br><br><button class="btn" id="starter">Fill in a starter list for a baby trip</button>
+      <p class="hint" style="margin:10px 0 0">About 45 things to start from. Change or delete anything you like.</p></div></div>`;
+    $('#starter').onclick = addStarter;
+    return;
+  }
+
+  // one card per person, then "Last minute"
+  const groups = [...WHO.map(([w, label]) => ({ label, rows: mine.filter(([, it]) => !it.lastMinute && it.who === w) })),
+    { label: '⏰ Last minute', last: true, rows: mine.filter(([, it]) => it.lastMinute) }];
+  // things for someone who's no longer in site.js still show up, under Shared
+  const known = new Set(WHO.map(w => w[0]));
+  groups[WHO.length - 1].rows.push(...mine.filter(([, it]) => !it.lastMinute && !known.has(it.who)));
+
+  $('#sections').innerHTML = groups.filter(g => g.rows.length).map(g => {
+    const left = g.rows.filter(([, it]) => !it.packed).length;
+    const rows = hidePacked ? g.rows.filter(([, it]) => !it.packed) : g.rows;
+    return `<div class="card${g.last ? ' last' : ''}"><h3>${esc(g.label)}<span class="cnt">${left ? `${left} to go` : '✓ done'}</span></h3>
+      <ul class="list">${rows.map(([id, it]) => {
+        const n = qty(it);
+        return `<li class="item${it.packed ? ' done' : ''}" data-id="${esc(id)}">
+          <div class="check${it.packed ? ' done' : ''}" role="checkbox" aria-checked="${!!it.packed}" tabindex="0"></div>
+          <div class="txt">${esc(it.text)}${n > 1 ? `<span class="qty" title="${esc(qtyHow(it))}">×${n}</span>` : ''}
+            ${g.last ? `<span class="who-pill">${esc(whoLabel(it.who))}</span>` : ''}</div>
+          <button class="edit" title="Edit">✏️</button>
+        </li>`;
+      }).join('') || '<div class="empty" style="padding:8px">All packed ✓</div>'}</ul></div>`;
+  }).join('');
+}
+
+/* ───────── clicks ───────── */
+$('#trips').onclick = async e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  if (b.id === 'newList') return newList();
+  trip.list = b.dataset.id;
+  if (trip.list === 'day') trip.nights = 0;
+  else if (trip.nights === 0) trip.nights = 2;
+  draw(); store.set('trip', 'current', trip);
+};
+$('#fewer').onclick = () => { trip.nights = Math.max(0, trip.nights - 1); draw(); store.set('trip', 'current', trip); };
+$('#more').onclick = () => { trip.nights = Math.min(30, trip.nights + 1); draw(); store.set('trip', 'current', trip); };
+$('#hidePacked').onclick = () => {
+  hidePacked = !hidePacked;
+  try { localStorage.setItem('packing_hide', hidePacked ? '1' : '0'); } catch (e) {}
+  draw();
+};
+$('#reset').onclick = async () => {
+  const ticked = Object.entries(items).filter(([, it]) => it.packed);
+  if (!ticked.length) return;
+  if (!confirm('Untick everything, ready for a new trip?')) return;
+  for (const [id] of ticked) store.update('items', id, { packed: false });
+};
+$('#sections').addEventListener('click', e => {
+  const li = e.target.closest('.item'); if (!li) return;
+  const id = li.dataset.id;
+  if (e.target.closest('.edit')) return openEditor(id);
+  if (e.target.closest('.check, .txt')) store.update('items', id, { packed: !items[id].packed });
+});
+$('#sections').addEventListener('keydown', e => {
+  if ((e.key === ' ' || e.key === 'Enter') && e.target.matches('.check')) {
+    e.preventDefault(); const id = e.target.closest('.item').dataset.id;
+    store.update('items', id, { packed: !items[id].packed });
+  }
+});
+
+/* ───────── adding ───────── */
+$('#newWho').innerHTML = WHO.map(([w, l]) => `<option value="${esc(w)}">${esc(l)}</option>`).join('');
+function addItem() {
+  const text = $('#newText').value.trim();
+  if (!text) return;
+  store.add('items', { text, who: $('#newWho').value, lists: [trip.list], count: 1, packed: false });
+  $('#newText').value = ''; $('#newText').focus();
+}
+$('#addBtn').onclick = addItem;
+$('#newText').addEventListener('keydown', e => { if (e.key === 'Enter') addItem(); });
+
+async function newList() {
+  const name = (prompt('Name of the new trip type (e.g. Holiday abroad):') || '').trim();
+  if (!name) return;
+  const emoji = (prompt('An emoji for it (optional):', '✈️') || '🧳').trim().slice(0, 4);
+  const id = await store.add('lists', { name, emoji, order: 10 });
+  trip.list = id; store.set('trip', 'current', trip);
+}
+
+/* ───────── the edit box ───────── */
+const dlg = $('#dlg'), form = $('#dlgForm');
+form.who.innerHTML = WHO.map(([w, l]) => `<option value="${esc(w)}">${esc(l)}</option>`).join('');
+let editing = null;
+function openEditor(id) {
+  editing = id;
+  const it = items[id];
+  form.text.value = it.text;
+  form.who.value = WHO.some(w => w[0] === it.who) ? it.who : 'shared';
+  form.mode.value = it.perDay ? 'perDay' : 'count';
+  form.count.value = it.count || 1;
+  form.perDay.value = it.perDay || 1;
+  form.spare.value = it.spare || 0;
+  form.lastMinute.checked = !!it.lastMinute;
+  $('#dlgLists').innerHTML = Object.entries(lists).sort((a, b) => (a[1].order || 99) - (b[1].order || 99)).map(([lid, l]) =>
+    `<label><input type="checkbox" value="${esc(lid)}"${(it.lists || []).includes(lid) ? ' checked' : ''}> ${esc(l.emoji || '')} ${esc(l.name)}</label>`).join('');
+  dlg.showModal();
+}
+// Saving happens as the Save button submits the form (Cancel and the Esc key just close it).
+form.addEventListener('submit', e => {
+  if (e.submitter?.value !== 'save' || !editing) return;
+  const perDay = form.mode.value === 'perDay';
+  store.update('items', editing, {
+    text: form.text.value.trim() || items[editing].text,
+    who: form.who.value,
+    count: perDay ? 1 : Math.max(1, Number(form.count.value) || 1),
+    perDay: perDay ? Math.max(1, Number(form.perDay.value) || 1) : 0,
+    spare: perDay ? Math.max(0, Number(form.spare.value) || 0) : 0,
+    lastMinute: form.lastMinute.checked,
+    lists: [...$('#dlgLists').querySelectorAll('input:checked')].map(c => c.value),
+  });
+});
+$('#dlgDelete').onclick = () => {
+  if (!editing || !confirm(`Delete “${items[editing].text}” from every trip?`)) return;
+  store.remove('items', editing); editing = null; dlg.close('cancel');
+};
+
+/* ───────── the starter list ─────────
+   [text, who, trips (W weekend, D day, H other house), how many]
+   how many: a number, or 'perDay+spare' like '8+4', and '!' at the end = last minute. */
+const STARTER = [
+  ['Nappies', 'baby', 'WDH', '8+4'], ['Wipes', 'baby', 'WDH', 1], ['Nappy bags', 'baby', 'WDH', 1],
+  ['Nappy cream', 'baby', 'WDH', 1], ['Changing mat', 'baby', 'WD', 1],
+  ['Bodysuits', 'baby', 'WDH', '2+1'], ['Sleepsuits', 'baby', 'WH', '1+1'], ['Socks', 'baby', 'WH', '1+1'],
+  ['Wool base layer', 'baby', 'WH', '1+0'], ['Hat', 'baby', 'WDH', 1], ['Outdoor suit', 'baby', 'WDH', 1],
+  ['Sleeping bag', 'baby', 'WH', 1], ['Muslins / burp cloths', 'baby', 'WDH', '2+0'], ['Bibs', 'baby', 'WDH', '2+0'],
+  ['Bottles', 'baby', 'WDH', 3], ['Toys & rattles', 'baby', 'WDH', 2], ['Blanket', 'baby', 'WDH', 1],
+  ['Baby carrier', 'baby', 'WD', 1], ['Baby towel', 'baby', 'W', 1], ['Baby monitor', 'baby', 'WH', 1],
+  ['Baby paracetamol & syringe', 'baby', 'WH', 1], ['Thermometer', 'baby', 'WH', 1],
+  ['Milk from the fridge', 'baby', 'WDH', '1!'], ['Dummies', 'baby', 'WDH', '2!'], ['Favourite cuddly toy', 'baby', 'WDH', '1!'],
+  ['Car seat', 'shared', 'WDH', 1], ['Pram & rain cover', 'shared', 'WD', 1], ['Changing bag', 'shared', 'WDH', 1],
+  ['Travel cot', 'shared', 'W', 1], ['Phone chargers', 'shared', 'WH', 1], ['Snacks & water', 'shared', 'WDH', 1],
+  ['First aid kit', 'shared', 'W', 1], ['Phones', 'shared', 'WDH', '1!'], ['Keys & wallets', 'shared', 'WDH', '1!'],
+  ...people.flatMap(p => [
+    ['Clothes', p, 'WH', '1+0'], ['Pyjamas', p, 'WH', 1], ['Toiletry bag', p, 'WH', 1], ['Jacket & shoes', p, 'WDH', 1],
+  ]),
+];
+async function addStarter() {
+  const btn = $('#starter'); btn.disabled = true; btn.textContent = 'Adding…';
+  const code = { W: 'weekend', D: 'day', H: 'house' };
+  const t0 = Date.now();
+  await Promise.all(STARTER.map(([text, who, trips, how], i) => {
+    const s = String(how), last = s.endsWith('!'), [a, b] = s.replace('!', '').split('+');
+    const perDay = b !== undefined;
+    return store.add('items', {
+      ts: t0 + i, text, who, lists: [...trips].map(c => code[c]),
+      count: perDay ? 1 : Number(a), perDay: perDay ? Number(a) : 0, spare: perDay ? Number(b) : 0,
+      lastMinute: last, packed: false,
+    });
+  }));
+}
+
+/* ───────── live data ───────── */
+store.ready.then(() => {
+  const cloud = store.mode === 'cloud';
+  $('#sync').className = 'badge ' + (cloud ? 'ok' : 'local');
+  $('#sync').textContent = cloud ? '☁️ Synced' : '📴 This device only';
+  // Make sure the starting trip types exist (fixed ids, so this is safe on two phones at once).
+  store.get('lists').then(have => {
+    for (const [id, l] of Object.entries(DEFAULT_LISTS)) if (!have[id]) store.set('lists', id, l);
+  });
+});
+store.watch('lists', v => { lists = v; draw(); });
+store.watch('items', v => { items = v; draw(); });
+store.watch('trip', v => { if (v.current) trip = Object.assign({ list: 'weekend', nights: 2 }, v.current); draw(); });
+</script>
+</body>
+</html>

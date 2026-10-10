@@ -7,8 +7,13 @@ code readable and commented for a non-expert.
 ## Layout
 - `site.js`: `window.SITE`: site name, `people`, `supabase {url,key}`, and the `tools` registry.
   The home page and the ☰ menu are generated from `tools`.
-- `shared/family.js`: `window.Family`: `store(toolId)`, `me()`, `entries()`, `esc()`, `url()`, `signOut()`.
-  It injects the menu bar on pages with `<body data-tool="…">`, and shows the sign-in card when Supabase is configured.
+- `shared/family.js`: `window.Family`: `store(toolId)`, `me()`, `entries()`, `esc()`, `url()`, `signOut()`,
+  `client()`, `peek()` (client only if already signed in, never shows the sign-in card) and
+  `call(fn, route, body)` (call an edge function as the signed-in person).
+  It injects the menu bar on pages with `<body data-tool="…">`, shows the sign-in card when Supabase is
+  configured, and adds the tab icon + app manifest links to every page that loads it.
+- `icons/` + `manifest.webmanifest`: the "Tyse" logo (letters are paths, no font needed) and the
+  installable-app (PWA) details. No service worker, on purpose: nothing gets stuck in a cache.
 - `shared/family.css`: design tokens (`--meadow`, `--forest`, `--cream`…) and components
   (`.wrap .card .addrow .btn .list .item .check .del .who-pill .empty .badge`).
 - `tools/<id>/index.html`: each tool is self-contained. Start from `tools/new-tool-template/`.
@@ -19,6 +24,13 @@ code readable and commented for a non-expert.
   (`game_state`, `garden_shares`, `rwgps_*`) and the `rwgps` edge function in
   `supabase/functions/rwgps/`. It shares the sign-in session with the rest of the site (same
   project, same origin).
+- `index.html` (home): borrows `SPECIES`/`creatureSVG` from `tools/wanderlings/creatures.js` so a few
+  creatures stroll on the header hills, and shows a "Coming up" box from the calendar via `Family.peek()`.
+- `tools/calendar/`: view-only shared Google Calendar. The `calendar` edge function
+  (`supabase/functions/calendar/`, verify_jwt ON, checks the guest list) reads each calendar's secret
+  iCal link from `calendar_feeds` (`supabase/calendar.sql`; RLS on, no policies) and expands repeats
+  with ical.js in `calendar/ics.ts`. The links must never reach the browser.
+- `tools/packing/`: shared packing checklists in `family_items` (tool `packing`: `lists`, `items`, `trip`).
 - `tools/energy/`: Tibber prices + usage per house, plus a Bills list. The page calls the `energy`
   edge function (`supabase/functions/energy/`), which reads Tibber/Elvia tokens from
   `energy_accounts` (`supabase/energy.sql`; RLS on, no policies, so the browser can't read it).
