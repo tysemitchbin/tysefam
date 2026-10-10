@@ -111,6 +111,9 @@ table.bills td:first-child{text-align:left;font-weight:700;overflow:hidden;text-
 .attrib{font-size:.75rem;color:var(--ink-soft);margin:10px 0 0;}
 
 /* tenant */
+.tenant-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.tenant-head h3{margin:0;flex:1;}
+.hidden-card .tenant-head{margin-bottom:4px;}
 .tenant-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .msg-box{width:100%;min-height:250px;margin:12px 0 0;resize:vertical;line-height:1.45;white-space:pre-wrap;}
 .tenant-row label,.tenant-acc{display:block;font-weight:800;font-size:.78rem;color:var(--ink-soft);}
@@ -860,125 +863,138 @@ function renderCapacity() {
   });
 }
 
-/* ════════════════════════════════════════════════════════════════
-   TENANT: a ready-to-send message saying what the tenant owes for a month.
-   Houses ticked "Tenant" under ⚙️ Settings get their own card.
-   Saved in the family database (never shown to the tenant):
-     settings  { kind: 'tenant', account }               the account number to pay into
-     tenant    { ean, period, total, sentOn, paidOn }    which months were sent / paid
-   Amounts: the real bill when it's known (bank, BKK export, typed in), otherwise the
-   estimate from the meter readings, which has matched the real bills to within a few kroner.
-═════════════════════════════════════════════════════════════════ */
-let tenantItems = {};
-const tenantUi = {};            // per house: { month, due, custom } (custom = message edited by hand)
-store.watch('tenant', v => { tenantItems = v; renderTenants(); });
-
-const pad2 = n => String(n).padStart(2, '0');
-const fmtKr = v => `${v < 0 ? '−' : ''}${Math.abs(v).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr`;
-const longDate = d => new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-// The 20th of the month after the one billed, e.g. October's bill is due 20 November.
-const defaultDue = m => { const [y, mo] = m.split('-').map(Number); const d = new Date(y, mo, 20); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-20`; };
-const tenantAccount = () => Object.values(settingItems).find(x => x.kind === 'tenant')?.account || '';
-const tenantStatus = (ean, month) => Object.entries(tenantItems).find(([, x]) => x.ean === ean && x.period === month) || [null, {}];
-
-// What the tenant owes for one month: power (Tibber) + grid rent (BKK/Elvia), real where known.
-function tenantBill(h, month) {
-  const mine = Object.values(invoices).filter(x => x.period === month && invoiceHouse(x) === h.ean && x.amount != null);
-  const isPower = x => x.company === 'Tibber' || x.part === 'power';
-  const powerReal = mine.filter(isPower), gridReal = mine.filter(x => !isPower(x));
-  const pEst = tibberEstimate(h.ean, month), gEst = gridEstimate(h.ean, month);
-  const power = powerReal.length ? { v: sum(powerReal, x => x.amount), real: true } : pEst ? { v: pEst.total, real: false } : null;
-  const grid = gridReal.length ? { v: sum(gridReal, x => x.amount), real: true } : gEst ? { v: gEst.total, real: false } : null;
-  return {
-    power, grid, kwh: pEst?.kwh ?? gEst?.kwh ?? null,
-    total: Math.round(((power?.v || 0) + (grid?.v || 0)) * 100) / 100,
-    allReal: Boolean(power?.real && grid?.real),
-  };
-}
-
-function tenantMessage(h, month, b, due, account) {
-  const place = h.home.address?.address1 || h.name;
-  const scheme = { norgespris: ', incl. Norgespris', stromstotte: ', incl. strømstøtte' }[supportOf(h.ean)] || '';
-  const lines = [`Electricity for ${place}, ${longMonth(month)}${month === thisMonth() ? ' (so far)' : ''}`, ''];
-  if (b.kwh != null) lines.push(`Usage: ${Math.round(b.kwh).toLocaleString('en-GB')} kWh`);
-  if (b.power) lines.push(`Power (Tibber): ${fmtKr(b.power.v)}`);
-  if (b.grid) lines.push(`Grid rent (${h.company || 'grid company'}${scheme}): ${fmtKr(b.grid.v)}`);
-  lines.push(`Total to pay: ${fmtKr(b.total)}`);
-  if (due || account) lines.push('', `Please pay${due ? ' by ' + longDate(due) : ''}${account ? ' to account ' + account : ''}.`);
-  if (!b.allReal) lines.push('', '(Worked out from the meter readings; the final bills can differ by a few kroner.)');
-  return lines.join('\n');
-}
-
-function renderTenants() {
-  const box = $('#tenants');
-  if (!box) return;
-  const houses = data?.sample ? [] : houseList().filter(h => houseCfg(h.ean).tenant);
-  if (!houses.length) { box.innerHTML = ''; return; }
-  const months = recentMonths(13);                       // this month (so far) + the 12 before it
-  box.innerHTML = houses.map(h => {
-    const ui = tenantUi[h.ean] ||= { month: months[1] };
-    ui.due ??= defaultDue(ui.month);
-    const b = tenantBill(h, ui.month);
-    const [, st] = tenantStatus(h.ean, ui.month);
-    const history = months.slice(1, 7).map(m => {
-      const hb = tenantBill(h, m), [, s] = tenantStatus(h.ean, m);
-      if (!hb.power && !hb.grid) return '';
-      return `<tr><td>${esc(longMonth(m))}</td><td>${hb.allReal ? '' : '≈ '}${fmtKr(hb.total)}</td>
-        <td>${s.sentOn ? 'Sent ' + esc(niceDay(s.sentOn)) : '<span class="sub">Not sent</span>'}</td>
-        <td>${s.paidOn ? '<span class="ok">✓</span> Paid ' + esc(niceDay(s.paidOn)) : '<span class="sub">Not paid</span>'}</td></tr>`;
-    }).join('');
-    return `
-    <div class="card" data-tenant="${esc(h.ean)}">
-      <h3>🏠 Tenant at ${esc(h.home.address?.address1 || h.name)}</h3>
-      <p class="hint" style="margin:-6px 0 12px">A message with what the tenant owes. Pick the month, check it, then copy it into a text or email.</p>
-      <div class="row2 tenant-row">
-        <label>Month<select class="field" data-k="month">${months.map((m, i) =>
-          `<option value="${m}"${m === ui.month ? ' selected' : ''}>${esc(longMonth(m))}${i === 0 ? ' (so far)' : ''}</option>`).join('')}</select></label>
-        <label>Pay by<input class="field" type="date" data-k="due" value="${esc(ui.due || '')}"></label>
-      </div>
-      <label class="tenant-acc">Account number to pay into (optional)
-        <input class="field" data-k="account" value="${esc(tenantAccount())}" placeholder="e.g. 1234.56.78901" autocomplete="off"></label>
-      <textarea class="field msg-box" data-k="msg" rows="9" spellcheck="false">${esc(ui.custom ?? tenantMessage(h, ui.month, b, ui.due, tenantAccount()))}</textarea>
-      <div class="acts">
-        <button class="btn" data-act="copy">📋 Copy</button>
-        <button class="btn ghost" data-act="sent">${st.sentOn ? '✓ Sent ' + esc(niceDay(st.sentOn)) : 'Mark as sent'}</button>
-        <button class="btn ghost" data-act="paid">${st.paidOn ? '✓ Paid ' + esc(niceDay(st.paidOn)) : 'Mark as paid'}</button>
-        ${ui.custom != null ? '<button class="btn ghost" data-act="reset">Undo my edits</button>' : ''}
-      </div>
-      ${b.allReal ? '<p class="hint" style="margin:8px 0 0">✅ Both amounts are from the real bills.</p>'
-        : `<p class="hint" style="margin:8px 0 0">${b.power || b.grid ? '≈ Some amounts are worked out from the meter readings until the real bills are paid (Tibber ~15th, BKK mid-month).' : 'No numbers for this month yet.'}</p>`}
-      ${history ? `<details class="numbers"><summary>Last 6 months</summary><div class="scroll-x"><table class="nums tenant-hist">${history}</table></div></details>` : ''}
-    </div>`;
-  }).join('');
-
-  box.querySelectorAll('[data-tenant]').forEach(card => {
-    const ean = card.dataset.tenant, ui = tenantUi[ean];
-    const h = houses.find(x => x.ean === ean);
-    const msg = card.querySelector('[data-k=msg]');
-    card.querySelector('[data-k=month]').onchange = e => { ui.month = e.target.value; ui.due = defaultDue(ui.month); delete ui.custom; renderTenants(); };
-    card.querySelector('[data-k=due]').onchange = e => { ui.due = e.target.value; delete ui.custom; renderTenants(); };
-    card.querySelector('[data-k=account]').onchange = e => { delete ui.custom; saveBy('settings', settingItems, 'kind', 'tenant', { account: e.target.value.trim() }); };
-    msg.oninput = () => { ui.custom = msg.value; };
-    const reset = card.querySelector('[data-act=reset]');
-    if (reset) reset.onclick = () => { delete ui.custom; renderTenants(); };
-    const copyBtn = card.querySelector('[data-act=copy]');
-    copyBtn.onclick = async () => {
-      try { await navigator.clipboard.writeText(msg.value); }
-      catch (e) { msg.select(); document.execCommand('copy'); }   // older browsers
-      copyBtn.textContent = '✓ Copied';
-      setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 2000);
-    };
-    // Sent / paid: tap to set today's date; tap twice to clear it again.
-    const mark = (field, btn) => {
-      const [id, st] = tenantStatus(ean, ui.month);
-      const fields = { [field]: localToday('Europe/Oslo'), total: tenantBill(h, ui.month).total };
-      if (!st[field]) return id ? store.update('tenant', id, fields) : store.add('tenant', { ean, period: ui.month, ...fields });
-      tapTwice(btn, 'Tap again to undo', () => store.update('tenant', id, { [field]: null }));
-    };
-    card.querySelector('[data-act=sent]').onclick = e => mark('sentOn', e.currentTarget);
-    card.querySelector('[data-act=paid]').onclick = e => mark('paidOn', e.currentTarget);
-  });
-}
+/* ════════════════════════════════════════════════════════════════
+   TENANT: a ready-to-send message saying what the tenant owes for a month.
+   Houses ticked "Tenant" under ⚙️ Settings get their own card.
+   Saved in the family database (never shown to the tenant):
+     settings  { kind: 'tenant', account }               the account number to pay into
+     tenant    { ean, period, total, sentOn, paidOn }    which months were sent / paid
+   Amounts: the real bill when it's known (bank, BKK export, typed in), otherwise the
+   estimate from the meter readings, which has matched the real bills to within a few kroner.
+═════════════════════════════════════════════════════════════════ */
+let tenantItems = {};
+const tenantUi = {};            // per house: { month, due, custom } (custom = message edited by hand)
+// Hidden or shown, remembered on this device only. Storage can be blocked (private mode): then it just resets.
+const tenantHidden = ean => { try { return localStorage.getItem('energy:tenantHidden:' + ean) === '1'; } catch (e) { return false; } };
+const setTenantHidden = (ean, hide) => { try { localStorage.setItem('energy:tenantHidden:' + ean, hide ? '1' : '0'); } catch (e) { /* ignore */ } };
+store.watch('tenant', v => { tenantItems = v; renderTenants(); });
+
+const pad2 = n => String(n).padStart(2, '0');
+const fmtKr = v => `${v < 0 ? '−' : ''}${Math.abs(v).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr`;
+const longDate = d => new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+// The 20th of the month after the one billed, e.g. October's bill is due 20 November.
+const defaultDue = m => { const [y, mo] = m.split('-').map(Number); const d = new Date(y, mo, 20); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-20`; };
+const tenantAccount = () => Object.values(settingItems).find(x => x.kind === 'tenant')?.account || '';
+const tenantStatus = (ean, month) => Object.entries(tenantItems).find(([, x]) => x.ean === ean && x.period === month) || [null, {}];
+
+// What the tenant owes for one month: power (Tibber) + grid rent (BKK/Elvia), real where known.
+function tenantBill(h, month) {
+  const mine = Object.values(invoices).filter(x => x.period === month && invoiceHouse(x) === h.ean && x.amount != null);
+  const isPower = x => x.company === 'Tibber' || x.part === 'power';
+  const powerReal = mine.filter(isPower), gridReal = mine.filter(x => !isPower(x));
+  const pEst = tibberEstimate(h.ean, month), gEst = gridEstimate(h.ean, month);
+  const power = powerReal.length ? { v: sum(powerReal, x => x.amount), real: true } : pEst ? { v: pEst.total, real: false } : null;
+  const grid = gridReal.length ? { v: sum(gridReal, x => x.amount), real: true } : gEst ? { v: gEst.total, real: false } : null;
+  return {
+    power, grid, kwh: pEst?.kwh ?? gEst?.kwh ?? null,
+    total: Math.round(((power?.v || 0) + (grid?.v || 0)) * 100) / 100,
+    allReal: Boolean(power?.real && grid?.real),
+  };
+}
+
+function tenantMessage(h, month, b, due, account) {
+  const place = h.home.address?.address1 || h.name;
+  const scheme = { norgespris: ', incl. Norgespris', stromstotte: ', incl. strømstøtte' }[supportOf(h.ean)] || '';
+  const lines = [`Electricity for ${place}, ${longMonth(month)}${month === thisMonth() ? ' (so far)' : ''}`, ''];
+  if (b.kwh != null) lines.push(`Usage: ${Math.round(b.kwh).toLocaleString('en-GB')} kWh`);
+  if (b.power) lines.push(`Power (Tibber): ${fmtKr(b.power.v)}`);
+  if (b.grid) lines.push(`Grid rent (${h.company || 'grid company'}${scheme}): ${fmtKr(b.grid.v)}`);
+  lines.push(`Total to pay: ${fmtKr(b.total)}`);
+  if (due || account) lines.push('', `Please pay${due ? ' by ' + longDate(due) : ''}${account ? ' to account ' + account : ''}.`);
+  if (!b.allReal) lines.push('', '(Worked out from the meter readings; the final bills can differ by a few kroner.)');
+  return lines.join('\n');
+}
+
+function renderTenants() {
+  const box = $('#tenants');
+  if (!box) return;
+  const houses = data?.sample ? [] : houseList().filter(h => houseCfg(h.ean).tenant);
+  if (!houses.length) { box.innerHTML = ''; return; }
+  const months = recentMonths(13);                       // this month (so far) + the 12 before it
+  box.innerHTML = houses.map(h => {
+    const ui = tenantUi[h.ean] ||= { month: months[1] };
+    ui.due ??= defaultDue(ui.month);
+    const b = tenantBill(h, ui.month);
+    const [, st] = tenantStatus(h.ean, ui.month);
+    const history = months.slice(1, 7).map(m => {
+      const hb = tenantBill(h, m), [, s] = tenantStatus(h.ean, m);
+      if (!hb.power && !hb.grid) return '';
+      return `<tr><td>${esc(longMonth(m))}</td><td>${hb.allReal ? '' : '≈ '}${fmtKr(hb.total)}</td>
+        <td>${s.sentOn ? 'Sent ' + esc(niceDay(s.sentOn)) : '<span class="sub">Not sent</span>'}</td>
+        <td>${s.paidOn ? '<span class="ok">✓</span> Paid ' + esc(niceDay(s.paidOn)) : '<span class="sub">Not paid</span>'}</td></tr>`;
+    }).join('');
+    const hidden = tenantHidden(h.ean);
+    const last = tenantBill(h, months[1]), [, lastSt] = tenantStatus(h.ean, months[1]);
+    const head = `<div class="tenant-head"><h3>🏠 Tenant at ${esc(h.home.address?.address1 || h.name)}</h3>
+      <button class="btn ghost sm" data-act="toggle" aria-expanded="${!hidden}">${hidden ? 'Show' : 'Hide'}</button></div>`;
+    if (hidden) return `
+    <div class="card tenant-card hidden-card" data-tenant="${esc(h.ean)}">${head}
+      <p class="hint" style="margin:0">${esc(longMonth(months[1]))}: ${last.power || last.grid ? `${last.allReal ? '' : '≈ '}${fmtKr(last.total)}` : 'no numbers yet'}
+        · ${lastSt.paidOn ? '✓ paid' : lastSt.sentOn ? 'sent, not paid yet' : 'not sent yet'}</p>
+    </div>`;
+    return `
+    <div class="card tenant-card" data-tenant="${esc(h.ean)}">${head}
+      <p class="hint" style="margin:-6px 0 12px">A message with what the tenant owes. Pick the month, check it, then copy it into a text or email.</p>
+      <div class="row2 tenant-row">
+        <label>Month<select class="field" data-k="month">${months.map((m, i) =>
+          `<option value="${m}"${m === ui.month ? ' selected' : ''}>${esc(longMonth(m))}${i === 0 ? ' (so far)' : ''}</option>`).join('')}</select></label>
+        <label>Pay by<input class="field" type="date" data-k="due" value="${esc(ui.due || '')}"></label>
+      </div>
+      <label class="tenant-acc">Account number to pay into (optional)
+        <input class="field" data-k="account" value="${esc(tenantAccount())}" placeholder="e.g. 1234.56.78901" autocomplete="off"></label>
+      <textarea class="field msg-box" data-k="msg" rows="9" spellcheck="false">${esc(ui.custom ?? tenantMessage(h, ui.month, b, ui.due, tenantAccount()))}</textarea>
+      <div class="acts">
+        <button class="btn" data-act="copy">📋 Copy</button>
+        <button class="btn ghost" data-act="sent">${st.sentOn ? '✓ Sent ' + esc(niceDay(st.sentOn)) : 'Mark as sent'}</button>
+        <button class="btn ghost" data-act="paid">${st.paidOn ? '✓ Paid ' + esc(niceDay(st.paidOn)) : 'Mark as paid'}</button>
+        ${ui.custom != null ? '<button class="btn ghost" data-act="reset">Undo my edits</button>' : ''}
+      </div>
+      ${b.allReal ? '<p class="hint" style="margin:8px 0 0">✅ Both amounts are from the real bills.</p>'
+        : `<p class="hint" style="margin:8px 0 0">${b.power || b.grid ? '≈ Some amounts are worked out from the meter readings until the real bills are paid (Tibber ~15th, BKK mid-month).' : 'No numbers for this month yet.'}</p>`}
+      ${history ? `<details class="numbers"><summary>Last 6 months</summary><div class="scroll-x"><table class="nums tenant-hist">${history}</table></div></details>` : ''}
+    </div>`;
+  }).join('');
+
+  box.querySelectorAll('[data-tenant]').forEach(card => {
+    const ean = card.dataset.tenant, ui = tenantUi[ean];
+    card.querySelector('[data-act=toggle]').onclick = () => { setTenantHidden(ean, !tenantHidden(ean)); renderTenants(); };
+    if (card.classList.contains('hidden-card')) return;
+    const h = houses.find(x => x.ean === ean);
+    const msg = card.querySelector('[data-k=msg]');
+    card.querySelector('[data-k=month]').onchange = e => { ui.month = e.target.value; ui.due = defaultDue(ui.month); delete ui.custom; renderTenants(); };
+    card.querySelector('[data-k=due]').onchange = e => { ui.due = e.target.value; delete ui.custom; renderTenants(); };
+    card.querySelector('[data-k=account]').onchange = e => { delete ui.custom; saveBy('settings', settingItems, 'kind', 'tenant', { account: e.target.value.trim() }); };
+    msg.oninput = () => { ui.custom = msg.value; };
+    const reset = card.querySelector('[data-act=reset]');
+    if (reset) reset.onclick = () => { delete ui.custom; renderTenants(); };
+    const copyBtn = card.querySelector('[data-act=copy]');
+    copyBtn.onclick = async () => {
+      try { await navigator.clipboard.writeText(msg.value); }
+      catch (e) { msg.select(); document.execCommand('copy'); }   // older browsers
+      copyBtn.textContent = '✓ Copied';
+      setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 2000);
+    };
+    // Sent / paid: tap to set today's date; tap twice to clear it again.
+    const mark = (field, btn) => {
+      const [id, st] = tenantStatus(ean, ui.month);
+      const fields = { [field]: localToday('Europe/Oslo'), total: tenantBill(h, ui.month).total };
+      if (!st[field]) return id ? store.update('tenant', id, fields) : store.add('tenant', { ean, period: ui.month, ...fields });
+      tapTwice(btn, 'Tap again to undo', () => store.update('tenant', id, { [field]: null }));
+    };
+    card.querySelector('[data-act=sent]').onclick = e => mark('sentOn', e.currentTarget);
+    card.querySelector('[data-act=paid]').onclick = e => mark('paidOn', e.currentTarget);
+  });
+}
 
 /* Ask "are you sure?" on the button itself: the first tap changes its text, a second tap within
    5 seconds does it. (Pop-up confirm() dialogs are blocked in some browsers, e.g. in-app ones.) */
