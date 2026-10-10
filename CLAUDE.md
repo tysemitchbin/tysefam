@@ -41,8 +41,9 @@ code readable and commented for a non-expert.
   by a pg_cron job (`energy-bank-sync`, 06:15 UTC) that calls `energy/bank/sync` with the secret in
   `energy_accounts` (provider `cron`). Payments to Tibber/BKK/Elvia fill in or create bills. The
   `energy` function has verify_jwt OFF (bank callback + cron); every other route checks the family
-  guest list itself. A Claude scheduled task (`tibber-invoice-check`, 4th of each month) also adds
-  Tibber invoice emails from the family Gmail. The old `tibber` edge function is a retired stub.
+  guest list itself. Houses ticked "Tenant" get a card with a monthly message of what the tenant owes
+  (status in collection `tenant`). Older bills came from Gmail and a BKK export (`source` field).
+  The old `tibber` edge function is a retired stub (delete it in the Supabase dashboard).
 
 ## Hosting
 - GitHub Pages serves `main` from the repo root at https://tysemitchbin.github.io/tysefam/ and
