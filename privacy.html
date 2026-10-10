@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Privacy</title>
+<!-- Privacy policy for the family site. Enable Banking (the bank connection on the
+     Energy page) asks every app for one, so it's written for that, in plain words. -->
+<link rel="stylesheet" href="shared/family.css">
+<style>
+.doc p,.doc li{line-height:1.55;}
+.doc h2{color:var(--forest);font-size:1.15rem;margin:22px 0 6px;}
+</style>
+</head>
+<body>
+<main class="wrap doc">
+  <div class="page-head"><span class="emoji">🔒</span><h1>Privacy</h1></div>
+  <p class="hint">Tyse Fam is a private website for one family. Only family members on its guest list can sign in.
+    Last updated 10 October 2026.</p>
+
+  <div class="card">
+    <h2>What the bank connection reads</h2>
+    <p>The Energy page can connect to a family member's own bank account through
+      <a href="https://enablebanking.com" target="_blank" rel="noopener">Enable Banking</a>, with their BankID approval.
+      Access is <b>read-only</b>: the site can't move money or make payments.</p>
+    <p>Of the transactions it can see, the site keeps <b>only payments to or from the family's power companies</b>
+      (Tibber, BKK and Elvia): the amount, the date and the payment text. Every other transaction is ignored and never stored.
+      It also keeps the bank's name, the account's name and the last four digits of the account number, to show which account is connected.</p>
+
+    <h2>Where it's kept and who can see it</h2>
+    <p>The data is stored in the family's private database (Supabase, in the EU). Only family members who are signed in can see the bills.
+      Access tokens and keys are stored where only the server can read them, never in the website's code.</p>
+
+    <h2>Other data</h2>
+    <p>The Energy page also reads electricity prices and usage from Tibber and Elvia, and the family's power invoices from email,
+      for the same purpose: showing the family its power bills.</p>
+
+    <h2>Nothing is shared or sold</h2>
+    <p>No data is sold, shared with anyone else, used for advertising, or used for anything other than the family's own overview.</p>
+
+    <h2>Stopping and deleting</h2>
+    <p>The bank connection can be disconnected at any time on the Energy page (⚙️ Settings → Disconnect), which also ends the
+      permission at the bank. The bank's permission also runs out by itself after the period the bank allows (usually 180 days).
+      Saved bills can be deleted on the Energy page. For anything else, contact the family member who runs the site.</p>
+  </div>
+  <p class="foot"><a href="./">← Back to Tyse Fam</a> · <a href="terms.html">Terms</a></p>
+</main>
+</body>
+</html>

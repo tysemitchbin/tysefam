@@ -19,4 +19,4 @@ http.createServer((req, res) => {
   if (!fs.existsSync(file)) { res.writeHead(404); return res.end('Not found'); }
   res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
   fs.createReadStream(file).pipe(res);
-}).listen(3000, () => console.log('Tyse Fam preview at http://localhost:3000'));
+}).listen(process.env.PORT || 3000, function () { console.log('Tyse Fam preview at http://localhost:' + this.address().port); });

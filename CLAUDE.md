@@ -19,6 +19,18 @@ code readable and commented for a non-expert.
   (`game_state`, `garden_shares`, `rwgps_*`) and the `rwgps` edge function in
   `supabase/functions/rwgps/`. It shares the sign-in session with the rest of the site (same
   project, same origin).
+- `tools/energy/`: Tibber prices + usage per house, plus a Bills list. The page calls the `energy`
+  edge function (`supabase/functions/energy/`), which reads Tibber/Elvia tokens from
+  `energy_accounts` (`supabase/energy.sql`; RLS on, no policies, so the browser can't read it).
+  Grid bills (BKK/Elvia) are worked out in `energy/grid.ts`: **update its price lists when BKK or
+  Elvia change prices** (usually 1 Jan / 1 Jul) and the strømstøtte threshold each year.
+  Real invoices live in `family_items` (tool `energy`, collection `invoices`). The main source is
+  the bank: Enable Banking (`energy/bank.ts`, restricted mode = own accounts only) is read daily
+  by a pg_cron job (`energy-bank-sync`, 06:15 UTC) that calls `energy/bank/sync` with the secret in
+  `energy_accounts` (provider `cron`). Payments to Tibber/BKK/Elvia fill in or create bills. The
+  `energy` function has verify_jwt OFF (bank callback + cron); every other route checks the family
+  guest list itself. A Claude scheduled task (`tibber-invoice-check`, 4th of each month) also adds
+  Tibber invoice emails from the family Gmail. The old `tibber` edge function is a retired stub.
 
 ## Hosting
 - GitHub Pages serves `main` from the repo root at https://tysemitchbin.github.io/tysefam/ and

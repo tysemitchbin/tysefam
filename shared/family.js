@@ -10,6 +10,8 @@
      Family.entries(obj)      [id, item] pairs sorted oldest-first
      Family.esc(text)         make text safe to put in innerHTML
      Family.url('tools/x/')   link relative to the site root
+     Family.client()          the signed-in Supabase client (null when Supabase is off),
+                              e.g. to call an edge function as the signed-in person
      Family.signOut()
 
    Saving data:
@@ -339,5 +341,5 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectNav);
   else injectNav();
 
-  window.Family = { site: SITE, store, me, entries, esc, uid, url, signOut };
+  window.Family = { site: SITE, store, client: connect, me, entries, esc, uid, url, signOut };
 })();

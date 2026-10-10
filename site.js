@@ -51,6 +51,13 @@ window.SITE = {
       color: 'peach'
     },
     {
+      id: 'energy',
+      name: 'Energy',
+      emoji: '⚡',
+      description: 'Power prices, electricity use and the bills for both houses: Tibber, BKK and Elvia.',
+      color: 'sun'
+    },
+    {
       id: 'new-tool-template',
       name: 'New Tool Template',
       emoji: '🧪',

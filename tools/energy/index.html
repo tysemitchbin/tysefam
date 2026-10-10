@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Energy</title>
+
+<!-- ════════════════════════════════════════════════════════════════
+     ENERGY — electricity prices and usage for our houses, from Tibber.
+
+     How it works:
+       • The Tibber token is kept in Supabase (table tibber_accounts), never
+         in this page, because the website's code is public.
+       • This page asks the `energy` edge function (supabase/functions/energy/)
+         for the data, as the signed-in family member.
+       • Every home on every connected Tibber login shows up automatically.
+       • Bills: Tibber invoices are found in Gmail each month (a scheduled Claude
+         task adds them to this page's data); the grid bills from BKK/Elvia are
+         worked out from hourly usage. Real amounts can be typed in to compare.
+═════════════════════════════════════════════════════════════════ -->
+
+<link rel="stylesheet" href="../../shared/family.css">
+<style>
+/* One fixed colour per house, in this order. Checked to stay tell-apart-able
+   for colour-blind eyes. A third house would need a new, checked colour. */
+:root{ --house1:#2b7fb0; --house2:#d0703a; --grid:#ece6d8; --axis:#8a8f82; }
+
+.page-head{flex-wrap:wrap;}
+.head-btns{display:flex;gap:8px;align-items:center;margin-left:auto;}
+.updated{font-size:.78rem;color:var(--ink-soft);font-weight:700;}
+
+/* house header */
+.house-head{display:flex;align-items:center;gap:10px;margin-bottom:4px;}
+.house-head h3{margin:0;}
+.dot{width:12px;height:12px;border-radius:50%;flex:0 0 auto;}
+.addr{color:var(--ink-soft);font-size:.85rem;margin:0 0 14px;}
+
+/* "price right now" */
+.now{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+.now .big{font-family:'Nunito',sans-serif;font-weight:800;font-size:2.6rem;color:var(--ink);line-height:1;}
+.now .unit{color:var(--ink-soft);font-weight:700;}
+.level{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:800;padding:4px 10px;
+  border-radius:999px;background:#f1eee6;color:var(--ink);}
+.level i{width:10px;height:10px;border-radius:3px;display:inline-block;}
+.tipline{font-size:.9rem;color:var(--ink-soft);margin:6px 0 16px;line-height:1.4;}
+.tipline b{color:var(--ink);}
+
+/* small stat tiles */
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+.tile{background:#f7f3ea;border-radius:12px;padding:10px;}
+.tile .lbl{font-size:.72rem;font-weight:800;color:var(--ink-soft);}
+.tile .val{font-weight:800;font-size:1.15rem;margin-top:2px;}
+.tile .sub{font-size:.75rem;color:var(--ink-soft);font-weight:700;}
+@media(max-width:420px){.tile{padding:8px;} .tile .val{font-size:1rem;}}
+
+/* chart section + its little tab switcher */
+.sect{display:flex;align-items:center;gap:8px;margin:6px 0 4px;flex-wrap:wrap;}
+.sect h4{margin:0;font-family:'Fredoka',sans-serif;font-weight:600;color:var(--forest);font-size:1rem;flex:1;}
+.tabs{display:inline-flex;background:#f1eee6;border-radius:999px;padding:3px;}
+.tabs button{border:none;background:none;font-weight:800;font-size:.78rem;color:var(--ink-soft);padding:5px 11px;border-radius:999px;}
+.tabs button.on{background:#fff;color:var(--forest);box-shadow:0 1px 4px rgba(0,0,0,.08);}
+.tabs button:disabled{opacity:.4;cursor:default;}
+.chart{position:relative;width:100%;min-height:190px;margin-bottom:6px;touch-action:pan-y;}
+.chart svg{display:block;width:100%;overflow:visible;}
+.chart text{font-family:'Nunito',sans-serif;font-size:11px;fill:var(--axis);}
+.chart .nowlbl{fill:var(--ink);font-weight:800;}
+.chart-note{font-size:.78rem;color:var(--ink-soft);margin:0 0 6px;}
+.tip{position:absolute;pointer-events:none;background:#fff;border:1px solid var(--line);border-radius:10px;
+  padding:7px 10px;font-size:.8rem;line-height:1.35;box-shadow:var(--shadow);white-space:nowrap;z-index:5;display:none;}
+.tip b{font-weight:800;}
+details.numbers{margin:2px 0 14px;font-size:.82rem;}
+details.numbers summary{cursor:pointer;color:var(--ink-soft);font-weight:700;}
+details.numbers table{margin-top:6px;}
+
+/* tables */
+table.nums{width:100%;border-collapse:collapse;font-size:.88rem;}
+table.nums th,table.nums td{padding:7px 6px;text-align:right;border-bottom:1px dashed var(--line);font-variant-numeric:tabular-nums;}
+table.nums th:first-child,table.nums td:first-child{text-align:left;}
+table.nums th{font-size:.75rem;color:var(--ink-soft);font-weight:800;}
+#compareTable td:first-child{width:38%;}
+table.nums td .sub{display:block;font-size:.74rem;color:var(--ink-soft);}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.82rem;font-weight:700;margin:4px 0 6px;}
+.legend span{display:inline-flex;align-items:center;gap:6px;}
+.scroll-x{overflow-x:auto;}
+
+/* bills */
+.bills-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-4px 0 12px;}
+.bills-top .hint{margin:0;flex:1;min-width:200px;}
+.bm{border-top:1px dashed var(--line);padding:12px 0 6px;}
+.bm:first-child{border-top:none;}
+.bm-head{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;}
+.bm-head b{font-family:'Fredoka',sans-serif;font-weight:600;color:var(--forest);font-size:1.05rem;}
+.bm-head .so-far{font-size:.75rem;font-weight:800;color:var(--ink-soft);}
+.bm-head .tot{margin-left:auto;font-weight:800;}
+table.bills{width:100%;border-collapse:collapse;font-size:.88rem;table-layout:fixed;}
+table.bills th{font-size:.72rem;color:var(--ink-soft);font-weight:800;text-align:right;padding:2px 4px;}
+table.bills th:first-child{text-align:left;width:30%;}
+table.bills td{padding:3px 2px;text-align:right;vertical-align:top;font-variant-numeric:tabular-nums;}
+table.bills td:first-child{text-align:left;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-top:7px;}
+.amt{border:none;background:none;font:inherit;padding:3px 4px;border-radius:8px;color:var(--ink);font-weight:800;text-align:right;white-space:nowrap;}
+@media(max-width:420px){table.bills{font-size:.8rem;}}
+.amt:hover{background:#f1eee6;}
+.amt.est{color:var(--ink-soft);font-weight:600;font-style:italic;}
+.amt .co{display:block;font-size:.68rem;font-weight:800;font-style:normal;color:var(--ink-soft);}
+.amt .ok{color:var(--meadow-deep);font-style:normal;}
+.notice{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#f7f3ea;border-radius:10px;padding:8px 10px;margin:6px 0;font-size:.85rem;}
+.notice .txt{flex:1;min-width:160px;}
+.capacity{font-size:.88rem;background:#f7f3ea;border-radius:12px;padding:9px 12px;margin:-4px 0 16px;line-height:1.45;}
+.capacity b{color:var(--ink);}
+.capacity.near{background:#fdf0e3;}
+.attrib{font-size:.75rem;color:var(--ink-soft);margin:10px 0 0;}
+
+/* bill editor */
+.overlay{position:fixed;inset:0;z-index:250;background:rgba(60,65,56,.35);display:flex;align-items:center;justify-content:center;padding:16px;}
+.dialog{background:var(--paper);border-radius:var(--r);padding:18px;max-width:420px;width:100%;max-height:90vh;overflow:auto;box-shadow:var(--shadow-lg);}
+.dialog h3{margin:0 0 10px;color:var(--forest);}
+.dialog label{display:block;font-weight:800;font-size:.78rem;color:var(--ink-soft);margin:10px 0 4px;}
+.dialog .field{width:100%;}
+.dialog .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.dialog .acts{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;}
+.breakdown{background:#f7f3ea;border-radius:12px;padding:10px 12px;font-size:.84rem;margin-top:12px;}
+.breakdown table{width:100%;border-collapse:collapse;}
+.breakdown td{padding:2px 0;}
+.breakdown td:last-child{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:8px;}
+.breakdown tr.total td{border-top:1px solid var(--line);font-weight:800;padding-top:5px;}
+.check-row{display:flex;align-items:center;gap:8px;margin-top:12px;font-weight:700;}
+
+/* bank */
+.bank-box{background:#f3f8f1;border-radius:14px;padding:12px 14px;}
+code.cb{background:#fff;border:1px solid var(--line);border-radius:8px;padding:2px 6px;font-size:.78rem;word-break:break-all;}
+.acct .sub{display:block;font-size:.75rem;color:var(--ink-soft);font-weight:600;}
+
+/* setup */
+.setup-sec{border-top:1px dashed var(--line);margin-top:16px;padding-top:12px;}
+.setup-sec h4,.setup-h{margin:0 0 8px;font-family:'Fredoka',sans-serif;font-weight:600;color:var(--forest);font-size:1rem;}
+.house-set{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px dashed var(--line);}
+.house-set .nm{flex:1;min-width:140px;font-weight:700;}
+.house-set select{border:2px solid var(--line);border-radius:10px;padding:6px 8px;background:#fff;font:inherit;font-size:.88rem;}
+.steps{margin:0 0 12px;padding-left:20px;line-height:1.55;}
+.acct{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line);}
+.acct .txt{flex:1;}
+.msg{font-weight:700;min-height:1.2em;margin:4px 0 0;}
+.msg.bad{color:var(--peach-deep);}
+.banner{background:#fdf3dc;border:1px solid #f0dfae;border-radius:12px;padding:10px 12px;font-size:.88rem;margin-bottom:16px;}
+.hidden{display:none !important;}
+</style>
+</head>
+<body data-tool="energy">
+
+<main class="wrap">
+  <div class="page-head">
+    <span class="emoji">⚡</span><h1>Energy</h1>
+    <div class="head-btns">
+      <span class="updated" id="updated"></span>
+      <button class="btn ghost sm" id="refreshBtn" title="Fetch fresh numbers from Tibber">↻ Refresh</button>
+      <button class="btn ghost sm" id="setupBtn">⚙️ Settings</button>
+    </div>
+  </div>
+  <p class="hint">Electricity prices and how much power each house is using, straight from Tibber.</p>
+
+  <div id="banner"></div>
+
+  <!-- Connections and settings -->
+  <div class="card hidden" id="setup">
+    <h3>⚙️ Connections &amp; settings</h3>
+
+    <div class="bank-box">
+      <h4 class="setup-h">🏦 Bank: bills fill themselves in</h4>
+      <p class="hint" style="margin:0 0 10px">Once a day, the payments to Tibber, BKK and Elvia are read from your bank
+        (read-only, through <a href="https://enablebanking.com" target="_blank" rel="noopener">Enable Banking</a>),
+        so every bill shows the exact amount paid. Nothing to type in.</p>
+      <div id="ebSetup">
+        <ol class="steps">
+          <li>Sign in at <a href="https://enablebanking.com/sign-in/" target="_blank" rel="noopener">enablebanking.com</a> (they email you a sign-in link).</li>
+          <li>Open <a href="https://enablebanking.com/cp/applications" target="_blank" rel="noopener">API applications</a> and add one:
+            choose <b>Production</b>, name it <b>Tyse Fam</b>, and add this <b>redirect URL</b>:
+            <code class="cb" id="cbUrl"></code> <button class="btn ghost sm" type="button" id="cbCopy">Copy</button><br>
+            Press <b>Register</b>. A <b>.pem</b> file downloads: that's the app's private key.</li>
+          <li>On the new application press <b>Activate by linking accounts</b> and log in to your bank with BankID.
+            Pick the account the power bills are paid from.</li>
+          <li>Below, paste the <b>application ID</b> (the long code with dashes) and choose the <b>.pem</b> file.</li>
+        </ol>
+        <div class="addrow"><input id="ebAppId" placeholder="Application ID" autocomplete="off" spellcheck="false"></div>
+        <div class="addrow"><input id="ebPem" type="file" accept=".pem,.key,text/plain" class="field"><button class="btn" id="ebSave">Save</button></div>
+        <p class="msg" id="ebMsg"></p>
+      </div>
+      <div id="bankConnect" class="hidden">
+        <p class="hint" style="margin:0 0 8px">✅ Enable Banking app saved. <button class="btn ghost sm" type="button" id="ebChange">Change</button></p>
+        <div class="addrow"><select id="bankPick" class="field"><option value="">Loading banks…</option></select><button class="btn" id="bankGo">Connect bank</button></div>
+        <p class="msg" id="bankMsg"></p>
+      </div>
+      <div id="bankAccounts"></div>
+    </div>
+
+    <h4 class="setup-h" style="margin-top:16px">🔌 Tibber</h4>
+    <ol class="steps">
+      <li>Open <a href="https://developer.tibber.com/settings/access-token" target="_blank" rel="noopener">developer.tibber.com</a> and sign in with your usual Tibber login.</li>
+      <li>Under <b>Access token</b>, press <b>Create token</b> (tick the boxes it offers) and copy it.</li>
+      <li>Paste it below and press <b>Connect</b>.</li>
+    </ol>
+    <p class="hint" style="margin:0 0 10px">If both houses are on the same Tibber login, one token brings in both.
+      If they're on different logins, connect each one. The token is kept privately in our database and is never shown on the website.</p>
+    <div class="addrow">
+      <input id="token" type="password" placeholder="Paste Tibber token…" autocomplete="off" />
+      <button class="btn" id="connectBtn">Connect</button>
+    </div>
+    <p class="msg" id="setupMsg"></p>
+    <div id="accounts"></div>
+
+    <div class="setup-sec">
+      <h4>🔌 Elvia (optional)</h4>
+      <p class="hint" style="margin:0 0 10px">Makes the Elvia grid bill exact by reading the meter straight from Elvia.
+        On <a href="https://www.elvia.no/logg-inn/" target="_blank" rel="noopener">Elvia's Min side</a>, open <b>Tilganger</b>,
+        create a token for <b>målerverdier</b> (meter values) and paste it here. Without it, Tibber's numbers are used instead.</p>
+      <div class="addrow">
+        <input id="elviaToken" type="password" placeholder="Paste Elvia token…" autocomplete="off" />
+        <button class="btn" id="elviaBtn">Connect</button>
+      </div>
+      <p class="msg" id="elviaMsg"></p>
+      <div id="elviaAccounts"></div>
+    </div>
+
+    <div class="setup-sec">
+      <h4>🏠 Each house's grid bill</h4>
+      <p class="hint" style="margin:0 0 6px">Strømstøtte and Norgespris are settled on the grid bill, so pick the one each house has.</p>
+      <div id="houseSettings"><p class="hint">Connect Tibber first.</p></div>
+      <div class="check-row">Tibber's monthly fee per house
+        <input class="field" id="tibberFee" type="number" min="0" step="1" style="max-width:90px;margin-left:auto;border:2px solid var(--line);border-radius:10px;padding:6px 8px"> kr</div>
+    </div>
+
+    <p style="margin:16px 0 0"><button class="btn ghost sm" id="sampleBtn">👀 Preview with sample data</button></p>
+  </div>
+
+  <!-- Both houses, side by side -->
+  <div class="card hidden" id="compare">
+    <h3>🏡 Side by side</h3>
+    <div class="scroll-x"><table class="nums" id="compareTable"></table></div>
+    <div class="sect" style="margin-top:16px"><h4>Electricity used each month</h4></div>
+    <div class="legend" id="compareLegend"></div>
+    <div class="chart" id="compareChart"></div>
+    <details class="numbers"><summary>Show as a table</summary><div class="scroll-x" id="compareNums"></div></details>
+  </div>
+
+  <!-- Bills: real invoices + worked-out estimates, month by month -->
+  <div class="card hidden" id="bills">
+    <h3>🧾 Bills</h3>
+    <div class="bills-top">
+      <p class="hint"><i>≈ amounts</i> are worked out from your usage; plain amounts are real invoices.
+        Tap an amount to type in the real one or see how it's worked out.</p>
+      <button class="btn sm" id="addBillBtn">+ Add a bill</button>
+    </div>
+    <div id="billsBody"><div class="empty">Working out the bills…</div></div>
+    <p class="attrib">Spot prices for strømstøtte/Norgespris from <a href="https://www.hvakosterstrommen.no" target="_blank" rel="noopener">Hva koster strømmen.no</a>.
+      Grid prices from BKK's and Elvia's 2026 price lists.</p>
+  </div>
+
+  <!-- One card per house -->
+  <div class="grid2" id="houses"></div>
+
+  <div class="empty hidden" id="loading"><span class="big">⚡</span>Fetching the latest from Tibber…</div>
+</main>
+
+<script src="../../site.js"></script>
+<script src="../../shared/family.js"></script>
+<script>
+const TOOL_ID = 'energy';
+const $ = s => document.querySelector(s);
+const esc = Family.esc;
+const HOUSE_COLORS = ['#2b7fb0', '#d0703a'];   // matches --house1 / --house2
+const houseColor = i => HOUSE_COLORS[i] || '#8a8f82';
+
+// Tibber's five price levels, cheap → expensive (green ↔ grey ↔ red, always shown with a word too).
+const LEVELS = {
+  VERY_CHEAP:     { txt: 'Very cheap',     color: '#3f8a52' },
+  CHEAP:          { txt: 'Cheap',          color: '#8dbb83' },
+  NORMAL:         { txt: 'Normal',         color: '#c9c3b4' },
+  EXPENSIVE:      { txt: 'Expensive',      color: '#e0a070' },
+  VERY_EXPENSIVE: { txt: 'Very expensive', color: '#c4502e' },
+};
+const level = l => LEVELS[l] || LEVELS.NORMAL;
+
+/* ───────── little number/date helpers ───────── */
+const cur = c => (c === 'EUR' ? '€' : 'kr');
+const money = (v, c, dp = 0) => v == null ? '–' : `${Number(v).toLocaleString('en-GB', { minimumFractionDigits: dp, maximumFractionDigits: dp })} ${cur(c)}`;
+const price = (v, c) => v == null ? '–' : `${Number(v).toFixed(2)} ${cur(c)}`;
+const kwh = (v, dp = 0) => v == null ? '–' : `${Number(v).toLocaleString('en-GB', { maximumFractionDigits: dp })} kWh`;
+const sum = (arr, f) => arr.reduce((t, x) => t + (Number(f(x)) || 0), 0);
+// Tibber times look like "2026-10-10T14:00:00.000+02:00": already the house's local time,
+// so the date and hour can be read straight off the text.
+const hourOf = s => s.slice(11, 13);
+const dayOf = s => s.slice(0, 10);
+const monthOf = s => s.slice(0, 7);
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const monthName = s => MONTHS[Number(s.slice(5, 7)) - 1];
+const niceDay = s => { const d = new Date(dayOf(s) + 'T12:00:00'); return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); };
+// Today's date (YYYY-MM-DD) where the house is.
+const localToday = tz => new Intl.DateTimeFormat('en-CA', { timeZone: tz || undefined }).format(new Date());
+
+/* ───────── talking to the `energy` edge function ───────── */
+async function api(route, body) {
+  const sb = await Family.client();
+  if (!sb) throw new Error('This page needs Supabase switched on in site.js.');
+  const { data: { session } } = await sb.auth.getSession();
+  const res = await fetch(`${Family.site.supabase.url}/functions/v1/energy/${route}`, {
+    method: body ? 'POST' : 'GET',
+    headers: {
+      Authorization: `Bearer ${session?.access_token}`,
+      apikey: Family.site.supabase.key,
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(out.error || out.message || `Something went wrong (${res.status})`);
+  return out;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CHARTS: one small SVG column-chart drawer used everywhere.
+     groups: [{ label, tip, values: [{ v, color, faded }] }]
+     More than one value per group = bars side by side (one per house).
+═════════════════════════════════════════════════════════════════ */
+function niceStep(range, count) {
+  const raw = range / count || 1;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  return [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw);
+}
+// A column with 4px rounded corners on the data end, square on the baseline.
+function columnPath(x, w, yBase, yEnd) {
+  const h = Math.abs(yBase - yEnd);
+  const r = Math.min(4, w / 2, h);
+  if (h < 0.5) return '';
+  if (yEnd < yBase) {        // grows upwards
+    return `M${x},${yBase}V${yEnd + r}Q${x},${yEnd} ${x + r},${yEnd}H${x + w - r}Q${x + w},${yEnd} ${x + w},${yEnd + r}V${yBase}Z`;
+  }
+  return `M${x},${yBase}V${yEnd - r}Q${x},${yEnd} ${x + r},${yEnd}H${x + w - r}Q${x + w},${yEnd} ${x + w},${yEnd - r}V${yBase}Z`;
+}
+
+function drawChart(el, { groups, yFmt = v => v, labelEvery = 1, nowIndex = -1, height = 190 }) {
+  el._chart = arguments[1];                 // remembered so it can redraw when the width changes
+  const W = Math.max(260, el.clientWidth);
+  const H = height, padL = 40, padR = 6, padT = 16, padB = 24;
+  const n = Math.max(1, groups.length), k = Math.max(1, ...groups.map(g => g.values.length));
+  const vals = groups.flatMap(g => g.values.map(v => v.v)).filter(v => v != null);
+  let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+  if (hi === lo) hi = lo + 1;
+  const step = niceStep(hi - lo, 4);
+  lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+  const y = v => padT + (hi - v) / (hi - lo) * (H - padT - padB);
+  const band = (W - padL - padR) / n;
+  // Bars never wider than 24px; neighbours always keep a 2px gap.
+  const inner = Math.min(24 * k + 2 * (k - 1), band - Math.max(2, band * 0.25));
+  const barW = Math.max(1, (inner - 2 * (k - 1)) / k);
+
+  let svg = '';
+  for (let t = lo; t <= hi + step / 1e6; t += step) {          // gridlines + y labels
+    const yy = y(t).toFixed(1);
+    svg += `<line x1="${padL}" x2="${W - padR}" y1="${yy}" y2="${yy}" stroke="${t === 0 ? '#cfc7b5' : 'var(--grid)'}" stroke-width="1"/>`;
+    svg += `<text x="${padL - 6}" y="${yy}" dy="3.5" text-anchor="end">${esc(yFmt(+t.toFixed(6)))}</text>`;
+  }
+  groups.forEach((g, i) => {
+    const x0 = padL + i * band + (band - inner) / 2;
+    g.values.forEach((v, j) => {
+      if (v.v == null) return;
+      const d = columnPath(x0 + j * (barW + 2), barW, y(0), y(v.v));
+      if (d) svg += `<path d="${d}" fill="${v.color}"${v.faded ? ' opacity=".4"' : ''}/>`;
+    });
+    if (g.label && i % labelEvery === 0) {
+      svg += `<text x="${padL + i * band + band / 2}" y="${H - 6}" text-anchor="middle">${esc(g.label)}</text>`;
+    }
+  });
+  if (nowIndex >= 0) {                                       // "now" marker
+    const cx = (padL + nowIndex * band + band / 2).toFixed(1);
+    svg += `<line x1="${cx}" x2="${cx}" y1="${padT - 4}" y2="${H - padB}" stroke="var(--ink)" stroke-width="1"/>`;
+    svg += `<text class="nowlbl" x="${cx}" y="${padT - 7}" text-anchor="middle">now</text>`;
+  }
+  // Invisible full-height strips make hovering/tapping easy, even on thin bars.
+  groups.forEach((g, i) => {
+    svg += `<rect data-i="${i}" x="${padL + i * band}" y="${padT}" width="${band}" height="${H - padT - padB}" fill="transparent"/>`;
+  });
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img">${svg}</svg><div class="tip"></div>`;
+
+  const tip = el.querySelector('.tip');
+  const show = e => {
+    const r = e.target.closest('rect[data-i]');
+    if (!r) { tip.style.display = 'none'; return; }
+    tip.innerHTML = groups[r.dataset.i].tip;
+    tip.style.display = 'block';
+    const box = el.getBoundingClientRect();
+    const x = e.clientX - box.left, w = tip.offsetWidth;
+    tip.style.left = Math.max(0, Math.min(box.width - w, x - w / 2)) + 'px';
+    tip.style.top = Math.max(0, e.clientY - box.top - tip.offsetHeight - 14) + 'px';
+  };
+  const svgEl = el.querySelector('svg');
+  svgEl.addEventListener('pointermove', show);
+  svgEl.addEventListener('pointerdown', show);
+  svgEl.addEventListener('pointerleave', () => { tip.style.display = 'none'; });
+}
+// Redraw charts when the window is resized (phones turning sideways, etc.).
+const resizer = new ResizeObserver(entries => entries.forEach(en => {
+  const el = en.target;
+  if (el._chart && Math.abs((el._w || 0) - el.clientWidth) > 4) { el._w = el.clientWidth; drawChart(el, el._chart); }
+}));
+const watchSize = el => { el._w = el.clientWidth; resizer.observe(el); };
+
+const table = (head, rows) => `<table class="nums"><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</table>`;
+
+/* ════════════════════════════════════════════════════════════════
+   WORKING THINGS OUT from the raw numbers
+═════════════════════════════════════════════════════════════════ */
+function summary(h) {
+  const today = localToday(h.timeZone);
+  const thisMonth = today.slice(0, 7);
+  const monthDays = h.daily.filter(d => monthOf(d.from) === thisMonth);
+  const lastMonthKey = (() => { const [y, m] = thisMonth.split('-').map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })();
+  const lastMonth = h.monthly.find(m => monthOf(m.from) === lastMonthKey);
+  const latestDay = h.daily[h.daily.length - 1];
+  const used = sum(monthDays, d => d.consumption), cost = sum(monthDays, d => d.cost);
+  const currency = h.price?.currency || h.daily[0]?.currency || 'NOK';
+  return {
+    currency, today,
+    month: { kwh: used, cost, days: monthDays.length, avg: used ? cost / used : null },
+    lastMonth: lastMonth ? { kwh: lastMonth.consumption, cost: lastMonth.cost, name: monthName(lastMonth.from) } : null,
+    latestDay: latestDay ? { kwh: latestDay.consumption, cost: latestDay.cost, when: latestDay.from } : null,
+    bestWindow: bestWindow(h, 3),
+  };
+}
+
+// The cheapest run of `hours` back-to-back hours from now on, e.g. for the washing machine.
+function bestWindow(h, hours) {
+  const all = [...h.today, ...h.tomorrow];
+  const now = Date.now();
+  const ahead = all.filter(p => Date.parse(p.startsAt) + 3600e3 > now);
+  let best = null;
+  for (let i = 0; i + hours <= ahead.length; i++) {
+    const avg = sum(ahead.slice(i, i + hours), p => p.total) / hours;
+    if (!best || avg < best.avg) best = { avg, from: ahead[i].startsAt, to: ahead[i + hours - 1].startsAt };
+  }
+  return best;
+}
+const hourRange = (a, b) => `${hourOf(a)}:00–${String((Number(hourOf(b)) + 1) % 24).padStart(2, '0')}:00`;
+const whenWord = (s, tz) => dayOf(s) === localToday(tz) ? 'today' : 'tomorrow';
+
+/* ════════════════════════════════════════════════════════════════
+   DRAWING THE PAGE
+═════════════════════════════════════════════════════════════════ */
+let data = null;          // last answer from Tibber (or the sample)
+const ui = {};            // which tab each house has picked: ui[homeId] = { price: 'today', use: 'hours' }
+
+function render() {
+  const homes = data?.homes || [];
+  $('#loading').classList.add('hidden');
+  $('#compare').classList.toggle('hidden', homes.length === 0);
+  $('#houses').innerHTML = homes.map((h, i) => houseCard(h, i)).join('');
+  homes.forEach((h, i) => drawHouseCharts(h, i));
+  if (homes.length) drawCompare(homes);
+  renderCapacity(); renderBills(); renderHouseSettings();
+}
+
+function houseName(h, i) { return h.nickname || h.address?.address1 || `House ${i + 1}`; }
+
+function houseCard(h, i) {
+  const s = summary(h);
+  const p = h.price, lv = level(p?.level);
+  const bw = s.bestWindow;
+  ui[h.id] = ui[h.id] || { price: 'today', use: 'hours' };
+  const addr = [h.address?.address1, h.address?.city].filter(Boolean).join(', ');
+  return `
+  <div class="card" data-home="${esc(h.id)}">
+    <div class="house-head"><span class="dot" style="background:${houseColor(i)}"></span><h3>${esc(houseName(h, i))}</h3></div>
+    <p class="addr">${esc(addr)}${h.accountName ? ` · Tibber: ${esc(h.accountName)}` : ''}</p>
+
+    ${p ? `
+    <div class="now">
+      <span class="big">${Number(p.total).toFixed(2)}</span><span class="unit">${cur(p.currency)}/kWh right now</span>
+      <span class="level"><i style="background:${lv.color}"></i>${lv.txt}</span>
+    </div>` : `<p class="tipline">No price right now (is the Tibber subscription active?)</p>`}
+    <div class="capacity hidden" data-capacity="${esc(h.ean || '')}"></div>
+    ${bw ? `<p class="tipline">🧺 Cheapest 3 hours coming up: <b>${hourRange(bw.from, bw.to)} ${whenWord(bw.from, h.timeZone)}</b>, about ${price(bw.avg, s.currency)}/kWh.</p>` : ''}
+
+    <div class="tiles">
+      <div class="tile"><div class="lbl">${s.latestDay ? esc(niceDay(s.latestDay.when)) : 'Latest day'}</div>
+        <div class="val">${kwh(s.latestDay?.kwh, 1)}</div><div class="sub">${money(s.latestDay?.cost, s.currency)}</div></div>
+      <div class="tile"><div class="lbl">This month so far</div>
+        <div class="val">${kwh(s.month.kwh)}</div><div class="sub">${money(s.month.cost, s.currency)}</div></div>
+      <div class="tile"><div class="lbl">${s.lastMonth ? s.lastMonth.name : 'Last month'}</div>
+        <div class="val">${kwh(s.lastMonth?.kwh)}</div><div class="sub">${money(s.lastMonth?.cost, s.currency)}</div></div>
+    </div>
+
+    <div class="sect"><h4>Price per hour</h4>
+      <div class="tabs" data-kind="price">
+        <button data-v="today">Today</button>
+        <button data-v="tomorrow"${h.tomorrow.length ? '' : ' disabled title="Tomorrow’s prices arrive around 13:00"'}>Tomorrow</button>
+      </div>
+    </div>
+    <div class="chart" data-chart="price"></div>
+    <p class="chart-note">Bar colours: <span style="color:#3f8a52">■</span> cheap · <span style="color:#a69f8e">■</span> normal · <span style="color:#c4502e">■</span> expensive (compared with recent days). Includes taxes and VAT.</p>
+
+    <div class="sect" style="margin-top:12px"><h4>Electricity used</h4>
+      <div class="tabs" data-kind="use">
+        <button data-v="hours">48 hours</button><button data-v="days">30 days</button><button data-v="months">12 months</button>
+      </div>
+    </div>
+    <div class="chart" data-chart="use"></div>
+    <details class="numbers"><summary>Show as a table</summary><div class="scroll-x" data-nums></div></details>
+  </div>`;
+}
+
+function drawHouseCharts(h, i) {
+  const card = document.querySelector(`[data-home="${CSS.escape(h.id)}"]`);
+  const c = summary(h).currency;
+  const pick = ui[h.id];
+  card.querySelectorAll('.tabs').forEach(t => {
+    t.querySelectorAll('button').forEach(b => {
+      b.classList.toggle('on', b.dataset.v === pick[t.dataset.kind]);
+      b.onclick = () => { pick[t.dataset.kind] = b.dataset.v; drawHouseCharts(h, i); };
+    });
+  });
+
+  // Price chart: one bar per hour, coloured by Tibber's cheap/expensive level.
+  const prices = pick.price === 'tomorrow' ? h.tomorrow : h.today;
+  const now = Date.now();
+  const nowIndex = pick.price === 'today' ? prices.findIndex(p => Date.parse(p.startsAt) <= now && now < Date.parse(p.startsAt) + 3600e3) : -1;
+  const pEl = card.querySelector('[data-chart=price]');
+  if (!prices.length) pEl.innerHTML = '<div class="empty">No prices yet.</div>';
+  else drawChart(pEl, {
+    labelEvery: 3, nowIndex, yFmt: v => v.toFixed(2),
+    groups: prices.map((p, j) => ({
+      label: hourOf(p.startsAt),
+      values: [{ v: p.total, color: level(p.level).color, faded: nowIndex >= 0 && j < nowIndex }],
+      tip: `<b>${hourRange(p.startsAt, p.startsAt)}</b><br>${price(p.total, c)}/kWh · ${level(p.level).txt}`,
+    })),
+  });
+  watchSize(pEl);
+
+  // Usage chart: hours / days / months.
+  const use = { hours: h.hourly, days: h.daily.slice(-30), months: h.monthly.slice(-12) }[pick.use];
+  const label = pick.use === 'hours' ? n => hourOf(n.from) : pick.use === 'days' ? n => String(Number(n.from.slice(8, 10))) : n => monthName(n.from);
+  const when = pick.use === 'hours' ? n => `${niceDay(n.from)}, ${hourRange(n.from, n.from)}` : pick.use === 'days' ? n => niceDay(n.from) : n => `${monthName(n.from)} ${n.from.slice(0, 4)}`;
+  const uEl = card.querySelector('[data-chart=use]');
+  if (!use.length) uEl.innerHTML = '<div class="empty">No usage data yet.</div>';
+  else drawChart(uEl, {
+    labelEvery: pick.use === 'hours' ? 6 : pick.use === 'days' ? 5 : 1,
+    yFmt: v => v.toLocaleString('en-GB'),
+    groups: use.map(n => ({
+      label: label(n),
+      values: [{ v: n.consumption, color: houseColor(i) }],
+      tip: `<b>${esc(when(n))}</b><br>${kwh(n.consumption, 2)} · ${money(n.cost, c, 2)}${n.unitPrice != null ? `<br>avg ${price(n.unitPrice, c)}/kWh` : ''}`,
+    })),
+  });
+  watchSize(uEl);
+  card.querySelector('[data-nums]').innerHTML = table(['When', 'Used', 'Cost'],
+    use.slice().reverse().map(n => [esc(when(n)), kwh(n.consumption, 2), money(n.cost, c, 2)]));
+}
+
+function drawCompare(homes) {
+  const S = homes.map(summary);
+  const head = ['', ...homes.map((h, i) => `<span class="dot" style="display:inline-block;background:${houseColor(i)};margin-right:5px;vertical-align:-1px"></span>${esc(houseName(h, i))}`)];
+  const cell = (main, sub) => `${main}${sub ? `<span class="sub">${sub}</span>` : ''}`;
+  $('#compareTable').innerHTML = `<tr>${head.map(h => `<th>${h}</th>`).join('')}</tr>` + [
+    ['Price now', homes.map((h, i) => h.price ? cell(`${price(h.price.total, S[i].currency)}/kWh`, level(h.price.level).txt) : '–')],
+    ['Latest day', S.map(s => s.latestDay ? cell(kwh(s.latestDay.kwh, 1), money(s.latestDay.cost, s.currency)) : '–')],
+    ['This month so far', S.map(s => cell(kwh(s.month.kwh), money(s.month.cost, s.currency)))],
+    ['Average price paid this month', S.map(s => s.month.avg != null ? `${price(s.month.avg, s.currency)}/kWh` : '–')],
+    ['Last month', S.map(s => s.lastMonth ? cell(kwh(s.lastMonth.kwh), money(s.lastMonth.cost, s.currency)) : '–')],
+  ].map(([lbl, cells]) => `<tr><td><b>${lbl}</b></td>${cells.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
+
+  // Monthly use, both houses side by side, over the months either house has data for.
+  const months = [...new Set(homes.flatMap(h => h.monthly.map(m => monthOf(m.from))))].sort().slice(-12);
+  const byMonth = homes.map(h => Object.fromEntries(h.monthly.map(m => [monthOf(m.from), m])));
+  $('#compareLegend').innerHTML = homes.length > 1 ? homes.map((h, i) => `<span><span class="dot" style="background:${houseColor(i)}"></span>${esc(houseName(h, i))}</span>`).join('') : '';
+  const el = $('#compareChart');
+  if (!months.length) { el.innerHTML = '<div class="empty">No monthly numbers yet.</div>'; $('#compareNums').innerHTML = ''; return; }
+  drawChart(el, {
+    yFmt: v => v.toLocaleString('en-GB'),
+    groups: months.map(m => ({
+      label: monthName(m + '-01'),
+      values: homes.map((h, i) => ({ v: byMonth[i][m]?.consumption ?? null, color: houseColor(i) })),
+      tip: `<b>${monthName(m + '-01')} ${m.slice(0, 4)}</b>` + homes.map((h, i) =>
+        `<br><span class="dot" style="display:inline-block;background:${houseColor(i)};margin-right:5px"></span>${esc(houseName(h, i))}: ${kwh(byMonth[i][m]?.consumption)} · ${money(byMonth[i][m]?.cost, S[i].currency)}`).join(''),
+    })),
+  });
+  watchSize(el);
+  $('#compareNums').innerHTML = table(['Month', ...homes.map((h, i) => esc(houseName(h, i)))],
+    months.slice().reverse().map(m => [`${monthName(m + '-01')} ${m.slice(0, 4)}`,
+      ...homes.map((h, i) => byMonth[i][m] ? `${kwh(byMonth[i][m].consumption)}<span class="sub">${money(byMonth[i][m].cost, S[i].currency)}</span>` : '–')]));
+}
+
+/* ════════════════════════════════════════════════════════════════
+   BILLS
+   Real invoices are saved in the family database, Family.store('energy'):
+     invoices  { company: 'Tibber' | 'BKK' | 'Elvia', period: 'YYYY-MM' (the month billed),
+                 part: 'power' | 'grid' (optional: BKK sold the power too, before Tibber),
+                 house: <meter number> | 'both' | null, houseHint: a Gmail label naming the house,
+                 amount, due: 'YYYY-MM-DD', paid, note,
+                 subject, received, emailUrl, gmailId, source: 'gmail' | 'manual' }
+     houses    { ean: <meter number>, support: 'stromstotte' | 'norgespris' | 'none', cabin }
+     settings  { kind: 'tibber', fee }
+   Estimates come from the `energy` function's bills route (grid) and Tibber's usage (power).
+═════════════════════════════════════════════════════════════════ */
+const store = Family.store(TOOL_ID);
+let invoices = {}, houseItems = {}, settingItems = {};
+let bills = null;                // answer from energy/bills, or { error }
+let olderOpen = false;           // is "Show older months" open?
+const DEFAULT_FEE = 49;          // Tibber's monthly fee per home (change it under ⚙️ Settings)
+const SUPPORT_TXT = { stromstotte: 'Strømstøtte', norgespris: 'Norgespris', none: 'Neither' };
+
+const houseCfg = ean => Object.values(houseItems).find(x => x.ean === ean) || {};
+const supportOf = ean => houseCfg(ean).support || 'stromstotte';
+const tibberFee = () => Object.values(settingItems).find(x => x.kind === 'tibber')?.fee ?? DEFAULT_FEE;
+// Settings items are found by a field (ean / kind), so update the one that's there or add it.
+function saveBy(collection, items, key, value, fields) {
+  const found = Object.entries(items).find(([, x]) => x[key] === value);
+  return found ? store.update(collection, found[0], fields) : store.add(collection, { [key]: value, ...fields });
+}
+
+store.watch('invoices', v => { invoices = v; renderBills(); });
+store.watch('houses', v => { houseItems = v; renderBills(); renderCapacity(); renderHouseSettings(); });
+store.watch('settings', v => { settingItems = v; $('#tibberFee').value = tibberFee(); renderBills(); });
+
+const thisMonth = () => localToday('Europe/Oslo').slice(0, 7);
+const longMonth = m => new Date(m + '-15T12:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+function recentMonths(n) {
+  const [y, m] = thisMonth().split('-').map(Number);
+  return Array.from({ length: n }, (_, i) => { const d = new Date(y, m - 1 - i, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; });
+}
+const companyOf = g => /elvia/i.test(g || '') ? 'Elvia' : /bkk/i.test(g || '') ? 'BKK' : null;
+
+// The houses, keyed by meter number (EAN), in the same order and colours as the cards.
+function houseList() {
+  return (data?.homes || []).map((h, i) => ({ ean: h.ean, name: houseName(h, i), home: h, i, company: companyOf(h.gridCompany) }))
+    .filter(h => h.ean);
+}
+// Which house an invoice belongs to: picked by hand, or guessed from its Gmail label.
+function invoiceHouse(inv) {
+  if (inv.house) return inv.house;
+  const hint = (inv.houseHint || '').toLowerCase().trim();
+  if (!hint) return null;
+  const hit = houseList().find(h => [h.name, h.home.address?.address1].some(n => n && n.toLowerCase().trim() === hint));
+  return hit ? hit.ean : null;
+}
+
+/* ───────── what each bill should come to ───────── */
+function gridEstimate(ean, month) {
+  const house = (bills?.houses || []).find(x => x.ean === ean);
+  const b = house?.months.find(m => m.month === month);
+  if (!b) return null;
+  const scheme = supportOf(ean);
+  const support = scheme === 'stromstotte' ? b.stromstotte : scheme === 'norgespris' ? b.norgespris : 0;
+  return { ...b, source: house.source, scheme, support, total: b.energy + b.fixed - support };
+}
+function tibberEstimate(ean, month) {
+  const h = (data?.homes || []).find(x => x.ean === ean);
+  if (!h) return null;
+  const nodes = month === thisMonth() ? h.daily.filter(n => monthOf(n.from) === month) : h.monthly.filter(n => monthOf(n.from) === month);
+  if (!nodes.length) return null;
+  const cost = sum(nodes, n => n.cost), used = sum(nodes, n => n.consumption);
+  return { cost, kwh: used, fee: tibberFee(), total: cost + tibberFee() };
+}
+
+/* ───────── the bills card ───────── */
+function amtBtn(edit, value, { est, company, paid, mail } = {}) {
+  return `<button class="amt${est ? ' est' : ''}" data-edit="${esc(JSON.stringify(edit))}">` +
+    (company ? `<span class="co">${esc(company)}</span>` : '') +
+    (value == null ? '–' : (est ? '≈ ' : '') + money(value)) +
+    (paid ? ' <span class="ok" title="Paid">✓</span>' : '') + (mail ? ' <span title="Invoice arrived, amount not typed in yet">📧</span>' : '') +
+    '</button>';
+}
+
+// One amount cell: the real invoice if we have one, otherwise the estimate.
+function cell(house, company, month, placed, sharedTibber) {
+  const est = company === 'Tibber' ? tibberEstimate(house.ean, month) : gridEstimate(house.ean, month);
+  const label = company === 'Tibber' ? null : company;
+  const estValue = est ? est.total : null;
+  if (company === 'Tibber' && sharedTibber.length) {
+    return { html: `<span class="amt est">shared bill</span>`, value: 0, est: false, shared: true };
+  }
+  const isPower = x => x.company === 'Tibber' || x.part === 'power';
+  const mine = placed.filter(([, x, h]) => h === house.ean && (company === 'Tibber' ? isPower(x) : x.company === company && !isPower(x)));
+  const realLabel = company === 'Tibber' ? (mine.find(([, x]) => x.company !== 'Tibber')?.[1].company || null) : company;
+  if (mine.length) {
+    const typed = mine.filter(([, x]) => x.amount != null);
+    if (typed.length === mine.length) {
+      const total = sum(typed, ([, x]) => x.amount);
+      return { html: amtBtn({ id: mine[0][0] }, total, { company: realLabel, paid: mine.every(([, x]) => x.paid) }), value: total, est: false };
+    }
+    const waiting = mine.find(([, x]) => x.amount == null);
+    return { html: amtBtn({ id: waiting[0] }, estValue, { est: true, company: label, mail: true }), value: estValue, est: true };
+  }
+  return { html: amtBtn({ company, house: house.ean, period: month }, estValue, { est: true, company: label }), value: estValue, est: true };
+}
+
+function monthBlock(month, houses, invs) {
+  const placed = invs.map(([id, x]) => [id, x, invoiceHouse(x)]);
+  const shared = placed.filter(([, x, h]) => x.company === 'Tibber' && h === 'both');
+  const unplaced = placed.filter(([, , h]) => !h);
+  let monthTotal = 0, anyEst = false;
+  const rows = houses.map(h => {
+    const power = cell(h, 'Tibber', month, placed, shared);
+    const grid = cell(h, h.company || 'Grid', month, placed, shared);
+    const vals = [power, grid].filter(c => c.value != null);
+    const total = vals.length ? sum(vals, c => c.value) : null;
+    const est = power.est || grid.est;
+    if (total != null) monthTotal += total;
+    anyEst = anyEst || est;
+    return `<tr><td><span class="dot" style="display:inline-block;background:${houseColor(h.i)};margin-right:5px"></span>${esc(h.name)}</td>
+      <td>${power.html}</td><td>${grid.html}</td>
+      <td><span class="amt${est ? ' est' : ''}">${total == null ? '–' : (est ? '≈ ' : '') + money(total)}</span></td></tr>`;
+  });
+  shared.forEach(([id, x]) => {
+    const estBoth = sum(houses, h => tibberEstimate(h.ean, month)?.total || 0) || null;
+    const value = x.amount ?? estBoth;
+    if (value != null) monthTotal += value;
+    anyEst = anyEst || x.amount == null;
+    rows.push(`<tr><td>Both houses</td><td>${amtBtn({ id }, value, { est: x.amount == null, paid: x.paid, mail: x.amount == null })}</td><td></td>
+      <td><span class="amt${x.amount == null ? ' est' : ''}">${value == null ? '–' : (x.amount == null ? '≈ ' : '') + money(value)}</span></td></tr>`);
+  });
+  const notices = unplaced.map(([id, x]) => `
+    <div class="notice"><span class="txt">📧 ${esc(x.company)} invoice${x.subject ? ` “${esc(x.subject)}”` : ''}${x.received ? `, arrived ${esc(niceDay(x.received))}` : ''}.
+      Which house is it for?${x.emailUrl ? ` <a href="${esc(x.emailUrl)}" target="_blank" rel="noopener">Open email</a>` : ''}</span>
+      ${houses.map(h => `<button class="btn ghost sm" data-assign="${esc(h.ean)}" data-id="${esc(id)}">${esc(h.name)}</button>`).join('')}
+      ${x.company === 'Tibber' ? `<button class="btn ghost sm" data-assign="both" data-id="${esc(id)}">Both</button>` : ''}
+    </div>`).join('');
+  return `<div class="bm">
+    <div class="bm-head"><b>${esc(longMonth(month))}</b>${month === thisMonth() ? '<span class="so-far">so far</span>' : ''}
+      <span class="tot">${anyEst ? '≈ ' : ''}${money(monthTotal)}</span></div>
+    <table class="bills"><tr><th>House</th><th>Power<span style="display:block;font-weight:700">Tibber</span></th><th>Grid<span style="display:block;font-weight:700">BKK / Elvia</span></th><th>Total</th></tr>${rows.join('')}</table>
+    ${notices}
+  </div>`;
+}
+
+function renderBills() {
+  const card = $('#bills');
+  const houses = houseList();
+  if (!houses.length || data?.sample) { card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  const inv = Object.entries(invoices);
+  const months = [...new Set([...recentMonths(6), ...inv.map(([, x]) => x.period).filter(Boolean)])].sort().reverse();
+  const head = bills?.error ? `<div class="banner">⚠️ Couldn't work out the grid bills: ${esc(bills.error)}</div>`
+    : !bills ? '<p class="hint">⏳ Working out the grid bills (the first time can take half a minute)…</p>' : '';
+  const block = m => monthBlock(m, houses, inv.filter(([, x]) => x.period === m));
+  const recent = months.slice(0, 6), older = months.slice(6);
+  $('#billsBody').innerHTML = head + recent.map(block).join('') + (older.length
+    ? `<details class="numbers"${olderOpen ? ' open' : ''}><summary>Show ${older.length} older months</summary>${older.map(block).join('')}</details>` : '');
+  const det = $('#billsBody details');
+  if (det) det.ontoggle = () => { olderOpen = det.open; };
+  $('#billsBody').querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEditor(JSON.parse(b.dataset.edit)));
+  $('#billsBody').querySelectorAll('[data-assign]').forEach(b => b.onclick = () => store.update('invoices', b.dataset.id, { house: b.dataset.assign }));
+}
+$('#addBillBtn').onclick = () => openEditor({});
+
+/* ───────── how an estimate is worked out ───────── */
+function breakdown(company, ean, period) {
+  const row = (label, value, cls = '') => `<tr class="${cls}"><td>${label}</td><td>${value}</td></tr>`;
+  if (!ean) return '';
+  if (company === 'Tibber') {
+    const eans = ean === 'both' ? houseList().map(h => h.ean) : [ean];
+    const parts = eans.map(e => tibberEstimate(e, period)).filter(Boolean);
+    if (!parts.length) return '<div class="breakdown">No Tibber usage for this month yet.</div>';
+    return `<div class="breakdown"><b>What Tibber's data says</b><table>
+      ${row(`Power used (${kwh(sum(parts, p => p.kwh))})`, money(sum(parts, p => p.cost), 'NOK', 2))}
+      ${row(`Monthly fee${parts.length > 1 ? ` × ${parts.length}` : ''}`, money(sum(parts, p => p.fee), 'NOK', 2))}
+      ${row('About', money(sum(parts, p => p.total), 'NOK', 2), 'total')}</table></div>`;
+  }
+  const e = gridEstimate(ean, period);
+  if (!e) return `<div class="breakdown">${bills ? 'No estimate for this month (it needs hourly usage and 2026 grid prices).' : 'Still working out the grid bills…'}</div>`;
+  const upper = e.stepKw[1] == null ? '+' : `–${e.stepKw[1]}`;
+  const supportRow = e.scheme === 'stromstotte' ? row('Strømstøtte (paid back)', '− ' + money(e.stromstotte, 'NOK', 2))
+    : e.scheme === 'norgespris' ? row(`Norgespris settlement (${e.norgespris >= 0 ? 'paid back' : 'you pay extra'})`, (e.norgespris >= 0 ? '− ' : '+ ') + money(Math.abs(e.norgespris), 'NOK', 2)) : '';
+  return `<div class="breakdown"><b>How the ${esc(e.company)} bill is worked out</b><table>
+    ${row(`Energy part: ${kwh(e.dayKwh)} daytime + ${kwh(e.nightKwh)} night/weekend`, money(e.energy, 'NOK', 2))}
+    ${row(`Capacity step ${e.step} (${e.stepKw[0]}${upper} kW): your 3 biggest hours averaged ${e.avgTop3.toFixed(1)} kW`, money(e.fixed, 'NOK', 2))}
+    ${supportRow}
+    ${row('About', money(e.total, 'NOK', 2), 'total')}</table>
+    <p class="hint" style="margin:6px 0 0">From ${e.source === 'elvia' ? 'Elvia’s' : 'Tibber’s'} hourly meter data (${e.hours} hours).
+      Biggest hours: ${e.peakDays.map(p => `${esc(niceDay(p.day))} ${p.kw.toFixed(1)} kW`).join(', ')}.</p></div>`;
+}
+
+/* ───────── the bill editor ───────── */
+function openEditor(edit) {
+  const id = edit.id, inv = id ? invoices[id] : null;
+  const houses = houseList();
+  const startHouse = inv ? (invoiceHouse(inv) || '') : (edit.house || '');
+  const startCompany = inv?.company || edit.company || 'Tibber';
+  const wrap = document.createElement('div');
+  wrap.className = 'overlay';
+  wrap.innerHTML = `<form class="dialog">
+    <h3>${id ? '🧾 Bill' : '🧾 Add a bill'}</h3>
+    ${inv?.subject ? `<p class="hint" style="margin:0">📧 ${inv.emailUrl ? `<a href="${esc(inv.emailUrl)}" target="_blank" rel="noopener">${esc(inv.subject)}</a>` : esc(inv.subject)}${inv.received ? ` · arrived ${esc(niceDay(inv.received))}` : ''}</p>` : ''}
+    <div class="row2">
+      <div><label>Company</label><select class="field" name="company">${['Tibber', 'BKK', 'Elvia'].map(c => `<option${c === startCompany ? ' selected' : ''}>${c}</option>`).join('')}</select></div>
+      <div><label>Month billed</label><input class="field" type="month" name="period" value="${esc(inv?.period || edit.period || thisMonth())}" required></div>
+    </div>
+    <label>House</label>
+    <select class="field" name="house"><option value="">Not sure yet</option>
+      ${houses.map(h => `<option value="${esc(h.ean)}"${h.ean === startHouse ? ' selected' : ''}>${esc(h.name)}</option>`).join('')}
+      <option value="both"${startHouse === 'both' ? ' selected' : ''}>Both houses (one shared invoice)</option></select>
+    <div class="row2">
+      <div><label>Amount (kr)</label><input class="field" type="number" step="0.01" name="amount" inputmode="decimal" value="${inv?.amount ?? ''}" placeholder="From the invoice"></div>
+      <div><label>Due date</label><input class="field" type="date" name="due" value="${esc(inv?.due || '')}"></div>
+    </div>
+    <label class="check-row"><input type="checkbox" name="paid"${inv?.paid ? ' checked' : ''}> Paid</label>
+    ${inv?.paidOn ? `<p class="hint" style="margin:4px 0 0">🏦 The bank shows ${esc(money(inv.paidAmount, 'NOK', 2))} ${inv.paidAmount < 0 ? 'paid back to you' : 'paid'} on ${esc(niceDay(inv.paidOn))}.</p>` : ''}
+    <label>Note</label><input class="field" name="note" value="${esc(inv?.note || '')}" placeholder="Optional">
+    <div data-breakdown></div>
+    <div class="acts">
+      <button class="btn" type="submit">Save</button>
+      ${id ? '<button class="btn ghost" type="button" data-act="delete">Delete</button>' : ''}
+      <button class="btn ghost" type="button" data-act="close">Cancel</button>
+    </div>
+  </form>`;
+  document.body.appendChild(wrap);
+  const f = wrap.querySelector('form');
+  const close = () => { wrap.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onKey);
+  wrap.onclick = e => { if (e.target === wrap) close(); };
+  const showBreakdown = () => { f.querySelector('[data-breakdown]').innerHTML = breakdown(f.company.value, f.house.value, f.period.value); };
+  f.onchange = showBreakdown;
+  showBreakdown();
+  f.querySelector('[data-act=close]').onclick = close;
+  const del = f.querySelector('[data-act=delete]');
+  if (del) del.onclick = () => tapTwice(del, 'Tap again to delete', () => { store.remove('invoices', id); close(); });
+  f.onsubmit = e => {
+    e.preventDefault();
+    const fields = {
+      company: f.company.value, period: f.period.value, house: f.house.value || null,
+      amount: f.amount.value === '' ? null : Number(f.amount.value),
+      due: f.due.value || null, paid: f.paid.checked, note: f.note.value.trim(),
+    };
+    if (id) store.update('invoices', id, fields); else store.add('invoices', { ...fields, source: 'manual' });
+    close();
+  };
+}
+
+/* ───────── capacity step on each house card ───────── */
+function renderCapacity() {
+  document.querySelectorAll('[data-capacity]').forEach(el => {
+    const e = el.dataset.capacity && gridEstimate(el.dataset.capacity, thisMonth());
+    if (!e) { el.classList.add('hidden'); return; }
+    const near = e.nextStepKw != null && e.avgTop3 >= e.nextStepKw * 0.85;
+    el.className = 'capacity' + (near ? ' near' : '');
+    el.innerHTML = `📶 <b>${esc(e.company)} capacity step ${e.step}</b> (${e.stepKw[0]}${e.stepKw[1] == null ? '+' : '–' + e.stepKw[1]} kW) so far this month: ${money(e.fixed)}.
+      Your 3 biggest hours average <b>${e.avgTop3.toFixed(1)} kW</b>.` +
+      (near ? ` That's close to the next step at ${e.nextStepKw} kW, so try not to run the car charger, oven and heaters all at once.` : '');
+  });
+}
+
+/* Ask "are you sure?" on the button itself: the first tap changes its text, a second tap within
+   5 seconds does it. (Pop-up confirm() dialogs are blocked in some browsers, e.g. in-app ones.) */
+function tapTwice(btn, question, action) {
+  if (btn.dataset.armed) { delete btn.dataset.armed; action(); return; }
+  const before = btn.textContent;
+  btn.dataset.armed = '1';
+  btn.textContent = question;
+  setTimeout(() => { if (btn.dataset.armed) { delete btn.dataset.armed; btn.textContent = before; } }, 5000);
+}
+
+/* ───────── the bank (Enable Banking) ───────── */
+const BANK_CALLBACK = `${Family.site.supabase.url}/functions/v1/energy/bank/callback`;
+let bankList = null;            // Norwegian banks, loaded when needed
+const shortDate = s => s ? new Date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+function renderBank() {
+  const all = data?.accounts || [];
+  const app = all.find(a => a.provider === 'enablebanking');
+  const sessions = all.filter(a => a.provider === 'bank');
+  $('#cbUrl').textContent = BANK_CALLBACK;
+  $('#ebSetup').classList.toggle('hidden', Boolean(app) && !bankSetupOpen);
+  $('#bankConnect').classList.toggle('hidden', !app || bankSetupOpen);
+  if (app && !bankList) loadBankList();
+  $('#bankAccounts').innerHTML = sessions.map(sess => {
+    const r = sess.lastResult;
+    const result = !r ? 'Not checked yet.'
+      : r.ok ? `Last checked ${esc(shortDate(r.at))}: ${r.found} bill payment${r.found === 1 ? '' : 's'} seen${r.added || r.matched ? ` (${r.added} new, ${r.matched} matched to bills)` : ''}.`
+      : `⚠️ Last check failed: ${esc(r.error)}`;
+    return `<div class="acct"><span>🏦</span>
+      <div class="txt">${esc(sess.name || 'Bank')}${(sess.accounts || []).map(a => ` · ${esc(a.name)}${a.ending ? ' …' + esc(a.ending) : ''}`).join('')}
+        <span class="sub">Permission until ${esc(shortDate(sess.validUntil))}. ${result}</span></div>
+      <button class="btn ghost sm" data-sync>Check now</button>
+      <button class="btn ghost sm" data-remove="${esc(sess.id)}">Disconnect</button></div>`;
+  }).join('');
+  $('#bankAccounts').querySelectorAll('[data-sync]').forEach(b => b.onclick = async () => {
+    b.disabled = true; b.textContent = 'Checking…';
+    try { await api('bank/sync', {}); await load(); }
+    catch (e) { $('#bankMsg').textContent = e.message; $('#bankMsg').className = 'msg bad'; }
+    b.disabled = false; b.textContent = 'Check now';
+  });
+  // A friendly nudge when the bank's permission is about to run out.
+  const soon = sessions.filter(sess => sess.validUntil && Date.parse(sess.validUntil) - Date.now() < 14 * 864e5);
+  soon.forEach(sess => $('#banner').insertAdjacentHTML('beforeend',
+    `<div class="banner">🏦 The bank permission for <b>${esc(sess.name)}</b> ${Date.parse(sess.validUntil) < Date.now() ? 'has run out' : 'runs out on ' + esc(shortDate(sess.validUntil))}.
+      Open ⚙️ Settings and press <b>Connect bank</b> again (one BankID login) to keep bills coming in.</div>`));
+}
+let bankSetupOpen = false;
+
+async function loadBankList() {
+  bankList = [];
+  try {
+    bankList = (await api('bank/banks')).banks;
+    $('#bankPick').innerHTML = '<option value="">Choose your bank…</option>' +
+      bankList.map(b => `<option>${esc(b.name)}</option>`).join('');
+  } catch (e) { $('#bankPick').innerHTML = '<option value="">Couldn’t load banks</option>'; $('#bankMsg').textContent = e.message; }
+}
+
+$('#cbCopy').onclick = async () => {
+  try { await navigator.clipboard.writeText(BANK_CALLBACK); $('#cbCopy').textContent = 'Copied ✓'; }
+  catch (e) { $('#cbCopy').textContent = 'Select and copy it'; }
+};
+$('#ebChange').onclick = () => { bankSetupOpen = true; renderBank(); };
+$('#ebSave').onclick = async () => {
+  const say = (t, bad) => { $('#ebMsg').textContent = t; $('#ebMsg').className = 'msg' + (bad ? ' bad' : ''); };
+  const appId = $('#ebAppId').value.trim(), file = $('#ebPem').files[0];
+  if (!appId || !file) return say('Fill in the application ID and choose the .pem file.', true);
+  say('Checking with Enable Banking…');
+  try {
+    const r = await api('bank/app', { appId, pem: await file.text() });
+    $('#ebPem').value = ''; bankSetupOpen = false; bankList = null;
+    say(`✅ Saved. ${r.banks.length} Norwegian banks available.`);
+    await load();
+  } catch (e) { say(e.message, true); }
+};
+$('#bankGo').onclick = async () => {
+  const bank = $('#bankPick').value;
+  if (!bank) { $('#bankMsg').textContent = 'Choose your bank first.'; return; }
+  $('#bankMsg').textContent = 'Opening your bank…';
+  try {
+    const r = await api('bank/connect', { bank, returnTo: location.origin + location.pathname });
+    location.href = r.url;            // BankID at the bank, then back here
+  } catch (e) { $('#bankMsg').textContent = e.message; $('#bankMsg').className = 'msg bad'; }
+};
+
+// Coming back from the bank: say how it went, then tidy the address bar.
+(function bankReturn() {
+  const result = new URLSearchParams(location.search).get('bank');
+  if (!result) return;
+  history.replaceState(null, '', location.pathname);
+  const text = {
+    connected: '🏦 Bank connected! Payments to Tibber, BKK and Elvia are now read once a day, and the bills below are filled in.',
+    cancelled: '🏦 The bank connection was cancelled. You can try again under ⚙️ Settings.',
+    error: '🏦 Something went wrong connecting the bank. Try again under ⚙️ Settings.',
+  }[result];
+  if (text) setTimeout(() => $('#banner').insertAdjacentHTML('afterbegin', `<div class="banner">${text}</div>`), 1500);
+})();
+
+/* ───────── settings card ───────── */
+function renderAccounts() {
+  const all = data?.accounts || [];
+  const list = (provider, label) => {
+    const accts = all.filter(a => a.provider === provider);
+    return accts.length ? `<p class="hint" style="margin:10px 0 4px">Connected ${label}:</p>` + accts.map(a => `
+      <div class="acct"><span>🔗</span><div class="txt">${esc(a.name || label)}</div>
+        <button class="btn ghost sm" data-remove="${esc(a.id)}">Disconnect</button></div>`).join('') : '';
+  };
+  renderBank();
+  $('#accounts').innerHTML = list('tibber', 'Tibber logins');
+  $('#elviaAccounts').innerHTML = list('elvia', 'Elvia tokens');
+  document.querySelectorAll('#setup [data-remove]').forEach(b => b.onclick = () =>
+    tapTwice(b, 'Tap again to disconnect', async () => {
+      b.disabled = true; b.textContent = 'Disconnecting…';
+      try { await api('disconnect', { account: b.dataset.remove }); await load(true); }
+      catch (e) { b.disabled = false; b.textContent = 'Disconnect'; b.title = e.message; b.insertAdjacentHTML('afterend', `<span class="msg bad">${esc(e.message)}</span>`); }
+    }));
+}
+
+function renderHouseSettings() {
+  const houses = houseList();
+  if (!houses.length) return;
+  $('#houseSettings').innerHTML = houses.map(h => `
+    <div class="house-set" data-ean="${esc(h.ean)}">
+      <span class="dot" style="background:${houseColor(h.i)}"></span>
+      <span class="nm">${esc(h.name)}<span style="display:block;font-size:.75rem;color:var(--ink-soft)">Grid: ${esc(h.home.gridCompany || 'unknown')}${h.home.area ? ' · price area ' + esc(h.home.area) : ''}</span></span>
+      <select data-k="support" aria-label="Support scheme">${Object.entries(SUPPORT_TXT).map(([v, t]) => `<option value="${v}"${supportOf(h.ean) === v ? ' selected' : ''}>${t}</option>`).join('')}</select>
+      <label style="display:flex;align-items:center;gap:4px;font-size:.85rem;font-weight:700"><input type="checkbox" data-k="cabin"${houseCfg(h.ean).cabin ? ' checked' : ''}> Cabin</label>
+    </div>`).join('');
+  $('#houseSettings').querySelectorAll('.house-set').forEach(row => {
+    const ean = row.dataset.ean;
+    row.querySelector('[data-k=support]').onchange = e => saveBy('houses', houseItems, 'ean', ean, { support: e.target.value });
+    row.querySelector('[data-k=cabin]').onchange = async e => {
+      await saveBy('houses', houseItems, 'ean', ean, { cabin: e.target.checked });
+      loadBills(true);   // cabins have a lower monthly cap for strømstøtte/Norgespris
+    };
+  });
+}
+$('#tibberFee').onchange = () => saveBy('settings', settingItems, 'kind', 'tibber', { fee: Number($('#tibberFee').value) || 0 });
+
+$('#setupBtn').onclick = () => $('#setup').classList.toggle('hidden');
+async function connect(provider, input, msg, checking) {
+  const token = $(input).value.trim();
+  const say = (t, bad) => { $(msg).textContent = t; $(msg).className = 'msg' + (bad ? ' bad' : ''); };
+  if (!token) return say('Paste the token first.', true);
+  say(checking);
+  try {
+    const r = await api(`${provider}/connect`, { token });
+    $(input).value = '';
+    say(provider === 'tibber'
+      ? `✅ Connected ${r.name || 'Tibber'} (${r.homes} ${r.homes === 1 ? 'home' : 'homes'}).`
+      : `✅ Connected Elvia (${r.meters} ${r.meters === 1 ? 'meter' : 'meters'}).`);
+    await load(true);
+  } catch (e) { say(e.message, true); }
+}
+$('#connectBtn').onclick = () => connect('tibber', '#token', '#setupMsg', 'Checking with Tibber…');
+$('#elviaBtn').onclick = () => connect('elvia', '#elviaToken', '#elviaMsg', 'Checking with Elvia…');
+$('#sampleBtn').onclick = () => {
+  data = sampleData();
+  $('#banner').innerHTML = '<div class="banner">👀 You’re looking at <b>made-up sample data</b>. Connect Tibber above to see the real houses, or <a href="">reload</a> to leave the preview.</div>';
+  $('#updated').textContent = '';
+  render();
+};
+
+/* ───────── loading ───────── */
+async function loadBills(fresh) {
+  if (!data?.homes?.length || data.sample) return;
+  const cabins = Object.values(houseItems).filter(x => x.cabin).map(x => x.ean).join(',');
+  // Estimate every month back to January 2026 (the oldest grid prices in energy/grid.ts), at most 12.
+  const [y, m] = thisMonth().split('-').map(Number);
+  const months = Math.min(12, (y - 2026) * 12 + m);
+  try { bills = await api(`bills?months=${months}${cabins ? '&cabins=' + cabins : ''}${fresh ? '&fresh=1' : ''}`); }
+  catch (e) { bills = { error: e.message }; }
+  (bills.problems || []).forEach(p => $('#banner').insertAdjacentHTML('beforeend', `<div class="banner">⚠️ ${esc(p)}</div>`));
+  renderBills(); renderCapacity();
+}
+
+async function load(fresh) {
+  if (!data) $('#loading').classList.remove('hidden');
+  $('#refreshBtn').disabled = true;
+  try {
+    data = await api('homes');
+    const problems = (data.problems || []).map(p => `⚠️ Couldn’t reach Tibber for <b>${esc(p.name || 'one login')}</b>: ${esc(p.error)}. The token may have expired; reconnect it under ⚙️ Settings.`);
+    $('#banner').innerHTML = problems.map(p => `<div class="banner">${p}</div>`).join('');
+    if (!data.accounts.some(a => a.provider === 'tibber')) $('#setup').classList.remove('hidden');
+    renderAccounts();
+    render();
+    $('#updated').textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    loadBills(fresh);
+  } catch (e) {
+    $('#loading').classList.add('hidden');
+    $('#banner').innerHTML = `<div class="banner">⚠️ ${esc(e.message)}</div>`;
+  } finally {
+    $('#refreshBtn').disabled = false;
+  }
+}
+$('#refreshBtn').onclick = () => load(true);
+load();
+// Prices change every hour; quietly refresh every 15 minutes while the page is open.
+setInterval(() => { if (!document.hidden && !data?.sample) load(); }, 15 * 60e3);
+
+/* ════════════════════════════════════════════════════════════════
+   SAMPLE DATA: made-up numbers in the same shape Tibber sends,
+   so the page can be previewed before Tibber is connected.
+═════════════════════════════════════════════════════════════════ */
+function sampleData() {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const pad = n => String(n).padStart(2, '0');
+  const iso = d => { const o = -d.getTimezoneOffset(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:00:00.000${o >= 0 ? '+' : '-'}${pad(Math.floor(Math.abs(o) / 60))}:${pad(Math.abs(o) % 60)}`; };
+  const wobble = (seed) => { let s = seed; return () => (s = (s * 9301 + 49297) % 233280) / 233280; };
+  const rnd = wobble(42);
+  const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+  const curve = hr => 0.55 + 0.35 * Math.exp(-((hr - 8) ** 2) / 6) + 0.45 * Math.exp(-((hr - 18) ** 2) / 5) - 0.15 * Math.exp(-((hr - 3) ** 2) / 4);
+  const lvl = v => v < 0.45 ? 'VERY_CHEAP' : v < 0.6 ? 'CHEAP' : v < 0.85 ? 'NORMAL' : v < 1.05 ? 'EXPENSIVE' : 'VERY_EXPENSIVE';
+  const dayPrices = (offset, bump) => Array.from({ length: 24 }, (_, hr) => {
+    const d = new Date(midnight); d.setDate(d.getDate() + offset); d.setHours(hr);
+    const total = +(curve(hr) * bump + rnd() * 0.08).toFixed(4);
+    return { total, startsAt: iso(d), level: lvl(total) };
+  });
+  const today = dayPrices(0, 1), tomorrow = new Date().getHours() >= 13 ? dayPrices(1, 0.9) : [];
+  const home = (id, nickname, address1, city, scale) => {
+    const hourly = Array.from({ length: 48 }, (_, k) => {
+      const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(d.getHours() - 48 + k - 1);
+      const c = +((0.6 + curve(d.getHours()) * 1.4 + rnd() * 0.6) * scale).toFixed(3);
+      const up = +(curve(d.getHours()) * (0.9 + rnd() * 0.2)).toFixed(4);
+      return { from: iso(d), consumption: c, cost: +(c * up).toFixed(4), unitPrice: up, currency: 'NOK' };
+    });
+    const daily = Array.from({ length: 31 }, (_, k) => {
+      const d = new Date(midnight); d.setDate(d.getDate() - 31 + k);
+      const c = +((32 + rnd() * 18 + (31 - k) * 0.25) * scale).toFixed(2), up = +(0.62 + rnd() * 0.3).toFixed(4);
+      return { from: iso(d), consumption: c, cost: +(c * up).toFixed(2), unitPrice: up, currency: 'NOK' };
+    });
+    const monthly = Array.from({ length: 12 }, (_, k) => {
+      const d = new Date(midnight.getFullYear(), midnight.getMonth() - 12 + k, 1);
+      const winter = Math.cos((d.getMonth() - 0.5) / 12 * 2 * Math.PI);   // more power in winter
+      const c = +((1150 + 650 * winter + rnd() * 120) * scale).toFixed(1), up = +(0.75 + 0.35 * winter + rnd() * 0.1).toFixed(4);
+      return { from: iso(d), consumption: c, cost: +(c * up).toFixed(2), unitPrice: up, currency: 'NOK' };
+    });
+    const nowP = today[new Date().getHours()];
+    return {
+      id, account: 'sample', accountName: 'Sample', nickname, address: { address1, postalCode: '0000', city },
+      timeZone: tz, realtime: false, subscription: 'running',
+      price: { ...nowP, energy: nowP.total * 0.7, tax: nowP.total * 0.3, currency: 'NOK' },
+      today, tomorrow, hourly, daily, monthly,
+    };
+  };
+  return {
+    sample: true, accounts: [], problems: [],
+    homes: [home('sample-1', 'Home', 'Eksempelveien 1', 'Oslo', 1), home('sample-2', 'Cabin', 'Fjellstien 7', 'Geilo', 0.55)],
+  };
+}
+</script>
+</body>
+</html>
