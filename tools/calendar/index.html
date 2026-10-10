@@ -6,7 +6,8 @@
 <title>Calendar</title>
 
 <!-- ════════════════════════════════════════════════════════════════
-     CALENDAR: what's coming up, from our shared Google Calendar.
+     CALENDAR: our shared Google Calendar, as a list, a week or a month.
+     Weeks start on Monday.
 
      The page asks the `calendar` edge function (supabase/functions/calendar/)
      for the events. Each calendar's private link is saved in the database
@@ -16,13 +17,22 @@
 
 <link rel="stylesheet" href="../../shared/family.css">
 <style>
-.range{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px;}
+[hidden]{display:none !important;}
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px;}
+.chips{display:flex;gap:6px;flex-wrap:wrap;}
 .chip{border:2px solid var(--line);background:#fff;color:var(--forest);border-radius:999px;padding:6px 12px;font-weight:800;font-size:.85rem;}
 .chip.on{background:var(--meadow);border-color:var(--meadow);color:#fff;}
+.nav{display:flex;align-items:center;gap:6px;margin-left:auto;}
+.nav button{border:2px solid var(--line);background:#fff;color:var(--forest);border-radius:999px;font-weight:800;min-width:36px;height:36px;padding:0 12px;}
+.nav button:hover,.chip:hover{border-color:var(--meadow);}
+.period{font-family:'Fredoka',sans-serif;font-weight:600;color:var(--forest);font-size:1.25rem;margin:0 0 12px;}
+.period small{font-family:'Nunito',sans-serif;font-weight:800;font-size:.8rem;color:var(--ink-soft);margin-left:6px;}
+#agenda{transition:opacity .15s;}
+#agenda.loading{opacity:.45;}
 
 .problem{background:#fdeede;border:1px solid #f3c9a8;color:#8a4f2a;border-radius:14px;padding:10px 14px;margin:0 0 14px;font-weight:700;font-size:.9rem;}
 
-/* the list of days */
+/* ── list view ── */
 .month{font-family:'Fredoka',sans-serif;color:var(--ink-soft);font-size:1rem;margin:18px 4px 8px;text-transform:uppercase;letter-spacing:.06em;}
 .month:first-child{margin-top:0;}
 .day{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line);}
@@ -39,8 +49,61 @@
 .ev .title{font-weight:700;}
 .ev .where{display:block;font-size:.8rem;color:var(--ink-soft);}
 .ev .cal{font-size:.68rem;font-weight:800;color:var(--ink-soft);white-space:nowrap;}
-.ev.past{opacity:.5;}
+.past{opacity:.5;}
 @media(max-width:520px){ .ev{flex-wrap:wrap;} .ev .time{min-width:0;} .date{flex-basis:46px;} }
+
+/* ── week view: seven columns, Monday first ── */
+.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;}
+.wd{border-radius:14px;background:#fff;border:1px solid var(--line);min-height:180px;display:flex;flex-direction:column;}
+.wd.today{border-color:var(--meadow);box-shadow:0 0 0 2px var(--meadow) inset;}
+.wd.gone{background:#faf8f2;}
+.wd-head{display:flex;align-items:baseline;gap:6px;padding:8px 10px 6px;border-bottom:1px dashed var(--line);}
+.wd-head .dow{font-size:.72rem;font-weight:800;text-transform:uppercase;color:var(--ink-soft);letter-spacing:.05em;}
+.wd-head .num{font-family:'Fredoka',sans-serif;font-size:1.3rem;color:var(--forest);}
+.wd.today .wd-head .num{color:#fff;background:var(--meadow);border-radius:50%;width:32px;height:32px;display:inline-grid;place-items:center;font-size:1.1rem;}
+.wd-head .rel{margin-left:auto;font-size:.68rem;font-weight:800;color:var(--meadow-deep);}
+.wd-evs{padding:6px;display:flex;flex-direction:column;gap:5px;flex:1;}
+.wd-evs .none{color:#cfc6b4;text-align:center;margin-top:10px;}
+.wev{border-radius:9px;background:var(--bg);border-left:3px solid var(--c);padding:5px 7px;font-size:.82rem;line-height:1.25;word-break:break-word;}
+.wev .t{display:block;font-size:.7rem;font-weight:800;color:var(--c);}
+.wev .n{font-weight:700;}
+.wev .w{display:block;font-size:.72rem;color:var(--ink-soft);}
+.wev.allday{background:var(--c);color:#fff;border-left-color:var(--c);}
+.wev.allday .t{color:#fff;opacity:.85;}
+@media(max-width:760px){
+  .week{grid-template-columns:1fr;gap:6px;}
+  .wd{min-height:0;flex-direction:row;}
+  .wd-head{flex:0 0 64px;flex-direction:column;align-items:center;gap:0;border-bottom:none;border-right:1px dashed var(--line);padding:8px 4px;}
+  .wd-head .rel{margin:2px 0 0;}
+  .wd-evs .none{text-align:left;margin:4px 6px;}
+}
+
+/* ── month view: a grid of weeks, Monday first ── */
+.mgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;}
+.mgrid .wk{font-size:.72rem;font-weight:800;text-transform:uppercase;color:var(--ink-soft);text-align:center;letter-spacing:.05em;padding:2px 0 4px;}
+.md{border:1px solid var(--line);background:#fff;border-radius:10px;min-height:96px;padding:4px;text-align:left;
+  display:flex;flex-direction:column;gap:3px;color:var(--ink);font:inherit;min-width:0;}
+.md:hover{border-color:var(--meadow);}
+.md.out{background:#faf8f2;color:var(--ink-soft);}
+.md.out .n{opacity:.55;}
+.md.sel{box-shadow:0 0 0 2px var(--forest);border-color:var(--forest);}
+.md .n{font-family:'Fredoka',sans-serif;font-size:.95rem;color:var(--forest);width:26px;height:26px;display:grid;place-items:center;border-radius:50%;}
+.md.today .n{background:var(--meadow);color:#fff;}
+.mchips{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.mev{display:block;font-size:.7rem;line-height:1.2;padding:2px 5px;border-radius:6px;background:var(--bg);border-left:3px solid var(--c);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mev b{font-weight:800;color:var(--c);}
+.mev.allday{background:var(--c);color:#fff;}
+.more{font-size:.68rem;font-weight:800;color:var(--ink-soft);padding-left:4px;}
+.dots{display:none;gap:3px;flex-wrap:wrap;padding-left:3px;}
+.dots i{width:7px;height:7px;border-radius:50%;background:var(--c);}
+.detail{margin-top:16px;border-top:1px dashed var(--line);padding-top:12px;}
+.detail h4{margin:0 0 8px;font-family:'Fredoka',sans-serif;color:var(--forest);font-size:1.05rem;font-weight:600;}
+@media(max-width:640px){
+  .md{min-height:52px;align-items:center;padding:4px 2px;}
+  .mchips{display:none;}
+  .dots{display:flex;justify-content:center;padding:0;}
+}
 
 .c-meadow {--c:var(--meadow-deep); --bg:#eef6ea;}
 .c-sky    {--c:#4b93a5;            --bg:#e8f4f6;}
@@ -75,12 +138,24 @@ details.card[open]>summary::after{content:' ▾';}
     <span style="flex:1"></span>
     <button class="btn ghost sm" id="refresh" title="Check Google for changes now">↻ Refresh</button>
   </div>
-  <p class="hint">What's coming up, from our shared Google Calendar. Add or change events in Google Calendar or Notion as usual.</p>
+  <p class="hint">Our shared Google Calendar. Add or change events in Google Calendar or Notion as usual.</p>
 
-  <div class="range" id="range">
-    <button class="chip" data-days="14">2 weeks</button>
-    <button class="chip" data-days="60">2 months</button>
-    <button class="chip" data-days="183">6 months</button>
+  <div class="toolbar">
+    <div class="chips" id="views">
+      <button class="chip" data-view="list">📋 List</button>
+      <button class="chip" data-view="week">🗓️ Week</button>
+      <button class="chip" data-view="month">📆 Month</button>
+    </div>
+    <div class="chips" id="range">
+      <button class="chip" data-days="14">2 weeks</button>
+      <button class="chip" data-days="60">2 months</button>
+      <button class="chip" data-days="183">6 months</button>
+    </div>
+    <div class="nav" id="nav">
+      <button id="prev" aria-label="Earlier">‹</button>
+      <button id="todayBtn">Today</button>
+      <button id="next" aria-label="Later">›</button>
+    </div>
   </div>
 
   <div id="problems"></div>
@@ -123,13 +198,6 @@ const COLORS = ['meadow', 'sky', 'peach', 'blossom', 'sun'];
 // Google's own public calendar of Norwegian public holidays (anyone may use this link).
 const HOLIDAYS = 'https://calendar.google.com/calendar/ical/no.norwegian%23holiday%40group.v.calendar.google.com/public/basic.ics';
 
-// How far ahead to look. Remembered on this device only.
-let days = 60;
-try { days = Number(localStorage.getItem('calendar_days')) || 60; } catch (e) {}
-
-let feeds = [];      // [{ id, name, color }]
-let events = [];     // [{ title, start, end, allDay, location, feed }]
-
 /* ───────── dates, in the time on this device ───────── */
 const pad = n => String(n).padStart(2, '0');
 const dayKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;   // '2026-10-10'
@@ -137,19 +205,55 @@ const fromKey = k => { const [y, m, d] = k.split('-').map(Number); return new Da
 const addDays = (k, n) => { const d = fromKey(k); d.setDate(d.getDate() + n); return dayKey(d); };
 const hm = d => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 const todayKey = () => dayKey(new Date());
+// The Monday of the week a day is in (weeks start on Monday).
+const mondayOf = k => addDays(k, -((fromKey(k).getDay() + 6) % 7));
+const firstOfMonth = k => k.slice(0, 8) + '01';
+const addMonths = (k, n) => { const d = fromKey(firstOfMonth(k)); d.setMonth(d.getMonth() + n); return dayKey(d); };
+const fmt = (k, opts) => fromKey(k).toLocaleDateString('en-GB', opts);
+// Week number as used in Norway (ISO: week 1 is the week with 4 January in it).
+function weekNumber(k) {
+  const d = fromKey(k); d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);   // that week's Thursday
+  const jan4 = new Date(d.getFullYear(), 0, 4);
+  return 1 + Math.round(((d - jan4) / 864e5 - 3 + (jan4.getDay() + 6) % 7) / 7);
+}
 
-// Spread each event over the days it covers: { '2026-10-10': [ {ev, label}, … ] }
-function byDay() {
+/* ───────── what's on screen (remembered on this device) ───────── */
+const remembered = (key, fallback) => { try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; } };
+const remember = (key, value) => { try { localStorage.setItem(key, value); } catch (e) {} };
+let view = remembered('calendar_view', 'week');          // 'list' | 'week' | 'month'
+let days = Number(remembered('calendar_days', 60));     // how far ahead the list looks
+let anchor = todayKey();                                // a day inside the week/month being shown
+let selected = todayKey();                              // the day picked in the month view
+
+let ready = false;   // true once the first answer has arrived
+let feeds = [];      // [{ id, name, color }]
+let events = [];     // [{ title, start, end, allDay, location, feed }]
+const colorOf = id => (feeds.find(f => f.id === id) || {}).color || 'meadow';
+const nameOf = id => (feeds.find(f => f.id === id) || {}).name || '';
+
+// The first and last day the current view covers.
+function span() {
+  if (view === 'week') { const mon = mondayOf(anchor); return [mon, addDays(mon, 6)]; }
+  if (view === 'month') {
+    const first = firstOfMonth(anchor), last = addDays(addMonths(anchor, 1), -1);
+    return [mondayOf(first), addDays(mondayOf(last), 6)];     // whole weeks, Monday to Sunday
+  }
+  return [todayKey(), addDays(todayKey(), days)];
+}
+
+// Spread each event over the days it covers, between `first` and `last`:
+// { '2026-10-10': [ { ev, label, time, past }, … ] }
+function byDay(first, last) {
   const out = {};
   const put = (k, item) => (out[k] = out[k] || []).push(item);
-  const first = todayKey(), last = addDays(first, days);
   for (const ev of events) {
     if (ev.allDay) {
       // all-day: ev.end is the day after the last day
       const total = Math.round((fromKey(ev.end) - fromKey(ev.start)) / 864e5) || 1;
       for (let i = 0, k = ev.start; k < ev.end && i < 62; i++, k = addDays(k, 1)) {
         if (k < first || k > last) continue;
-        put(k, { ev, sort: '', label: total > 1 ? `Day ${i + 1} of ${total}` : 'All day' });
+        put(k, { ev, sort: '', time: '', allDay: true, label: total > 1 ? `Day ${i + 1} of ${total}` : 'All day',
+          past: ev.end <= todayKey() });
       }
     } else {
       const s = new Date(ev.start), e = new Date(ev.end);
@@ -158,7 +262,7 @@ function byDay() {
         if (k < first || k > last) continue;
         const label = sk === ek ? (+e === +s ? hm(s) : `${hm(s)}–${hm(e)}`)
           : k === sk ? `From ${hm(s)}` : k === ek ? `Until ${hm(e)}` : 'All day';
-        put(k, { ev, sort: k === sk ? hm(s) : '', label, past: e < new Date() });
+        put(k, { ev, sort: k === sk ? hm(s) : '', time: k === sk ? hm(s) : '', label, past: e < new Date() });
       }
     }
   }
@@ -166,42 +270,108 @@ function byDay() {
   return out;
 }
 
+// One event as a row (list view and the month view's chosen day).
+const evRow = ({ ev, label, past }) => `
+  <div class="ev c-${colorOf(ev.feed)}${past ? ' past' : ''}">
+    <span class="time">${esc(label)}</span>
+    <span class="what"><span class="title">${esc(ev.title)}</span>
+      ${ev.location ? `<span class="where">📍 ${esc(ev.location)}</span>` : ''}</span>
+    ${feeds.length > 1 ? `<span class="cal">${esc(nameOf(ev.feed))}</span>` : ''}
+  </div>`;
+
 /* ───────── drawing ───────── */
-function drawAgenda() {
+function draw() {
+  document.querySelectorAll('#views .chip').forEach(b => b.classList.toggle('on', b.dataset.view === view));
+  document.querySelectorAll('#range .chip').forEach(b => b.classList.toggle('on', Number(b.dataset.days) === days));
+  $('#range').hidden = view !== 'list';
+  $('#nav').hidden = view === 'list';
   const box = $('#agenda');
+  if (!ready) return;   // still showing "Fetching the calendar…"
   if (!feeds.length) {
     box.innerHTML = `<div class="empty"><span class="big">📅</span>No calendar added yet.<br>
       Open <b>⚙️ Calendars shown here</b> below to add ours.</div>`;
     $('#setup').open = true;
     return;
   }
-  const groups = byDay();
-  const keys = Object.keys(groups).sort();
-  if (!keys.length) { box.innerHTML = '<div class="empty"><span class="big">🌤️</span>Nothing on the calendar. Enjoy the quiet!</div>'; return; }
+  box.innerHTML = view === 'week' ? drawWeek() : view === 'month' ? drawMonth() : drawList();
+}
 
-  const colorOf = id => (feeds.find(f => f.id === id) || {}).color || 'meadow';
-  const nameOf = id => (feeds.find(f => f.id === id) || {}).name || '';
+function drawList() {
+  const [first, last] = span();
+  const groups = byDay(first, last);
+  const keys = Object.keys(groups).sort();
+  if (!keys.length) return '<div class="empty"><span class="big">🌤️</span>Nothing on the calendar. Enjoy the quiet!</div>';
   const today = todayKey(), tomorrow = addDays(today, 1);
   let html = '', month = '';
   for (const k of keys) {
-    const d = fromKey(k);
-    const m = d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    const m = fmt(k, { month: 'long', year: 'numeric' });
     if (m !== month) { html += `<div class="month">${esc(m)}</div>`; month = m; }
     const rel = k === today ? 'Today' : k === tomorrow ? 'Tomorrow' : '';
     html += `<div class="day${k === today ? ' today' : ''}">
-      <div class="date"><div class="dow">${esc(d.toLocaleDateString('en-GB', { weekday: 'short' }))}</div>
-        <div class="num">${d.getDate()}</div>${rel ? `<div class="rel">${rel}</div>` : ''}</div>
-      <div class="evs">${groups[k].map(({ ev, label, past }) => `
-        <div class="ev c-${colorOf(ev.feed)}${past ? ' past' : ''}">
-          <span class="time">${esc(label)}</span>
-          <span class="what"><span class="title">${esc(ev.title)}</span>
-            ${ev.location ? `<span class="where">📍 ${esc(ev.location)}</span>` : ''}</span>
-          ${feeds.length > 1 ? `<span class="cal">${esc(nameOf(ev.feed))}</span>` : ''}
-        </div>`).join('')}</div>
+      <div class="date"><div class="dow">${esc(fmt(k, { weekday: 'short' }))}</div>
+        <div class="num">${fromKey(k).getDate()}</div>${rel ? `<div class="rel">${rel}</div>` : ''}</div>
+      <div class="evs">${groups[k].map(evRow).join('')}</div>
     </div>`;
   }
-  box.innerHTML = html;
+  return html;
 }
+
+function drawWeek() {
+  const [mon, sun] = span();
+  const groups = byDay(mon, sun);
+  const today = todayKey();
+  const sameMonth = mon.slice(0, 7) === sun.slice(0, 7);
+  const title = sameMonth
+    ? `${fromKey(mon).getDate()}–${fmt(sun, { day: 'numeric', month: 'long', year: 'numeric' })}`
+    : `${fmt(mon, { day: 'numeric', month: 'short' })} – ${fmt(sun, { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  let html = `<div class="period">${esc(title)}<small>Week ${weekNumber(mon)}</small></div><div class="week">`;
+  for (let i = 0; i < 7; i++) {
+    const k = addDays(mon, i), items = groups[k] || [];
+    const rel = k === today ? 'Today' : k === addDays(today, 1) ? 'Tomorrow' : '';
+    html += `<div class="wd${k === today ? ' today' : ''}${k < today ? ' gone' : ''}">
+      <div class="wd-head"><span class="dow">${esc(fmt(k, { weekday: 'short' }))}</span>
+        <span class="num">${fromKey(k).getDate()}</span>${rel ? `<span class="rel">${rel}</span>` : ''}</div>
+      <div class="wd-evs">${items.length ? items.map(({ ev, label, allDay, past }) => `
+        <div class="wev c-${colorOf(ev.feed)}${allDay ? ' allday' : ''}${past ? ' past' : ''}" title="${esc(ev.title)}">
+          <span class="t">${esc(label)}</span><span class="n">${esc(ev.title)}</span>
+          ${ev.location ? `<span class="w">📍 ${esc(ev.location)}</span>` : ''}
+        </div>`).join('') : '<div class="none">·</div>'}</div>
+    </div>`;
+  }
+  return html + '</div>';
+}
+
+function drawMonth() {
+  const [first, last] = span();
+  const groups = byDay(first, last);
+  const today = todayKey(), month = anchor.slice(0, 7);
+  let html = `<div class="period">${esc(fmt(firstOfMonth(anchor), { month: 'long', year: 'numeric' }))}</div><div class="mgrid">`;
+  for (let i = 0; i < 7; i++) html += `<div class="wk">${esc(fmt(addDays(first, i), { weekday: 'short' }))}</div>`;
+  for (let k = first; k <= last; k = addDays(k, 1)) {
+    const items = groups[k] || [];
+    const cls = [k.slice(0, 7) !== month && 'out', k === today && 'today', k === selected && 'sel'].filter(Boolean).join(' ');
+    html += `<button class="md ${cls}" data-day="${k}" aria-label="${esc(fmt(k, { weekday: 'long', day: 'numeric', month: 'long' }))}, ${items.length} events">
+      <span class="n">${fromKey(k).getDate()}</span>
+      <span class="mchips">${items.slice(0, 3).map(({ ev, time, allDay, past }) =>
+        `<span class="mev c-${colorOf(ev.feed)}${allDay ? ' allday' : ''}${past ? ' past' : ''}" title="${esc(ev.title)}">${time ? `<b>${esc(time)}</b> ` : ''}${esc(ev.title)}</span>`).join('')}
+        ${items.length > 3 ? `<span class="more">+${items.length - 3} more</span>` : ''}</span>
+      <span class="dots">${items.slice(0, 4).map(({ ev }) => `<i class="c-${colorOf(ev.feed)}"></i>`).join('')}</span>
+    </button>`;
+  }
+  html += '</div>';
+  // the chosen day, in full, under the grid
+  const picked = groups[selected] || [];
+  html += `<div class="detail"><h4>${esc(fmt(selected, { weekday: 'long', day: 'numeric', month: 'long' }))}</h4>
+    ${picked.length ? `<div class="evs">${picked.map(evRow).join('')}</div>` : '<div class="small">Nothing on.</div>'}</div>`;
+  return html;
+}
+
+$('#agenda').addEventListener('click', e => {
+  const cell = e.target.closest('.md'); if (!cell) return;
+  selected = cell.dataset.day;
+  if (selected.slice(0, 7) !== anchor.slice(0, 7)) { anchor = selected; load(); }   // a day from next/last month
+  else draw();
+});
 
 function drawFeeds() {
   const ul = $('#feeds');
@@ -215,37 +385,71 @@ function drawFeeds() {
   ul.querySelectorAll('.feed').forEach(li => {
     const f = feeds.find(x => x.id === li.dataset.id);
     li.querySelectorAll('.sw').forEach(b => b.onclick = async () => {
-      f.color = b.dataset.color; drawFeeds(); drawAgenda();
+      f.color = b.dataset.color; drawFeeds(); draw();
       await Family.call('calendar', 'update', { feed: f.id, color: f.color }).catch(e => alert(e.message));
     });
     li.querySelector('.del').onclick = async () => {
       if (!confirm(`Stop showing “${f.name}” here? (Nothing changes in Google Calendar.)`)) return;
-      try { await Family.call('calendar', 'disconnect', { feed: f.id }); load(); }
+      try { await Family.call('calendar', 'disconnect', { feed: f.id }); saved.clear(); load(); }
       catch (e) { alert(e.message); }
     };
   });
 }
 
-/* ───────── fetching ───────── */
+/* ───────── fetching ─────────
+   Each week/month is fetched once and kept while the page is open, so flicking
+   back and forth is instant. ↻ Refresh asks Google again. */
+const saved = new Map();
+let latest = 0;
 async function load(fresh = false) {
-  document.querySelectorAll('#range .chip').forEach(b => b.classList.toggle('on', Number(b.dataset.days) === days));
+  const [first, last] = span();
+  const route = view === 'list'
+    ? `events?days=${days}`
+    : `events?from=${encodeURIComponent(fromKey(first).toISOString())}&to=${encodeURIComponent(fromKey(addDays(last, 1)).toISOString())}`;
+  if (fresh) saved.clear();
+  const ticket = ++latest;
+  $('#agenda').classList.add('loading');
+  draw();
   try {
-    const out = await Family.call('calendar', `events?days=${days}${fresh ? '&fresh=1' : ''}`);
-    feeds = out.feeds; events = out.events;
+    if (!saved.has(route)) saved.set(route, await Family.call('calendar', route + (fresh ? '&fresh=1' : '')));
+    if (ticket !== latest) return;           // someone clicked on before this arrived
+    const out = saved.get(route);
+    feeds = out.feeds; events = out.events; ready = true;
     $('#problems').innerHTML = out.problems.map(p =>
       `<div class="problem">⚠️ Couldn't read “${esc(p.name)}”: ${esc(p.error)}</div>`).join('');
-    drawFeeds(); drawAgenda();
+    drawFeeds(); draw();
   } catch (e) {
-    $('#agenda').innerHTML = `<div class="empty"><span class="big">😕</span>${esc(e.message)}</div>`;
+    saved.delete(route);
+    if (ticket === latest) $('#agenda').innerHTML = `<div class="empty"><span class="big">😕</span>${esc(e.message)}</div>`;
+  } finally {
+    if (ticket === latest) $('#agenda').classList.remove('loading');
   }
 }
 
-$('#range').onclick = e => {
+$('#views').onclick = e => {
   const b = e.target.closest('.chip'); if (!b) return;
-  days = Number(b.dataset.days);
-  try { localStorage.setItem('calendar_days', days); } catch (err) {}
+  view = b.dataset.view; remember('calendar_view', view);
   load();
 };
+$('#range').onclick = e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  days = Number(b.dataset.days); remember('calendar_days', days);
+  load();
+};
+function move(step) {
+  anchor = view === 'week' ? addDays(anchor, 7 * step) : addMonths(anchor, step);
+  selected = view === 'month' ? (anchor.slice(0, 7) === todayKey().slice(0, 7) ? todayKey() : firstOfMonth(anchor)) : selected;
+  load();
+}
+$('#prev').onclick = () => move(-1);
+$('#next').onclick = () => move(1);
+$('#todayBtn').onclick = () => { anchor = selected = todayKey(); load(); };
+// ← and → keys flick between weeks or months too
+document.addEventListener('keydown', e => {
+  if (view === 'list' || e.target.closest('input, textarea, select')) return;
+  if (e.key === 'ArrowLeft') move(-1);
+  if (e.key === 'ArrowRight') move(1);
+});
 $('#refresh').onclick = async () => { $('#refresh').disabled = true; await load(true); $('#refresh').disabled = false; };
 
 /* ───────── adding a calendar ───────── */
@@ -262,6 +466,7 @@ async function addCalendar(url, name, color) {
   try {
     await Family.call('calendar', 'connect', { url, name, color });
     say(''); $('#fUrl').value = ''; $('#fName').value = '';
+    saved.clear();
     await load();
   } catch (e) { say(e.message); }
 }

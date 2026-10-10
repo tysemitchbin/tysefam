@@ -5,6 +5,7 @@
 //
 // Routes (all under /functions/v1/calendar/), signed-in family members only:
 //   GET  events?days=60    upcoming events from every saved calendar (&fresh=1 skips the 5-minute copy)
+//   GET  events?from=…&to=…  events between two moments (ISO times; for the week and month views)
 //   POST connect           { url, name, color }  check the link works, then save it
 //   POST update            { feed, name, color } rename or recolour a calendar
 //   POST disconnect        { feed }              forget a calendar
@@ -73,9 +74,7 @@ function tidyUrl(raw: unknown) {
 }
 
 /* ───────── GET events ───────── */
-async function events(days: number, fresh: boolean) {
-  const from = new Date(Date.now() - 864e5);           // from yesterday, so "today" is complete everywhere
-  const to = new Date(Date.now() + days * 864e5);
+async function events(from: Date, to: Date, fresh: boolean) {
   const list = await feeds();
   const problems: { feed: string; name: string; error: string }[] = [];
   const out: unknown[] = [];
@@ -101,8 +100,16 @@ Deno.serve(async (req) => {
     if (!user) return json({ error: 'not_family' }, 401);
 
     if (route === 'events') {
+      const fresh = url.searchParams.get('fresh') === '1';
+      // A week or month: exact start and end from the page.
+      const from = Date.parse(url.searchParams.get('from') || ''), to = Date.parse(url.searchParams.get('to') || '');
+      if (!isNaN(from) && !isNaN(to)) {
+        if (to <= from || to - from > 120 * 864e5) return json({ error: 'Pick a shorter stretch of dates.' }, 400);
+        return json(await events(new Date(from), new Date(to), fresh));
+      }
+      // The list: from yesterday (so "today" is complete everywhere) to `days` ahead.
       const days = Math.min(400, Math.max(1, Number(url.searchParams.get('days')) || 60));
-      return json(await events(days, url.searchParams.get('fresh') === '1'));
+      return json(await events(new Date(Date.now() - 864e5), new Date(Date.now() + days * 864e5), fresh));
     }
 
     if (req.method === 'POST') {
