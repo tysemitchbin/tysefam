@@ -65,16 +65,30 @@ revoke all on function public.family_whoami() from public, anon;
 grant execute on function public.family_whoami() to authenticated;
 
 -- Every tool's saved data.
+-- An item's id is text and only has to be unique inside its tool + collection, so a tool can
+-- use a friendly id such as a person's name: store.set('progress', 'Mitch', {...}).
 create table if not exists public.family_items (
-  id          uuid primary key default gen_random_uuid(),
+  id          text not null default gen_random_uuid()::text,
   tool        text not null,             -- folder name under tools/
   collection  text not null,             -- e.g. 'items', 'chores', 'settings'
   data        jsonb not null default '{}'::jsonb,
   created_by  uuid default auth.uid() references auth.users(id) on delete set null,
   created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
+  updated_at  timestamptz not null default now(),
+  primary key (tool, collection, id)
 );
-create index if not exists family_items_tool_idx on public.family_items (tool, collection);
+-- Older setups made id a uuid (the only key), which rejected friendly ids. Upgrade them.
+do $$ begin
+  if (select data_type from information_schema.columns
+      where table_schema = 'public' and table_name = 'family_items' and column_name = 'id') = 'uuid' then
+    alter table public.family_items drop constraint family_items_pkey;
+    alter table public.family_items alter column id drop default;
+    alter table public.family_items alter column id type text using id::text;
+    alter table public.family_items alter column id set default gen_random_uuid()::text;
+    alter table public.family_items add primary key (tool, collection, id);
+  end if;
+end $$;
+drop index if exists public.family_items_tool_idx;   -- the primary key now covers (tool, collection)
 create index if not exists family_items_created_by_idx on public.family_items (created_by);
 alter table public.family_items enable row level security;
 

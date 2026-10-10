@@ -164,17 +164,18 @@
     const localKey = 'family:' + toolId;
     let sb = null;
     let data = {};               // { collection: { id: item } }
-    const where = {};            // id → collection (to place realtime deletes)
     const watchers = [];         // [collection, callback]
 
     const notify = () => watchers.forEach(([c, cb]) => cb(clone(data[c] || {})));
     const saveLocal = () => { if (!sb) localStorage.setItem(localKey, JSON.stringify(data)); };
-    const put = (c, id, item) => { (data[c] = data[c] || {})[id] = item; where[id] = c; };
-    const drop = id => { const c = where[id]; if (c && data[c]) delete data[c][id]; delete where[id]; };
+    const put = (c, id, item) => { (data[c] = data[c] || {})[id] = item; };
+    const drop = (c, id) => { if (data[c]) delete data[c][id]; };
     const loadLocal = () => {
       try { data = JSON.parse(localStorage.getItem(localKey)) || {}; } catch (e) { data = {}; }
-      Object.entries(data).forEach(([c, items]) => Object.keys(items).forEach(id => { where[id] = c; }));
     };
+    // In the cloud an item is found by tool + collection + id together, so ids can be friendly
+    // names ('Mitch', 'theme') without clashing with other tools or collections.
+    const only = (query, collection, id) => query.eq('tool', toolId).eq('collection', collection).eq('id', id);
 
     async function loadCloud() {
       const { data: rows, error } = await sb.from('family_items').select('id,collection,data').eq('tool', toolId);
@@ -193,9 +194,10 @@
         await loadCloud();
         sb.channel('family:' + toolId)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'family_items' }, p => {
-            if (p.eventType === 'DELETE') { if (where[p.old.id]) { drop(p.old.id); notify(); } return; }
-            if (p.new.tool !== toolId) return;
-            drop(p.new.id); put(p.new.collection, p.new.id, p.new.data); notify();
+            const r = p.eventType === 'DELETE' ? p.old : p.new;
+            if (r.tool !== toolId) return;
+            if (p.eventType === 'DELETE') drop(r.collection, r.id); else put(r.collection, r.id, r.data);
+            notify();
           })
           .subscribe(status => { if (status === 'SUBSCRIBED') loadCloud(); });   // catch anything missed while connecting
       } else {
@@ -232,19 +234,19 @@
       await s.ready;
       const obj = Object.assign({}, (data[collection] || {})[id], clone(fields));
       put(collection, id, obj); saveLocal(); notify();
-      if (sb) check(await sb.from('family_items').update({ data: obj }).eq('id', id));
+      if (sb) check(await only(sb.from('family_items').update({ data: obj }), collection, id));
     };
     /* Replace an item completely (creates it if it doesn't exist). Handy for settings: set('settings', 'theme', {...}). */
     s.set = async (collection, id, item) => {
       await s.ready;
       const obj = clone(item);
       put(collection, id, obj); saveLocal(); notify();
-      if (sb) check(await sb.from('family_items').upsert({ id, tool: toolId, collection, data: obj }));
+      if (sb) check(await sb.from('family_items').upsert({ id, tool: toolId, collection, data: obj }, { onConflict: 'tool,collection,id' }));
     };
     s.remove = async (collection, id) => {
       await s.ready;
-      drop(id); saveLocal(); notify();
-      if (sb) check(await sb.from('family_items').delete().eq('id', id));
+      drop(collection, id); saveLocal(); notify();
+      if (sb) check(await only(sb.from('family_items').delete(), collection, id));
     };
     return s;
   }
