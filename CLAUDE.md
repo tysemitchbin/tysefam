@@ -30,6 +30,11 @@ code readable and commented for a non-expert.
   (`supabase/functions/calendar/`, verify_jwt ON, checks the guest list) reads each calendar's secret
   iCal link from `calendar_feeds` (`supabase/calendar.sql`; RLS on, no policies) and expands repeats
   with ical.js in `calendar/ics.ts`. The links must never reach the browser.
+- `tools/norskprove/`: study tool for HK-dir's Norskprøven at B1–B2 (same pattern as `teoriprove`).
+  `data.js` = grammar notes/questions, word cards, phrases; `oppgaver.js` = reading texts, listening
+  clips, writing and speaking tasks (all written for the tool). Listening uses the browser's own
+  speech synthesis (needs a Norwegian voice on the device). Progress per person in collection
+  `progress`; written texts + feedback shared in collection `texts`. Recordings never leave the browser.
 - `tools/packing/`: shared packing checklists in `family_items` (tool `packing`: `lists`, `items`, `trip`).
 - `tools/energy/`: Tibber prices + usage per house, plus a Bills list. The page calls the `energy`
   edge function (`supabase/functions/energy/`), which reads Tibber/Elvia tokens from

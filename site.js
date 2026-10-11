@@ -51,6 +51,13 @@ window.SITE = {
       color: 'peach'
     },
     {
+      id: 'norskprove',
+      name: 'Norskprøven',
+      emoji: '🗣️',
+      description: 'Study for the Norwegian language test at B1–B2: grammar, reading, listening, writing and speaking practice.',
+      color: 'blossom'
+    },
+    {
       id: 'calendar',
       name: 'Calendar',
       emoji: '📅',

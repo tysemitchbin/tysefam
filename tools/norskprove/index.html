@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Norskprøven</title>
+
+<!-- ════════════════════════════════════════════════════════════════
+     NORSKPRØVEN B1–B2: study tool for the Norwegian language test (HK-dir).
+
+       data.js      grammar notes + questions, word cards, phrase bank
+       oppgaver.js  reading texts, listening clips, writing and speaking tasks
+       this file    the app, in seven tabs:
+                    Plan · Grammatikk · Lese · Lytte · Skrive · Snakke · Ord
+
+     Built from the same pattern as tools/teoriprove/.
+     Progress (answers, finished sessions) is saved per person with
+     Family.store('norskprove') in collection "progress".
+     Written texts are shared in collection "texts", so the family can read
+     them and leave feedback.
+     Listening uses the browser's own Norwegian voice (speech synthesis):
+     nothing is downloaded and no audio files are needed.
+     Recordings in the Snakke tab stay in the browser and are never uploaded.
+═════════════════════════════════════════════════════════════════ -->
+
+<link rel="stylesheet" href="../../shared/family.css">
+<style>
+/* Layout: one study column under a sticky header with seven tabs.
+   Colours come from shared/family.css (--meadow, --forest, --cream, --paper, --ink, --line…). */
+:root{
+  --bgc:var(--cream); --surf:var(--paper); --sunk:#eef0e8;
+  --accent:var(--meadow-deep); --accent-ink:#fff; --accent-soft:#e3f1df;
+  --flag:#ba0c2f;
+  --ok:#3f8a52; --ok-soft:#e3f1df; --bad:#c2453a; --bad-soft:#fdeceb; --warn:#b07d12; --warn-soft:#fcf3d2;
+  --rr:14px;
+}
+*{box-sizing:border-box}
+body{font-size:16px;line-height:1.55}
+h1,h2,h3{font-family:"Fredoka",system-ui,sans-serif;font-weight:600;color:var(--forest);line-height:1.2;text-wrap:balance;margin:0}
+button{font:inherit;color:inherit}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+/* Language: every text pair is <span class="nb">…</span><span class="en">…</span>.
+   The class on <html> decides which one shows: l-nb (Norwegian), l-both, l-en (English). */
+.en{display:none}
+.l-both .en{display:block;color:var(--ink-soft);font-size:.88em;font-style:italic;font-weight:400;margin-top:2px}
+.l-en .nb{display:none}
+.l-en .en{display:block}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--bgc);border-bottom:1px solid var(--line)}
+.top-in{max-width:880px;margin:0 auto;padding:12px 16px 0;display:flex;flex-direction:column;gap:10px}
+.brand{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.brand-l{display:flex;align-items:center;gap:12px;min-width:0}
+.brand-l .mark{font-size:1.7rem;line-height:1}
+.brand h1{font-size:1.2rem;letter-spacing:-.01em}
+.brand small{display:block;font-weight:400;font-size:.78rem;color:var(--ink-soft);letter-spacing:.02em}
+.brand-r{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;background:var(--surf);padding:3px}
+.seg button{border:0;background:none;border-radius:999px;padding:4px 10px;font-size:.82rem;font-weight:700;color:var(--ink-soft);cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg .s{display:none}
+@media (max-width:560px){.seg .f{display:none}.seg .s{display:inline}}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:none;border:0;padding:8px 12px 10px;cursor:pointer;color:var(--ink-soft);font-weight:700;border-bottom:3px solid transparent;white-space:nowrap;font-size:.95rem}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--flag)}
+.tab:hover{color:var(--ink)}
+
+main.sb{max-width:880px;margin:0 auto;padding-inline:16px;padding-block:24px 64px;display:flex;flex-direction:column;gap:24px}
+
+/* generic */
+.eyebrow{font-size:.74rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft)}
+.scard{background:var(--surf);border:1px solid var(--line);border-radius:var(--rr);padding:20px}
+.muted{color:var(--ink-soft)}
+.small{font-size:.85rem}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.between{justify-content:space-between}
+.sbtn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surf);padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:700;font-size:.95rem;text-decoration:none;color:var(--ink)}
+.sbtn:hover{border-color:var(--accent)}
+.sbtn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.sbtn.primary:hover{filter:brightness(1.08)}
+.sbtn.ghost{background:none}
+.sbtn.small{padding:6px 11px;font-size:.85rem}
+.sbtn.danger{color:var(--bad)}
+.sbtn[disabled]{opacity:.45;cursor:not-allowed}
+.mono{font-variant-numeric:tabular-nums;font-weight:800}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surf);border-radius:999px;padding:6px 12px;font-size:.85rem;cursor:pointer;color:var(--ink);text-align:left}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);font-weight:700}
+.chip .n{color:var(--ink-soft);font-size:.78rem;margin-left:4px}
+.modlabel{font-size:.74rem;color:var(--ink-soft);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:10px 0 6px}
+.bar{height:6px;border-radius:3px;background:var(--sunk);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--ok);border-radius:3px}
+.lvl{display:inline-block;font-size:.72rem;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--sunk);color:var(--ink-soft);letter-spacing:.04em}
+.lvl.B2{background:#fbe3e7;color:var(--flag)}
+.lvl.B1{background:#e3eef7;color:#2c5d88}
+ul.clean{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+
+/* plan */
+.hero h2{font-size:clamp(1.7rem,4.6vw,2.4rem);letter-spacing:-.02em}
+.hero p{margin:.5em 0 0;max-width:62ch}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));border:1px solid var(--line);border-radius:var(--rr);background:var(--surf);overflow:hidden}
+.fact{padding:14px 16px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);margin:0 -1px -1px 0}
+.fact .k{font-size:.74rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--flag)}
+.fact b{display:block;font-family:"Fredoka",sans-serif;font-size:1.5rem;line-height:1.15}
+.fact span{font-size:.85rem;color:var(--ink-soft)}
+.days{display:flex;flex-direction:column;gap:10px}
+.day{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:start;background:var(--surf);border:1px solid var(--line);border-radius:var(--rr);padding:14px 16px}
+.day.done{opacity:.62}
+.day .dnum{font-family:"Fredoka",sans-serif;font-size:1.5rem;line-height:1;width:2.2ch;color:var(--flag)}
+.day h3{font-size:1.05rem;font-family:inherit}
+.day .chs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.scheck{width:26px;height:26px;border-radius:6px;border:2px solid var(--line);background:var(--surf);cursor:pointer;display:grid;place-items:center;color:var(--accent-ink);padding:0}
+.scheck[aria-pressed="true"]{background:var(--ok);border-color:var(--ok)}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) 110px 70px;gap:12px;align-items:center;padding:9px 4px;border:0;border-bottom:1px solid var(--line);cursor:pointer;background:none;text-align:left;width:100%}
+.prow:hover{background:var(--sunk)}
+.prow .lbl{min-width:0}
+.prow .pct{text-align:right;font-size:.82rem;color:var(--ink-soft)}
+
+/* notes */
+.notes h2{font-size:1.6rem}
+.notes ul{list-style:none;padding:0;margin:0}
+.notes li{padding:11px 0 11px 18px;border-bottom:1px solid var(--line);position:relative;max-width:70ch}
+.notes li::before{content:"";position:absolute;left:2px;top:20px;width:6px;height:6px;border-radius:50%;background:var(--flag)}
+.notes li.h{padding:22px 0 6px;border-bottom:0;font-family:"Fredoka",sans-serif;font-size:1.12rem;font-weight:600;color:var(--forest)}
+.notes li.h::before{display:none}
+
+/* question */
+.qcard{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:16px}
+.qmeta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:.84rem;color:var(--ink-soft)}
+.qtext{font-size:1.25rem;font-weight:700;line-height:1.35}
+.opts{display:flex;flex-direction:column;gap:10px}
+.opt{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:center;text-align:left;width:100%;background:var(--bgc);border:2px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .12s,background .12s}
+.opt:hover:not([disabled]){border-color:var(--accent)}
+.opt .L{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:var(--surf);border:1px solid var(--line);font-size:.9rem}
+.opt .t{min-width:0}
+.opt[disabled]{cursor:default}
+.opt.right{border-color:var(--ok);background:var(--ok-soft)}
+.opt.right .L{background:var(--ok);color:var(--accent-ink);border-color:var(--ok)}
+.opt.wrong{border-color:var(--bad);background:var(--bad-soft)}
+.opt.wrong .L{background:var(--bad);color:var(--accent-ink);border-color:var(--bad)}
+.verdict{border-radius:10px;padding:12px 14px;font-size:.95rem}
+.verdict.ok{background:var(--ok-soft);border-left:4px solid var(--ok)}
+.verdict.no{background:var(--bad-soft);border-left:4px solid var(--bad)}
+.verdict.info{background:var(--sunk);border-left:4px solid var(--ink-soft)}
+.verdict .vh{font-weight:800;margin-bottom:2px}
+.kbd{font-size:.75rem;border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--ink-soft)}
+.score{display:flex;gap:16px;flex-wrap:wrap;font-size:.9rem}
+.result{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.result .big{font-family:"Fredoka",sans-serif;font-size:clamp(2.6rem,9vw,4rem);line-height:1}
+
+/* task lists (reading, listening, writing) */
+.tlist{display:flex;flex-direction:column;gap:8px}
+.titem{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;text-align:left;width:100%;background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer}
+.titem:hover{border-color:var(--accent)}
+.titem b{display:block}
+.titem .sub{font-size:.82rem;color:var(--ink-soft)}
+.titem .st{font-size:.82rem;font-weight:800;color:var(--ink-soft);white-space:nowrap}
+.titem .st.done{color:var(--ok)}
+
+/* reading */
+.rtext{background:var(--surf);border:1px solid var(--line);border-radius:var(--rr);padding:22px 24px;font-size:1.05rem;line-height:1.7}
+.rtext p{margin:0 0 .9em;max-width:68ch}
+.rtext p:last-child{margin-bottom:0}
+.rtext .gap{display:block;border:2px dashed var(--flag);border-radius:10px;padding:10px;text-align:center;color:var(--flag);font-weight:800}
+.rq{display:flex;flex-direction:column;gap:10px;background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:18px}
+.rqq{font-weight:700;font-size:1.05rem;display:flex;gap:10px;align-items:baseline}
+.rqq .num{flex:none;width:26px;height:26px;border-radius:50%;background:var(--sunk);display:grid;place-items:center;font-size:.8rem}
+.gloss{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 16px;font-size:.92rem}
+.gloss b{color:var(--forest)}
+
+/* listening */
+.player{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:26px 20px}
+.play{width:92px;height:92px;border-radius:50%;border:0;background:var(--accent);color:#fff;font-size:2.2rem;cursor:pointer;display:grid;place-items:center;box-shadow:0 8px 24px rgba(63,94,68,.25)}
+.play[disabled]{background:var(--sunk);color:var(--ink-soft);box-shadow:none;cursor:not-allowed}
+.play.on{background:var(--flag)}
+@media (prefers-reduced-motion:no-preference){.play.on{animation:pulse 1.4s ease-in-out infinite}}
+@keyframes pulse{50%{transform:scale(1.06)}}
+.transcript p{margin:0 0 8px}
+.transcript .who{font-weight:800;color:var(--forest);margin-right:6px}
+select.sel{border:1px solid var(--line);background:var(--surf);border-radius:8px;padding:6px 8px;font:inherit;font-size:.88rem;max-width:100%}
+
+/* writing */
+.prompt{border-left:4px solid var(--flag);background:var(--surf);border-radius:0 var(--rr) var(--rr) 0;padding:16px 18px;border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.prompt .pt{font-size:1.08rem;font-weight:700;margin:4px 0 8px}
+textarea.ed{width:100%;min-height:340px;border:2px solid var(--line);border-radius:12px;padding:14px 16px;font:inherit;font-size:1.02rem;line-height:1.6;background:#fff;resize:vertical}
+textarea.ed:focus{border-color:var(--accent);outline:none}
+textarea.fbin{width:100%;min-height:90px;border:2px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;background:#fff}
+.wc{display:flex;align-items:center;gap:10px;font-size:.88rem;color:var(--ink-soft)}
+.wc .bar{flex:1}
+.wc b{color:var(--ink)}
+details.phr{background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+details.phr summary{cursor:pointer;font-weight:800}
+.phgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:10px}
+.phgrid h4{margin:0 0 4px;font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft)}
+.phgrid ul{margin:0;padding-left:18px;font-size:.92rem}
+.phgrid .en{font-size:.82em}
+.checks{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+.checks li{padding:10px 12px;border-radius:10px;background:var(--sunk);font-size:.93rem}
+.checks li.w{background:var(--warn-soft);border-left:4px solid var(--warn)}
+.checks li.g{background:var(--ok-soft);border-left:4px solid var(--ok)}
+.checks q{font-style:italic;quotes:"«" "»"}
+.wtext{white-space:pre-wrap;background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;line-height:1.65}
+.fb{border-left:3px solid var(--accent);padding:6px 12px;margin:8px 0;background:var(--surf)}
+.fb .who{font-size:.8rem;font-weight:800;color:var(--ink-soft)}
+.fb div{white-space:pre-wrap}
+
+/* timers */
+.timer{font-size:1.4rem;font-variant-numeric:tabular-nums;font-weight:800;padding:4px 12px;border-radius:8px;background:var(--surf);border:1px solid var(--line)}
+.timer.low{color:var(--bad);border-color:var(--bad)}
+.bigtime{font-family:"Fredoka",sans-serif;font-size:clamp(3rem,12vw,4.6rem);font-variant-numeric:tabular-nums;line-height:1;color:var(--forest)}
+.bigtime.over{color:var(--bad)}
+.confirm{border:2px solid var(--warn);background:var(--warn-soft);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
+
+/* speaking */
+.stype{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.stype button{text-align:left;border:2px solid var(--line);background:var(--surf);border-radius:12px;padding:14px;cursor:pointer}
+.stype button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.stype b{display:block}
+.stype span{font-size:.85rem;color:var(--ink-soft)}
+.claim{font-family:"Fredoka",sans-serif;font-size:clamp(1.3rem,4vw,1.7rem);color:var(--forest);line-height:1.3}
+.phase{display:flex;gap:6px;flex-wrap:wrap;font-size:.8rem}
+.phase span{padding:4px 10px;border-radius:999px;background:var(--sunk);color:var(--ink-soft);font-weight:700}
+.phase span.on{background:var(--flag);color:#fff}
+.phase span.ok{background:var(--ok-soft);color:var(--ok)}
+
+/* flashcards */
+.fcard{min-height:230px;border-radius:14px;border:1px solid var(--line);background:var(--surf);padding:26px;display:flex;flex-direction:column;justify-content:center;gap:12px;cursor:pointer;width:100%;text-align:left}
+.fcard>span{display:block}
+.fcard .side{font-size:.74rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);font-weight:700}
+.fcard .front{font-family:"Fredoka",sans-serif;font-size:1.7rem;color:var(--forest)}
+.fcard .ans{font-family:"Fredoka",sans-serif;font-size:1.45rem;color:var(--ok)}
+.fcard .ex{font-style:italic;color:var(--ink-soft)}
+.fcard.flipped{border-color:var(--ok)}
+@media (prefers-reduced-motion:no-preference){.qcard,.fcard{animation:rise .22s ease-out}}
+@keyframes rise{from{transform:translateY(4px);opacity:.6}to{transform:none;opacity:1}}
+.foot{font-size:.8rem;color:var(--ink-soft);border-top:1px solid var(--line);padding-top:16px}
+@media (max-width:560px){
+  .prow{grid-template-columns:minmax(0,1fr) 60px 52px}
+  .qcard{padding:16px}
+  .qtext{font-size:1.12rem}
+  .rtext{padding:16px;font-size:1rem}
+  .brand small{display:none}
+  .tab{padding:8px 9px 10px;font-size:.9rem}
+}
+.sbadge{font-size:.75rem;font-weight:800;padding:4px 10px;border-radius:999px;background:var(--sunk);color:var(--ink-soft);white-space:nowrap}
+.sbadge.ok{background:var(--accent-soft);color:var(--forest)}
+</style>
+</head>
+<body data-tool="norskprove">
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <div class="brand-l">
+        <span class="mark" aria-hidden="true">🗣️</span>
+        <div><h1>Norskprøven B1–B2</h1><small>Lese · lytte · skrive · snakke</small></div>
+      </div>
+      <div class="brand-r">
+        <span class="sbadge" id="sync">…</span>
+        <div class="seg" role="group" aria-label="Språk / Language" id="langs"></div>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" id="tabs"></nav>
+  </div>
+</header>
+<main class="sb" id="view" aria-live="polite"></main>
+
+<script src="../../site.js"></script>
+<script src="../../shared/family.js"></script>
+<script src="data.js"></script>
+<script src="oppgaver.js"></script>
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=Family.esc;
+// Every question and card gets a stable id from its text, so saved progress survives edits elsewhere.
+function hash(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function range(n){return Array.from({length:n},(_,i)=>i)}
+function pick(a){return a[Math.floor(Math.random()*a.length)]}
+// bi(): a Norwegian/English text pair; the language setting decides what shows.
+function bi(nb,en){return '<span class="nb">'+nb+'</span>'+(en?'<span class="en" lang="en">'+en+'</span>':'')}
+// t(): one short UI label, in English only when English is chosen.
+function t(nb,en){return S.lang==="en"?en:nb}
+const L=["A","B","C","D","E"];
+
+Q.forEach(x=>{x.id="g-"+x.ch+"-"+hash(x.nb+x.o[0])});
+const qById={}; Q.forEach(x=>qById[x.id]=x);
+const chById={}; CH.forEach(c=>chById[c.id]=c);
+const byCh={}; CH.forEach(c=>byCh[c.id]=Q.filter(x=>x.ch===c.id));
+const readById={}; READ.forEach(r=>{readById[r.id]=r; r.qs.forEach(q=>q.id="r-"+r.id+"-"+hash(q.q))});
+const lisById={}; LISTEN.forEach(c=>{lisById[c.id]=c; c.qs.forEach(q=>q.id="l-"+c.id+"-"+hash(q.q))});
+const CARDS=[]; DECKS.forEach(d=>WORDS[d.id].forEach(w=>CARDS.push({id:"v-"+d.id+"-"+hash(w[0]),deck:d.id,nb:w[0],en:w[1],ex:w[2]})));
+const cardById={}; CARDS.forEach(c=>cardById[c.id]=c);
+const deckById={}; DECKS.forEach(d=>deckById[d.id]=d);
+const emailById={}; EMAIL.forEach(e=>emailById[e.id]=e);
+const argById={}; ARG.forEach(a=>argById[a.id]=a);
+const READ_QS=[].concat(...READ.map(r=>r.qs)), LIS_QS=[].concat(...LISTEN.map(c=>c.qs));
+
+/* ---------- saving ----------
+   Settings, drafts and an exam in progress stay in this browser (localStorage).
+   Progress (answers, finished sessions, speaking count) is ALSO saved to the family account,
+   one record per person in collection "progress". Whichever copy is newest (field "ts") wins.
+   Written texts go to collection "texts" (shared, so others can give feedback). */
+const TOOL_ID="norskprove";
+const store=Family.store(TOOL_ID);
+const KEY="norskprove-v1";
+let S={lang:"both",tab:"plan",stats:{},days:{},spk:0,ts:0,gr:"ord",gSel:["all"],deck:"kon",dir:"nb",rate:1,voice:"",lsFree:false,drafts:{},wx:null,wt:null,wview:null,sp:{t:"paa",i:0}};
+try{const raw=localStorage.getItem(KEY); if(raw) Object.assign(S,JSON.parse(raw));}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+let meId=null, pushTimer=null, TEXTS={};
+function saveProgress(){S.ts=Date.now();save();
+  if(!meId) return;
+  clearTimeout(pushTimer);
+  pushTimer=setTimeout(()=>store.set("progress",meId,{stats:S.stats,days:S.days,spk:S.spk,ts:S.ts}),1500);
+}
+function syncBadge(){
+  const b=$("#sync"); if(!store.mode||store.mode==="connecting") return;
+  const cloud=store.mode==="cloud";
+  b.className="sbadge"+(cloud?" ok":"");
+  b.textContent=cloud?"☁️ "+meId+" · "+t("synket","synced"):"📴 "+t("Bare denne enheten","This device only");
+}
+store.ready.then(()=>{
+  meId=Family.me(); syncBadge();
+  store.watch("progress",items=>{
+    const mine=items[meId];
+    if(mine&&(mine.ts||0)>(S.ts||0)){          // newer progress from another device
+      S.stats=mine.stats||{};S.days=mine.days||{};S.spk=mine.spk||0;S.ts=mine.ts;save();softRender();
+    }else if((!mine||(mine.ts||0)<(S.ts||0))&&S.ts){   // this device is ahead: upload
+      saveProgress();
+    }
+  });
+  store.watch("texts",items=>{TEXTS=items;if(S.tab==="skrive"||S.tab==="plan")softRender()});
+});
+function record(id,ok){const s=S.stats[id]||(S.stats[id]={c:0,w:0,l:null});ok?s.c++:s.w++;s.l=ok?1:0;s.t=Date.now();saveProgress()}
+function status(id){const s=S.stats[id];if(!s)return "new";return s.l===1?"ok":"weak"}
+function mastery(list){let m=0;list.forEach(x=>{if(status(x.id)==="ok")m++});return m}
+
+/* ---------- top-level render ---------- */
+const TABS=[["plan","Plan","Plan"],["gram","Grammatikk","Grammar"],["lese","Lese","Read"],["lytte","Lytte","Listen"],["skrive","Skrive","Write"],["snakke","Snakke","Speak"],["ord","Ord","Words"]];
+const LANGS=[["nb","Norsk","NO"],["both","Norsk + English","NO + EN"],["en","English","EN"]];
+function render(){
+  const html=document.documentElement;
+  html.classList.remove("l-nb","l-both","l-en"); html.classList.add("l-"+S.lang);
+  html.lang=S.lang==="en"?"en":"nb";
+  $("#langs").innerHTML=LANGS.map(l=>'<button data-act="lang" data-v="'+l[0]+'" aria-pressed="'+(S.lang===l[0])+'"><span class="f">'+l[1]+'</span><span class="s">'+l[2]+'</span></button>').join("");
+  $("#tabs").innerHTML=TABS.map(x=>'<button class="tab" role="tab" data-act="tab" data-v="'+x[0]+'" aria-selected="'+(S.tab===x[0])+'">'+t(x[1],x[2])+'</button>').join("");
+  syncBadge();
+  $("#view").innerHTML=VIEWS[S.tab]();
+  wireEditor();
+  startTicker();
+}
+// softRender(): a redraw caused by data arriving from elsewhere. Skipped while you're typing,
+// so a sync can never wipe out the text box under your fingers. The next click redraws anyway.
+function softRender(){const a=document.activeElement;if(a&&a.tagName==="TEXTAREA")return;render()}
+
+/* ════════════ PLAN ════════════ */
+const DAYS=[
+  {t:["Ordstilling og leddsetninger","Word order and subordinate clauses"],x:["Grunnmuren for både skriving og snakking. Lær V2-regelen og BIFF.","The foundation for writing and speaking. Learn the V2 rule and BIFF."],a:[["gram","ord","Ordstilling","Word order"],["gram","ledd","Leddsetninger","Subordinate clauses"],["deck","kon","Ordkort: bindeord","Cards: linking words"]]},
+  {t:["Bindeord og e-posten","Linking words and the email"],x:["Øv på bindeord, og skriv din første e-post (oppgave 1).","Practise linking words and write your first email (task 1)."],a:[["gram","bind","Bindeord","Linking words"],["write","e","Skriv en e-post","Write an email"]]},
+  {t:["Verb, passiv og preposisjoner","Verbs, passive and prepositions"],x:["Typiske feil som trekker ned. Les to tekster etterpå.","Typical mistakes that cost points. Read two texts afterwards."],a:[["gram","verb","Verb","Verbs"],["gram","pass","Passiv","Passive"],["gram","prep","Preposisjoner","Prepositions"],["tab","lese","Lese","Read"]]},
+  {t:["Lese og lytte","Reading and listening"],x:["Les spørsmålet før teksten. Lytt uten å se teksten først.","Read the question before the text. Listen without looking at the text first."],a:[["tab","lese","Lesetekster","Reading texts"],["tab","lytte","Lytteoppgaver","Listening tasks"]]},
+  {t:["Argumenterende tekst","Argumentative text"],x:["Oppgave 2: 250–350 ord. Ett tydelig synspunkt, gode avsnitt.","Task 2: 250–350 words. One clear point of view, good paragraphs."],a:[["write","a","Skriv oppgave 2","Write task 2"],["gram","pron","Pronomen","Pronouns"],["deck","men","Ordkort: mening","Cards: opinions"]]},
+  {t:["Snakke","Speaking"],x:["Ta tiden og ta opp deg selv. Øv på samtalen med noen i familien.","Time yourself and record yourself. Practise the conversation with someone in the family."],a:[["speak","men","Si din mening","Give your opinion"],["speak","paa","Påstand","Statement"],["speak","sam","Samtale","Conversation"]]},
+  {t:["Prøvedag","Exam rehearsal"],x:["Skriv et helt prøvesett på to timer. Ta en påstand. Øv på feilene dine.","Write a full test set in two hours. Do a statement. Drill your mistakes."],a:[["wexam","","Prøvesett skriving (2 t)","Writing test set (2 h)"],["drillweak","","Øv på feil","Drill mistakes"]]}
+];
+function viewPlan(){
+  let h='<section class="hero"><div class="eyebrow">'+t("Norskprøve A1–B2 fra HK-dir","HK-dir's Norwegian test A1–B2")+'</div><h2>'+bi("Fire delprøver. Øv på alle fire.","Four sub-tests. Practise all four.")+'</h2>'+
+    '<p>'+bi("Prøven tester hvor godt du forstår og bruker norsk, ikke hva du vet om temaene. Her kan du øve på grammatikk, lesing, lytting, skriving og snakking på nivå B1–B2.","The test checks how well you understand and use Norwegian, not what you know about the topics. Practise grammar, reading, listening, writing and speaking at level B1–B2 here.")+'</p></section>';
+  h+='<section class="facts" aria-label="'+t("Om prøven","About the test")+'">'+
+    fact("Lese","Read","75 min",bi("Digital. Starter med to korte forprøver, så en hovedprøve på ditt nivå.","Digital. Two short pre-tests, then a main test at your level."))+
+    fact("Lytte","Listen","30–60 min",bi("B1-oppgaver høres to ganger, B2-oppgaver bare én gang. Du kan ikke gå tilbake.","B1 tasks play twice, B2 tasks only once. You can't go back."))+
+    fact("Skrive","Write","2 timer",bi("To oppgaver: en e-post (ca. 80+ ord) og en argumenterende tekst (ca. 250–350 ord).","Two tasks: an email (about 80+ words) and an argument (about 250–350 words)."))+
+    fact("Muntlig","Speak","20–25 min",bi("Med en annen kandidat: si din mening, utveksle meninger, ta stilling til en påstand.","With another candidate: give your opinion, exchange opinions, take a stand on a statement."))+'</section>';
+  h+='<p class="muted small" style="margin:-12px 0 0">'+bi("Lese og lytte gir resultat fra under A1 til B2. På skriveprøven kan du ikke få høyere enn nivået du meldte deg opp til. Statsborgerskap krever B1 muntlig. Sjekk alltid <a href=\"https://prove.hkdir.no/norskprove-a1-b2\" target=\"_blank\" rel=\"noopener\">prove.hkdir.no</a> og <a href=\"https://www.udi.no/\" target=\"_blank\" rel=\"noopener\">udi.no</a>.","Reading and listening give a result from below A1 to B2. On the writing test you can't score higher than the level you registered for. Citizenship needs B1 in speaking. Always check <a href=\"https://prove.hkdir.no/norskprove-a1-b2\" target=\"_blank\" rel=\"noopener\">prove.hkdir.no</a> and <a href=\"https://www.udi.no/\" target=\"_blank\" rel=\"noopener\">udi.no</a>.")+'</p>';
+  // progress
+  const mine=Family.entries(TEXTS).filter(([,x])=>x.by===meId).length;
+  const rows=[
+    ["gram","Grammatikk","Grammar",mastery(Q),Q.length],
+    ["lese","Lesespørsmål","Reading questions",mastery(READ_QS),READ_QS.length],
+    ["lytte","Lyttespørsmål","Listening questions",mastery(LIS_QS),LIS_QS.length],
+    ["ord","Ordkort","Word cards",mastery(CARDS),CARDS.length]];
+  h+='<section class="scard"><div class="eyebrow" style="margin-bottom:6px">'+t("Fremgangen din · trykk for å øve","Your progress · tap to practise")+'</div>';
+  rows.forEach(r=>{const p=Math.round(r[3]/r[4]*100);
+    h+='<button class="prow" data-act="tab" data-v="'+r[0]+'"><span class="lbl">'+bi(r[1],r[2])+'</span><span class="bar"><i style="width:'+p+'%"></i></span><span class="pct mono">'+r[3]+'/'+r[4]+'</span></button>'});
+  h+='<div class="row" style="margin-top:12px;gap:18px"><span>✍️ <b>'+mine+'</b> '+t("tekster skrevet","texts written")+'</span><span>🎙️ <b>'+(S.spk||0)+'</b> '+t("muntlige oppgaver","speaking tasks")+'</span></div></section>';
+  // plan
+  h+='<section><div class="eyebrow" style="margin-bottom:10px">'+t("Studieplan · 7 økter","Study plan · 7 sessions")+'</div><div class="days">';
+  DAYS.forEach((d,i)=>{const done=!!S.days[i];
+    h+='<div class="day'+(done?' done':'')+'"><div class="dnum">'+(i+1)+'</div><div><h3>'+bi(d.t[0],d.t[1])+'</h3><div class="muted" style="font-size:.9rem;margin-top:2px">'+bi(d.x[0],d.x[1])+'</div><div class="chs">'+
+      d.a.map((a,k)=>'<button class="sbtn small'+(k===0?' primary':' ghost')+'" data-act="'+a[0]+'" data-v="'+a[1]+'">'+t(a[2],a[3])+'</button>').join("")+
+      '</div></div><button class="scheck" data-act="day" data-v="'+i+'" aria-pressed="'+done+'" aria-label="'+t("Marker økt "+(i+1)+" som ferdig","Mark session "+(i+1)+" done")+'">'+(done?'✓':'')+'</button></div>'});
+  h+='</div></section>';
+  h+='<section class="scard"><div class="eyebrow">'+t("Hver dag, 20–30 minutter","Every day, 20–30 minutes")+'</div><ul class="clean" style="margin-top:10px">'+
+    '<li>'+bi("10 ordkort og 10 grammatikkspørsmål.","10 word cards and 10 grammar questions.")+'</li>'+
+    '<li>'+bi("Én lesetekst eller to lytteoppgaver.","One reading text or two listening tasks.")+'</li>'+
+    '<li>'+bi("Snakk høyt i 3 minutter om en påstand, gjerne med opptak.","Speak aloud for 3 minutes on a statement, ideally recorded.")+'</li>'+
+    '<li>'+bi("Skriv minst én tekst i uka, og få noen til å lese den.","Write at least one text a week and get someone to read it.")+'</li>'+
+    '<li>'+bi("Lytt til ekte norsk: NRK-radio, podkaster, TV med norsk teksting.","Listen to real Norwegian: NRK radio, podcasts, TV with Norwegian subtitles.")+'</li></ul></section>';
+  h+='<section class="scard"><div class="eyebrow">'+t("Slik blir du vurdert","How you're assessed")+'</div><ul class="clean" style="margin-top:10px">'+
+    '<li>'+bi("<b>Skriving</b>: om du svarer på det oppgaven spør om, tekstoppbygging, rettskriving, tegnsetting, ordforråd og grammatikk. To sensorer vurderer hver tekst.","<b>Writing</b>: whether you answer what the task asks, text structure, spelling, punctuation, vocabulary and grammar. Two examiners mark each text.")+'</li>'+
+    '<li>'+bi("<b>Muntlig</b>: flyt, uttale, ordforråd og grammatikk. Du kan få et ekstraspørsmål fra nivået over.","<b>Speaking</b>: fluency, pronunciation, vocabulary and grammar. You may get an extra question from the level above.")+'</li>'+
+    '<li>'+bi("<b>B1</b>: du kan skrive og snakke sammenhengende om kjente temaer og begrunne meningene dine enkelt.","<b>B1</b>: you can write and speak coherently about familiar topics and give simple reasons for your opinions.")+'</li>'+
+    '<li>'+bi("<b>B2</b>: du kan argumentere klart og detaljert, med variert språk og bindeord, og feilene gjør det ikke vanskelig å forstå deg.","<b>B2</b>: you can argue clearly and in detail, with varied language and linking words, and your mistakes don't get in the way.")+'</li></ul></section>';
+  h+='<section class="scard"><div class="eyebrow">'+t("Gode råd fra HK-dir","Good advice from HK-dir")+'</div><ul class="clean" style="margin-top:10px">'+
+    '<li>'+bi("Ikke pugg ferdige tekster. Prøven tester ditt eget språk, og innøvd tekst kan regnes som fusk. Å lime inn tekst blir registrert som fusk.","Don't memorise ready-made texts. The test checks your own language, and rehearsed text can count as cheating. Pasting text is logged as cheating.")+'</li>'+
+    '<li>'+bi("Ikke skriv for kort. Bruk heller ekstra tid på å lese over og rette.","Don't write too little. Spend spare time checking and correcting instead.")+'</li>'+
+    '<li>'+bi("I e-posten er det innholdet om saken som teller, ikke faste fraser som «Håper på raskt svar».","In the email, what counts is what you say about the issue, not stock phrases.")+'</li>'+
+    '<li>'+bi("I oppgave 2: argumenter for ett synspunkt. Motargumenter er lov, men ikke et krav.","In task 2: argue for one point of view. Counter-arguments are allowed but not required.")+'</li>'+
+    '<li>'+bi("På lese- og lytteprøven: les spørsmålet og svaralternativene først. Ikke bli sittende fast; gå videre.","On reading and listening: read the question and options first. Don't get stuck; move on.")+'</li>'+
+    '<li>'+bi("Velg nivå med omhu. B1–B2-prøven er vanskelig. Spør læreren hvis du er usikker.","Choose your level carefully. The B1–B2 test is hard. Ask your teacher if unsure.")+'</li></ul>'+
+    '<div class="row" style="margin-top:14px"><a class="sbtn small" href="https://prove.hkdir.no/norskprove-a1-b2/ov-til-prove-norsk-A1-B2" target="_blank" rel="noopener">'+t("Offisielle eksempeloppgaver ↗","Official example tasks ↗")+'</a><a class="sbtn small ghost" href="https://prove.hkdir.no/norskprove-a1-b2/les-om-proven-norsk-A1-B2" target="_blank" rel="noopener">'+t("Les om prøven ↗","About the test ↗")+'</a></div>'+
+    '<p class="muted small" style="margin:8px 0 0">'+bi("De offisielle eksempeloppgavene må tas på PC.","The official example tasks need a computer.")+'</p></section>';
+  h+='<p class="foot">'+bi("Kilde for prøveformatet: prove.hkdir.no (sidene om lese-, lytte-, skrive- og muntlig prøve), lest i oktober 2026. Alle tekster, spørsmål og oppgaver her er laget for dette verktøyet og er ikke hentet fra prøven. Personer og steder i tekstene er oppdiktet. Laget for egen øving.","Source for the test format: prove.hkdir.no (pages on the reading, listening, writing and speaking tests), read in October 2026. All texts, questions and tasks here were written for this tool and are not taken from the test. People and places in the texts are made up. Made for personal study.")+'</p>';
+  return h;
+}
+function fact(knb,ken,big,txt){return '<div class="fact"><div class="k">'+t(knb,ken)+'</div><b>'+big+'</b><span>'+txt+'</span></div>'}
+
+/* ════════════ GRAMMATIKK ════════════ */
+let P=null;   // the practice round in progress
+function prio(x){const s=status(x.id);return s==="weak"?0:s==="new"?1:2}
+function startDrill(sel,weakOnly){
+  let pool=Q.filter(x=>sel.includes("all")||sel.includes(x.ch));
+  if(weakOnly) pool=pool.filter(x=>status(x.id)!=="ok");
+  shuffle(pool); pool.sort((a,b)=>prio(a)-prio(b));
+  P={queue:pool.map(x=>x.id),i:0,ans:null,order:null,right:0,done:0,requeued:{},weakOnly:!!weakOnly};
+  P.order=pool.length?shuffle(range(pool[0].o.length)):[];
+}
+function viewGram(){
+  if(P&&P.i<P.queue.length) return viewDrill();
+  if(P) return viewDrillDone();
+  const c=chById[S.gr]||CH[0];
+  let h='<section>';
+  [1,2,3].forEach(mo=>{h+='<div class="modlabel">'+t(MOD[mo][0],MOD[mo][1])+'</div><div class="chips">';
+    CH.filter(x=>x.m===mo).forEach(x=>{h+='<button class="chip" data-act="gtopic" data-v="'+x.id+'" aria-pressed="'+(x.id===c.id)+'">'+t(x.nb,x.en)+'<span class="n">'+mastery(byCh[x.id])+'/'+byCh[x.id].length+'</span></button>'});
+    h+='</div>'});
+  h+='</section>';
+  h+='<article class="scard notes"><div class="eyebrow">'+t(MOD[c.m][0],MOD[c.m][1])+'</div><h2 style="margin-top:6px">'+bi(c.nb,c.en)+'</h2><ul style="margin-top:8px">';
+  NOTES[c.id].forEach(p=>{if(p[0][0]==="#") h+='<li class="h">'+bi(p[0].slice(1),p[1])+'</li>'; else h+='<li>'+bi(p[0],p[1])+'</li>'});
+  h+='</ul><div class="row" style="margin-top:18px"><button class="sbtn primary" data-act="gram" data-v="'+c.id+'">'+t("Øv på dette","Practise this")+' ('+byCh[c.id].length+')</button></div></article>';
+  const weak=Q.filter(x=>status(x.id)!=="ok").length;
+  h+='<section class="scard"><div class="eyebrow" style="margin-bottom:8px">'+t("Bland alle emnene","Mix all topics")+'</div><div class="row"><button class="sbtn" data-act="gram" data-v="all">'+t("Alle spørsmål","All questions")+' ('+Q.length+')</button><button class="sbtn" data-act="drillweak"'+(weak?'':' disabled')+'>'+t("Bare feil og nye","Only missed and new")+' ('+weak+')</button></div>'+
+    '<p class="muted small" style="margin:10px 0 0">'+bi("Spørsmål du har bommet på kommer først. Bommer du, kommer spørsmålet tilbake litt senere.","Questions you missed come first. Miss one and it comes back a few questions later.")+'</p></section>';
+  return h;
+}
+function viewDrill(){
+  const x=qById[P.queue[P.i]], c=chById[x.ch], st=status(x.id);
+  let h='<div class="row between"><div class="score"><span>'+t("Riktige","Correct")+': <b>'+P.right+'</b></span><span>'+t("Besvart","Answered")+': <b>'+P.done+'</b></span><span>'+t("Igjen","Left")+': <b>'+(P.queue.length-P.i)+'</b></span></div>'+
+    '<button class="sbtn small ghost" data-act="gquit">← '+t("Til notatene","Back to notes")+'</button></div>';
+  h+='<div class="qcard"><div class="qmeta"><span>'+t(c.nb,c.en)+'</span><span>'+(st==="weak"?t('Du bommet sist','You missed this last time'):st==="new"?t('Nytt spørsmål','New question'):t('Svarte riktig sist','Right last time'))+'</span></div>';
+  h+='<div class="qtext">'+bi(x.nb,x.en)+'</div><div class="opts">';
+  P.order.forEach((oi,pos)=>{let cls="";
+    if(P.ans!==null){if(oi===0)cls="right";else if(oi===P.ans)cls="wrong"}
+    h+='<button class="opt '+cls+'" data-act="pick" data-v="'+oi+'"'+(P.ans!==null?' disabled':'')+'><span class="L">'+L[pos]+'</span><span class="t" lang="nb">'+x.o[oi]+'</span></button>'});
+  h+='</div>';
+  if(P.ans!==null){const ok=P.ans===0;
+    h+='<div class="verdict '+(ok?'ok':'no')+'"><div class="vh">'+(ok?t('Riktig!','Correct!'):t('Feil. Riktig svar:','Wrong. Right answer:'))+'</div>'+(ok?'':'<div lang="nb">'+x.o[0]+'</div>')+(x.xnb?'<div style="margin-top:6px">'+bi(x.xnb,x.xen)+'</div>':'')+'</div>'+
+      '<div class="row between"><button class="sbtn primary" data-act="next" id="nextbtn">'+t("Neste","Next")+' →</button><span class="muted" style="font-size:.8rem">'+t("Tastatur","Keyboard")+': <span class="kbd">1</span>–<span class="kbd">4</span> '+t("og","and")+' <span class="kbd">Enter</span></span></div>'}
+  return h+'</div>';
+}
+function viewDrillDone(){
+  const pct=P.done?Math.round(P.right/P.done*100):0;
+  return '<section class="scard result"><div class="eyebrow">'+t("Runden er ferdig","Round finished")+'</div><div class="big">'+P.right+' / '+P.done+'</div><p class="muted" style="margin:0">'+pct+' % '+t("riktig, med repetisjoner","correct, including repeats")+'</p>'+
+    '<div class="row" style="margin-top:12px"><button class="sbtn primary" data-act="gagain">'+t("Øv igjen","Again")+'</button><button class="sbtn" data-act="drillweak">'+t("Bare feil og nye","Only missed and new")+'</button><button class="sbtn ghost" data-act="gquit">'+t("Til notatene","Back to notes")+'</button></div></section>';
+}
+
+/* ════════════ LESE ════════════ */
+let RD=null;   // the open text: {id, ans:{qi:option}, ord:{qi:[order]}}
+function openRead(id){const r=readById[id];RD={id:id,ans:{},ord:{}};r.qs.forEach((q,i)=>RD.ord[i]=shuffle(range(q.o.length)))}
+function qsDone(qs){return qs.filter(q=>status(q.id)==="ok").length}
+function viewLese(){
+  if(RD) return viewReadText();
+  let h='<section><div class="eyebrow">'+t("Leseprøven","The reading test")+'</div><h2 style="font-size:1.6rem;margin:4px 0 6px">'+t("Les og svar","Read and answer")+'</h2><p class="muted" style="margin:0;max-width:62ch">'+
+    bi("På prøven har du 75 minutter. Tekstene er korte, og det er bare ett riktig svar. Les spørsmålet og svaralternativene <b>før</b> teksten, så vet du hva du leter etter.","On the test you have 75 minutes. The texts are short and there's only one right answer. Read the question and options <b>before</b> the text so you know what to look for.")+'</p></section>';
+  h+=readList("B1")+readList("B2");
+  return h;
+}
+function readList(lvl){
+  const list=READ.filter(r=>r.lvl===lvl);
+  return '<section><div class="modlabel">'+t("Nivå ","Level ")+lvl+'</div><div class="tlist">'+list.map(r=>{const d=qsDone(r.qs);
+    return '<button class="titem" data-act="read" data-v="'+r.id+'"><span><b>'+esc(r.title)+'</b><span class="sub"><span class="lvl '+r.lvl+'">'+r.lvl+'</span> '+esc(r.type)+' · '+r.qs.length+' '+t("spørsmål","questions")+'</span></span><span class="st'+(d===r.qs.length?' done':'')+'">'+(d===r.qs.length?'✓ ':'')+d+'/'+r.qs.length+'</span></button>'}).join("")+'</div></section>';
+}
+function mcBlock(q,n,ans,order,act){
+  let h='<div class="rq"><div class="rqq"><span class="num">'+(n+1)+'</span><span lang="nb">'+q.q+'</span></div><div class="opts">';
+  order.forEach((oi,pos)=>{let cls="";
+    if(ans!==undefined){if(oi===0)cls="right";else if(oi===ans)cls="wrong"}
+    h+='<button class="opt '+cls+'" data-act="'+act+'" data-v="'+n+':'+oi+'"'+(ans!==undefined?' disabled':'')+'><span class="L">'+L[pos]+'</span><span class="t" lang="nb">'+q.o[oi]+'</span></button>'});
+  h+='</div>';
+  if(ans!==undefined) h+='<div class="verdict '+(ans===0?'ok':'no')+'"><b>'+(ans===0?t("Riktig!","Correct!"):t("Feil.","Wrong."))+'</b>'+(q.x?' <span lang="nb">'+q.x+'</span>':'')+'</div>';
+  return h+'</div>';
+}
+function viewReadText(){
+  const r=readById[RD.id]; const n=Object.keys(RD.ans).length, all=n===r.qs.length;
+  let h='<div class="row between"><button class="sbtn small ghost" data-act="readclose">← '+t("Alle tekster","All texts")+'</button><span><span class="lvl '+r.lvl+'">'+r.lvl+'</span> <span class="muted small">'+esc(r.type)+'</span></span></div>';
+  h+='<article class="rtext" lang="nb"><h2 style="font-size:1.4rem;margin-bottom:12px">'+esc(r.title)+'</h2>'+r.p.map(p=>p==="[ ? ]"?'<p><span class="gap">[ ? ]</span></p>':'<p>'+p+'</p>').join("")+'</article>';
+  r.qs.forEach((q,i)=>{h+=mcBlock(q,i,RD.ans[i],RD.ord[i],"rpick")});
+  if(all){const right=r.qs.filter((q,i)=>RD.ans[i]===0).length;
+    h+='<section class="scard result"><div class="eyebrow">'+t("Ferdig","Done")+'</div><div class="big">'+right+' / '+r.qs.length+'</div>';
+    if(r.ord&&r.ord.length) h+='<div style="margin-top:12px;width:100%"><div class="eyebrow" style="margin-bottom:6px">'+t("Ord fra teksten","Words from the text")+'</div><div class="gloss">'+r.ord.map(w=>'<div><b lang="nb">'+w[0]+'</b> <span class="muted">· '+w[1]+'</span></div>').join("")+'</div></div>';
+    const i=READ.indexOf(r), nx=READ[(i+1)%READ.length];
+    h+='<div class="row" style="margin-top:14px"><button class="sbtn primary" data-act="read" data-v="'+nx.id+'">'+t("Neste tekst","Next text")+' →</button><button class="sbtn" data-act="read" data-v="'+r.id+'">'+t("Prøv igjen","Try again")+'</button></div></section>';
+  }
+  return h;
+}
+
+/* ════════════ LYTTE ════════════
+   The browser reads the clips aloud with a Norwegian voice (speech synthesis). */
+let LS=null;   // the open clip: {id, plays, playing, ans:{}, ord:{}, show}
+function nbVoices(){try{return speechSynthesis.getVoices().filter(v=>/^(nb|no|nn)([-_]|$)/i.test(v.lang))}catch(e){return []}}
+const canSpeak="speechSynthesis" in window;
+// voiceFor(): pick a voice + pitch for a speaker. k = woman, m = man, n = announcer.
+function voiceFor(sp){
+  const vs=nbVoices();
+  const pitch=sp==="m"?0.85:sp==="k"?1.12:1;
+  if(!vs.length) return {v:null,p:pitch};
+  if(S.voice){const v=vs.find(x=>x.voiceURI===S.voice); if(v) return {v:v,p:pitch}}
+  const fem=vs.find(v=>/pernille|iselin|hulda|nora|liv|ingrid|female|kvinne/i.test(v.name));
+  const mal=vs.find(v=>/finn|jon|henrik|arne|male|mann/i.test(v.name)&&!/female/i.test(v.name));
+  if(sp==="m") return mal?{v:mal,p:1}:{v:vs.length>1?vs[1]:vs[0],p:vs.length>1&&!fem?1:0.85};
+  return fem?{v:fem,p:1}:{v:vs[0],p:sp==="k"?1.12:1};
+}
+let speakToken=0;
+// speak(): read [speaker, text] lines aloud, one sentence at a time (long utterances can stall in some browsers).
+function speak(lines,onend){
+  if(!canSpeak){onend&&onend();return}
+  speechSynthesis.cancel();
+  const my=++speakToken; const parts=[];
+  lines.forEach(l=>{const vp=voiceFor(l[0]);(l[1].match(/[^.!?…]+[.!?…»]*["»]?\s*/g)||[l[1]]).forEach(s=>{if(s.trim())parts.push([s.trim(),vp])})});
+  if(!parts.length){onend&&onend();return}
+  parts.forEach((p,i)=>{
+    const u=new SpeechSynthesisUtterance(p[0]); u.lang="nb-NO"; if(p[1].v)u.voice=p[1].v; u.pitch=p[1].p; u.rate=S.rate||1;
+    if(i===parts.length-1){u.onend=()=>{if(my===speakToken&&onend)onend()}}
+    u.onerror=()=>{if(my===speakToken&&i===parts.length-1&&onend)onend()};
+    speechSynthesis.speak(u);
+  });
+}
+function stopSpeak(){speakToken++;try{speechSynthesis.cancel()}catch(e){}}
+if(canSpeak) speechSynthesis.onvoiceschanged=()=>{if(S.tab==="lytte"||S.tab==="snakke"||S.tab==="ord")softRender()};
+function maxPlays(c){return S.lsFree?99:(c.lvl==="B2"?1:2)}
+function openListen(id){const c=lisById[id];stopSpeak();LS={id:id,plays:0,playing:false,ans:{},ord:{},show:false};c.qs.forEach((q,i)=>LS.ord[i]=shuffle(range(q.o.length)))}
+function voiceBar(){
+  const vs=nbVoices();
+  let h='<div class="row small" style="gap:14px">';
+  if(vs.length>1) h+='<label>'+t("Stemme","Voice")+' <select class="sel" data-chg="voice"><option value="">'+t("Automatisk","Automatic")+'</option>'+vs.map(v=>'<option value="'+esc(v.voiceURI)+'"'+(S.voice===v.voiceURI?' selected':'')+'>'+esc(v.name)+'</option>').join("")+'</select></label>';
+  h+='<label>'+t("Fart","Speed")+' <select class="sel" data-chg="rate">'+[[0.8,"0,8×"],[0.9,"0,9×"],[1,"1×"],[1.1,"1,1×"]].map(r=>'<option value="'+r[0]+'"'+((S.rate||1)==r[0]?' selected':'')+'>'+r[1]+'</option>').join("")+'</select></label>';
+  h+='<label><input type="checkbox" data-chg="lsfree"'+(S.lsFree?' checked':'')+'> '+t("Øvemodus: spill av så mange ganger du vil","Practice mode: unlimited plays")+'</label></div>';
+  if(!canSpeak) h+='<div class="verdict no" style="margin-top:10px">'+bi("Denne nettleseren kan ikke lese opp tekst. Prøv Chrome, Edge eller Safari.","This browser can't read text aloud. Try Chrome, Edge or Safari.")+'</div>';
+  else if(!vs.length) h+='<div class="verdict info" style="margin-top:10px">'+bi("Fant ingen norsk stemme på denne enheten, så uttalen kan bli rar. På Windows: Innstillinger → Tid og språk → Tale → Legg til stemmer → Norsk (bokmål). Microsoft Edge har gode norske stemmer innebygd, og det har også de fleste mobiler.","No Norwegian voice found on this device, so pronunciation may sound odd. On Windows: Settings → Time & language → Speech → Add voices → Norwegian (Bokmål). Microsoft Edge has good Norwegian voices built in, and so do most phones.")+'</div>';
+  return h;
+}
+function viewLytte(){
+  if(LS) return viewClip();
+  let h='<section><div class="eyebrow">'+t("Lytteprøven","The listening test")+'</div><h2 style="font-size:1.6rem;margin:4px 0 6px">'+t("Lytt og svar","Listen and answer")+'</h2><p class="muted" style="margin:0;max-width:62ch">'+
+    bi("Les spørsmålet, trykk ▶ og lytt. B1-oppgaver kan du høre to ganger, B2-oppgaver bare én gang, som på prøven. Teksten vises når du har svart.","Read the question, press ▶ and listen. B1 tasks can be played twice, B2 tasks only once, like the test. The text appears once you've answered.")+'</p></section>';
+  h+='<section class="scard">'+voiceBar()+'</section>';
+  ["B1","B2"].forEach(lvl=>{
+    h+='<section><div class="modlabel">'+t("Nivå ","Level ")+lvl+(lvl==="B1"?t(" · to avspillinger"," · two plays"):t(" · én avspilling"," · one play"))+'</div><div class="tlist">'+
+      LISTEN.filter(c=>c.lvl===lvl).map(c=>{const d=qsDone(c.qs);
+        return '<button class="titem" data-act="listen" data-v="'+c.id+'"><span><b>'+esc(c.title)+'</b><span class="sub">'+esc(c.type)+'</span></span><span class="st'+(d===c.qs.length?' done':'')+'">'+(d===c.qs.length?'✓ ':'')+d+'/'+c.qs.length+'</span></button>'}).join("")+'</div></section>'});
+  return h;
+}
+function viewClip(){
+  const c=lisById[LS.id], mx=maxPlays(c), left=Math.max(0,mx-LS.plays);
+  const all=Object.keys(LS.ans).length===c.qs.length;
+  let h='<div class="row between"><button class="sbtn small ghost" data-act="lisclose">← '+t("Alle lytteoppgaver","All listening tasks")+'</button><span><span class="lvl '+c.lvl+'">'+c.lvl+'</span> <span class="muted small">'+esc(c.type)+'</span></span></div>';
+  h+='<section class="scard player"><h2 style="font-size:1.3rem">'+esc(c.title)+'</h2>';
+  if(LS.playing) h+='<button class="play on" data-act="lisstop" aria-label="'+t("Stopp","Stop")+'">■</button><div class="muted small">'+t("Spiller …","Playing …")+'</div>';
+  else{
+    const can=left>0||all||LS.show;
+    h+='<button class="play" data-act="lisplay"'+(can?'':' disabled')+' aria-label="'+t("Spill av","Play")+'">▶</button><div class="muted small">'+
+      (all||LS.show?t("Spill av så mange ganger du vil","Play as often as you like"):left?t(left+(left===1?" avspilling igjen":" avspillinger igjen"),left+(left===1?" play left":" plays left")):t("Ingen avspillinger igjen. Svar så godt du kan.","No plays left. Answer as best you can."))+'</div>';
+  }
+  h+='</section>';
+  c.qs.forEach((q,i)=>{h+=mcBlock(q,i,LS.ans[i],LS.ord[i],"lpick")});
+  if(all||LS.show){
+    h+='<section class="scard transcript" lang="nb"><div class="eyebrow" style="margin-bottom:8px">'+t("Det du hørte","What you heard")+'</div>'+
+      c.lines.map(l=>'<p>'+(c.lines.length>1?'<span class="who">'+(l[0]==="k"?"👩":l[0]==="m"?"👨":"📢")+'</span>':'')+l[1]+'</p>').join("")+'</section>';
+    const i=LISTEN.indexOf(c), nx=LISTEN[(i+1)%LISTEN.length];
+    h+='<div class="row"><button class="sbtn primary" data-act="listen" data-v="'+nx.id+'">'+t("Neste oppgave","Next task")+' →</button><button class="sbtn" data-act="listen" data-v="'+c.id+'">'+t("Prøv igjen","Try again")+'</button></div>';
+  }else h+='<div class="row"><button class="sbtn small ghost" data-act="lisshow">'+t("Jeg gir opp, vis teksten","I give up, show the text")+'</button></div>';
+  return h;
+}
+
+/* ════════════ SKRIVE ════════════ */
+const ARG_TASK=["Skriv en tekst der du argumenterer for ditt syn. Skriv cirka 250–350 ord.","Write a text arguing for your view. About 250–350 words."];
+function emailPrompt(e){
+  return '<div class="prompt" lang="nb"><div class="eyebrow">'+t("Oppgave 1 · e-post · cirka 80 ord eller mer","Task 1 · email · about 80 words or more")+'</div><div class="pt">'+e.s+'</div>'+
+    '<div>Skriv en e-post til '+e.to+'. Du kan for eksempel:</div><ul class="clean" style="margin-top:6px">'+EMAIL_POINTS.map(p=>'<li>'+p+'</li>').join("")+'</ul></div>';
+}
+function argPrompt(a){
+  return '<div class="prompt" lang="nb"><div class="eyebrow">'+t("Oppgave 2 · argumenter for et synspunkt · cirka 250–350 ord","Task 2 · argue for a point of view · about 250–350 words")+'</div><div class="pt">'+a.q+'</div><div>'+ARG_TASK[0]+'</div>'+
+    '<div class="muted small" style="margin-top:6px">Du kan for eksempel tenke på: '+a.h.join(", ")+'.</div></div>';
+}
+function words(s){return (String(s||"").match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)||[]).length}
+function target(kind){return kind==="e"?[80,180]:[250,350]}
+function wcBar(n,kind){const tg=target(kind), p=Math.min(100,Math.round(n/tg[1]*100));
+  const msg=n<tg[0]?t("for kort ennå","too short so far"):n<=tg[1]?t("bra lengde","good length"):t("lang nok, bruk tiden på å rette","long enough, spend time correcting");
+  return '<span><b>'+n+'</b> '+t("ord","words")+'</span><span class="bar"><i style="width:'+p+'%;background:'+(n<tg[0]?'var(--warn)':'var(--ok)')+'"></i></span><span>'+msg+'</span>';
+}
+function phraseBank(open){
+  return '<details class="phr"'+(open?' open':'')+'><summary>'+t("Nyttige uttrykk","Useful phrases")+'</summary><div class="phgrid">'+PHRASES.map(g=>'<div><h4>'+t(g.nb,g.en)+'</h4><ul>'+g.l.map(p=>'<li>'+bi('<span lang="nb">'+p[0]+'</span>',p[1])+'</li>').join("")+'</ul></div>').join("")+'</div></details>';
+}
+function structureTips(kind){
+  if(kind==="e") return '<ul class="clean small">'+
+    '<li>'+bi("Si kort hvem du er og hvorfor du skriver.","Say briefly who you are and why you're writing.")+'</li>'+
+    '<li>'+bi("Si tydelig hva du mener, og gi to eller tre begrunnelser med eksempler fra din situasjon.","Say clearly what you think and give two or three reasons with examples from your situation.")+'</li>'+
+    '<li>'+bi("Foreslå en løsning eller si hva du ønsker.","Suggest a solution or say what you want.")+'</li>'+
+    '<li>'+bi("Avslutt med en hilsen. Sikter du mot B2, skriv gjerne 120–180 ord.","End with a greeting. Aiming for B2? Write 120–180 words.")+'</li></ul>';
+  return '<ul class="clean small">'+
+    '<li>'+bi("<b>Innledning</b>: presenter temaet og si hva du mener.","<b>Introduction</b>: present the topic and say what you think.")+'</li>'+
+    '<li>'+bi("<b>2–3 avsnitt</b>, ett argument i hvert: påstand → forklaring → eksempel.","<b>2–3 paragraphs</b>, one argument each: claim → explanation → example.")+'</li>'+
+    '<li>'+bi("Et motargument som du svarer på, er lov, men ikke et krav.","A counter-argument that you answer is allowed but not required.")+'</li>'+
+    '<li>'+bi("<b>Avslutning</b>: oppsummer og gjenta synet ditt med andre ord.","<b>Conclusion</b>: sum up and restate your view in other words.")+'</li></ul>';
+}
+function viewSkrive(){
+  if(S.wx) return viewWx();
+  if(S.wt) return viewWriteTask();
+  if(S.wview&&TEXTS[S.wview]) return viewSavedText();
+  let h='<section><div class="eyebrow">'+t("Skriveprøven B1–B2","The B1–B2 writing test")+'</div><h2 style="font-size:1.6rem;margin:4px 0 6px">'+t("To oppgaver, to timer","Two tasks, two hours")+'</h2><p class="muted" style="margin:0;max-width:62ch">'+
+    bi("Oppgave 1 er en e-post der du klager på noe og begrunner meningen din. I oppgave 2 velger du én av to problemstillinger og argumenterer for ditt syn. Du må svare på begge. Stavekontrollen er slått av her, så du øver på å skrive riktig selv.","Task 1 is an email complaining about something and giving reasons. In task 2 you choose one of two issues and argue for your view. You must answer both. Spell-check is off here, so you practise getting it right yourself.")+'</p></section>';
+  h+='<section class="scard"><div class="row between"><div><div class="eyebrow">'+t("Prøvesett","Test set")+'</div><h3 style="font-size:1.2rem;margin-top:4px">'+t("Skriv begge oppgavene på tid","Write both tasks against the clock")+'</h3></div><button class="sbtn primary" data-act="wexam">'+t("Start","Start")+' · 2:00:00</button></div></section>';
+  h+='<section><div class="modlabel">'+t("Oppgave 1 · e-post","Task 1 · email")+'</div>'+structureTips("e")+'<div class="tlist" style="margin-top:10px">'+EMAIL.map(e=>taskItem("e",e.id,e.t,e.s)).join("")+'</div></section>';
+  h+='<section><div class="modlabel">'+t("Oppgave 2 · argumenterende tekst","Task 2 · argumentative text")+'</div>'+structureTips("a")+'<div class="tlist" style="margin-top:10px">'+ARG.map(a=>taskItem("a",a.id,a.t,a.q)).join("")+'</div></section>';
+  h+=textsList();
+  return h;
+}
+function taskItem(kind,id,title,sub){
+  const n=Family.entries(TEXTS).filter(([,x])=>x.task===id&&x.by===meId).length, d=S.drafts["p-"+id];
+  return '<button class="titem" data-act="wtask" data-v="'+kind+':'+id+'"><span><b>'+esc(title)+'</b><span class="sub" lang="nb">'+esc(sub)+'</span></span><span class="st'+(n?' done':'')+'">'+(n?'✓ '+n:d?t("utkast","draft"):'')+'</span></button>';
+}
+function textsList(){
+  const rows=Family.entries(TEXTS).sort((a,b)=>(b[1].ts||0)-(a[1].ts||0));
+  let h='<section><div class="modlabel">'+t("Tekstene våre","Our texts")+'</div>';
+  if(!rows.length) return h+'<p class="muted" style="margin:0">'+bi("Ingen tekster ennå. Lagrede tekster havner her, så andre i familien kan lese dem og gi tilbakemelding.","No texts yet. Saved texts land here so others in the family can read them and give feedback.")+'</p></section>';
+  return h+'<div class="tlist">'+rows.map(([id,x])=>{const fb=(x.fb||[]).length, d=new Date(x.ts||0);
+    return '<button class="titem" data-act="wview" data-v="'+id+'"><span><b>'+esc(x.title||"")+'</b><span class="sub">'+esc(x.by||"")+' · '+d.getDate()+'.'+(d.getMonth()+1)+'.'+d.getFullYear()+' · '+(x.words||0)+' '+t("ord","words")+(x.exam?' · '+t("prøvesett","test set"):'')+'</span></span><span class="st">'+(fb?'💬 '+fb:'')+'</span></button>'}).join("")+'</div></section>';
+}
+// The text box. Its content lives in S.drafts[key]; wireEditor() keeps the word count live without redrawing.
+function editor(key,kind){
+  const v=S.drafts[key]||"";
+  return '<textarea class="ed" id="ed" data-key="'+key+'" data-kind="'+kind+'" spellcheck="false" lang="nb" placeholder="'+t("Skriv her …","Write here …")+'">'+esc(v)+'</textarea><div class="wc" id="wc">'+wcBar(words(v),kind)+'</div>';
+}
+let draftTimer=null;
+function wireEditor(){
+  const ed=document.getElementById("ed"); if(!ed) return;
+  ed.addEventListener("input",()=>{
+    S.drafts[ed.dataset.key]=ed.value;
+    document.getElementById("wc").innerHTML=wcBar(words(ed.value),ed.dataset.kind);
+    clearTimeout(draftTimer); draftTimer=setTimeout(save,600);
+  });
+}
+function viewWriteTask(){
+  const w=S.wt, task=w.kind==="e"?emailById[w.id]:argById[w.id]; if(!task){S.wt=null;return viewSkrive()}
+  const key="p-"+w.id;
+  let h='<div class="row between"><button class="sbtn small ghost" data-act="wclose">← '+t("Alle oppgaver","All tasks")+'</button><span class="muted small">'+t("Øving uten tid","Practice, no clock")+'</span></div>';
+  h+=w.kind==="e"?emailPrompt(task):argPrompt(task);
+  h+=editor(key,w.kind);
+  h+='<div class="row"><button class="sbtn primary" data-act="wsave">'+t("Lagre i «Tekstene våre»","Save to «Our texts»")+'</button><button class="sbtn" data-act="wcheck">'+t("Sjekk teksten","Check the text")+'</button><button class="sbtn ghost danger" data-act="wclear">'+t("Tøm","Clear")+'</button></div>';
+  h+='<div id="checkout">'+(CHK===key?checkHtml(S.drafts[key]||"",w.kind):'')+'</div>';
+  h+=phraseBank(false);
+  h+='<details class="phr"><summary>'+t("Slik bygger du teksten","How to build the text")+'</summary><div style="margin-top:8px">'+structureTips(w.kind)+'</div></details>';
+  return h;
+}
+let CHK=null;   // which draft the "Sjekk teksten" results are showing for
+
+/* ---- the simple text checker ----
+   Looks for a handful of common B1–B2 mistakes with patterns. It's a hint list, not a grade. */
+const CONNECT=["derfor","likevel","dessuten","i tillegg","derimot","imidlertid","fordi","selv om","siden","ettersom","på grunn av","til tross for","for eksempel","blant annet","alt i alt","til slutt","for det første","for det andre","på den ene siden","på den andre siden","samtidig","dermed","slik at","for at","først","deretter","etterpå","kort sagt","med andre ord","avslutningsvis","etter min mening","uansett","i stedet for","ifølge","følgelig","heldigvis","dessverre","når","hvis","mens"];
+const W="(?<![\\p{L}])", WE="(?![\\p{L}])";   // word edges that understand æ, ø and å
+const SUBJ="(jeg|du|han|hun|vi|dere|de|det|man|folk|mange|noen|barna|foreldrene)";
+function snippet(s){const w=s.trim().split(/\s+/);return esc(w.slice(0,9).join(" ")+(w.length>9?" …":""))}
+function checkText(txt,kind){
+  const out=[], n=words(txt), tg=target(kind);
+  out.push(n<tg[0]?["w",t("Teksten har "+n+" ord. Anbefalt er cirka "+(kind==="e"?"80 eller mer":"250–350")+".","The text has "+n+" words. Recommended: about "+(kind==="e"?"80 or more":"250–350")+".")]:["g",t(n+" ord. Bra lengde.",n+" words. Good length.")]);
+  const paras=txt.split(/\n\s*\n/).filter(p=>p.trim()).length;
+  if(kind==="a"&&paras<3) out.push(["w",t("Del teksten i avsnitt med en tom linje mellom: innledning, argumenter, avslutning.","Split the text into paragraphs with a blank line between: introduction, arguments, conclusion.")]);
+  if(kind==="e"&&paras<2&&n>60) out.push(["w",t("Lag gjerne avsnitt, også i en e-post.","Use paragraphs, even in an email.")]);
+  const used=CONNECT.filter(c=>new RegExp(W+c.replace(/ /g,"\\s+")+WE,"iu").test(txt));
+  out.push(used.length>=5?["g",t("Du har brukt "+used.length+" ulike bindeord: ","You used "+used.length+" different linking words: ")+used.join(", ")+"."]:["w",t("Bare "+used.length+" ulike bindeord ("+(used.join(", ")||"ingen")+"). På B2 bør du variere mer: derfor, likevel, dessuten, i tillegg, selv om …","Only "+used.length+" different linking words ("+(used.join(", ")||"none")+"). For B2, vary more: derfor, likevel, dessuten, i tillegg, selv om …")]);
+  const sentences=txt.split(/(?<=[.!?])\s+|\n+/).map(s=>s.trim()).filter(Boolean);
+  const v2=new RegExp("^(derfor|likevel|dessuten|i tillegg|etterpå|deretter|heldigvis|dessverre|i dag|i morgen|i går|i fjor|til slutt|først|samtidig|ofte|noen ganger|for eksempel|på den ene siden|på den andre siden|etter min mening|alt i alt|i framtiden|nå|her|derimot|dermed|kanskje ikke)\\s*,?\\s+"+SUBJ+WE,"iu");
+  sentences.forEach(s=>{const m=s.match(v2); if(m) out.push(["w",t("Ordstilling? Etter «"+esc(m[1])+"» skal verbet komme før subjektet (inversjon): ","Word order? After «"+esc(m[1])+"» the verb comes before the subject (inversion): ")+"<q>"+snippet(s)+"</q>"])});
+  const biff=new RegExp(W+"(fordi|at|selv om|hvis|når|om|som|siden|mens|ettersom|dersom|slik at)\\s+("+SUBJ.slice(1,-1)+"|den|\\p{L}+(?:en|et|ene|a))\\s+(er|har|kan|vil|skal|må|bør|var|hadde|kunne|ville|skulle|måtte|burde|blir|ble|får|fikk|\\p{L}+(?:er|et|te|de))\\s+(ikke|aldri|alltid|også|ofte|bare|egentlig)"+WE,"giu");
+  (txt.match(biff)||[]).forEach(m=>out.push(["w",t("Leddsetning: «ikke/aldri/også …» skal stå foran verbet (BIFF): ","Subordinate clause: «ikke/aldri/også …» goes before the verb (BIFF): ")+"<q>"+esc(m)+"</q>"]));
+  const modal=new RegExp(W+"(kan|kunne|må|måtte|skal|skulle|vil|ville|bør|burde)\\s+(ikke\\s+)?å"+WE,"giu");
+  (txt.match(modal)||[]).forEach(m=>out.push(["w",t("Ingen «å» etter modalverb: ","No «å» after a modal verb: ")+"<q>"+esc(m)+"</q>"]));
+  const og=new RegExp(W+"(liker|prøver|prøvde|begynner|begynte|slutter|elsker|pleier|ønsker|håper|glemmer|glemte|trenger|planlegger|husker|for|lyst til|tid til|bestemte meg for)\\s+og\\s+\\p{L}+","giu");
+  (txt.match(og)||[]).forEach(m=>out.push(["w",t("Skal det være «å» her? ","Should this be «å»? ")+"<q>"+esc(m)+"</q>"]));
+  const aa=new RegExp(W+"å\\s+"+SUBJ+"\\s+\\p{L}+","giu");
+  (txt.match(aa)||[]).forEach(m=>out.push(["w",t("Skal det være «og» her? ","Should this be «og»? ")+"<q>"+esc(m)+"</q>"]));
+  const caps=/([\p{Ll},]\s+)(Mandag|Tirsdag|Onsdag|Torsdag|Fredag|Lørdag|Søndag|Januar|Februar|Mars|April|Mai|Juni|Juli|August|September|Oktober|November|Desember|Norsk|Engelsk|Arabisk|Polsk|Somalisk|Spansk|Fransk|Tysk|Ukrainsk|Russisk|Persisk|Tyrkisk|Litauisk|Svensk|Dansk|Nordmann|Nordmenn)(?![\p{L}])/gu;
+  let mm; const seen={}; while((mm=caps.exec(txt))){if(!seen[mm[2]]){seen[mm[2]]=1;out.push(["w",t("Liten forbokstav i dager, måneder, språk og nasjonaliteter: ","Lowercase for days, months, languages and nationalities: ")+"<q>"+esc(mm[2])+"</q> → <q>"+esc(mm[2].toLowerCase())+"</q>"])}}
+  if(/,\s*at(?![\p{L}])/iu.test(txt)) out.push(["w",t("Vanligvis skal det ikke være komma foran «at».","Usually no comma before «at».")]);
+  const dem=new RegExp(W+"(med|til|for|av|hos|fra|uten|mellom|ved|om|på)\\s+de\\s*[.,!?]","giu");
+  (txt.match(dem)||[]).forEach(m=>out.push(["w",t("Etter preposisjon: «dem», ikke «de»: ","After a preposition: «dem», not «de»: ")+"<q>"+esc(m)+"</q>"]));
+  sentences.forEach(s=>{if(words(s)>40) out.push(["w",t("Veldig lang setning. Del den gjerne opp: ","Very long sentence. Consider splitting it: ")+"<q>"+snippet(s)+"</q>"])});
+  if(sentences.length>=6){const j=sentences.filter(s=>/^jeg(?![\p{L}])/iu.test(s)).length; if(j/sentences.length>=0.45) out.push(["w",t("Mange setninger starter med «Jeg». Varier: «Derfor …», «Etter min mening …», «I tillegg …» – og husk inversjon.","Many sentences start with «Jeg». Vary it: «Derfor …», «Etter min mening …», «I tillegg …» – and remember inversion.")])}
+  return out;
+}
+function checkHtml(txt,kind){
+  if(!txt.trim()) return '<p class="muted">'+t("Skriv noe først.","Write something first.")+'</p>';
+  const r=checkText(txt,kind);
+  return '<section class="scard"><div class="eyebrow" style="margin-bottom:8px">'+t("Maskinsjekk","Machine check")+'</div><ul class="checks">'+r.map(x=>'<li class="'+x[0]+'">'+(x[0]==="g"?"✓ ":"⚠️ ")+x[1]+'</li>').join("")+'</ul>'+
+    '<p class="muted small" style="margin:10px 0 0">'+bi("Dette er en enkel maskinsjekk som finner noen vanlige feil, men langt fra alle. Den kan også ta feil. Be gjerne noen lese teksten.","This is a simple machine check that finds some common mistakes, far from all. It can also be wrong. Ask someone to read the text.")+'</p>'+
+    '<div class="eyebrow" style="margin:14px 0 6px">'+t("Les over selv","Check it yourself")+'</div><ul class="clean small">'+
+    ["Har jeg svart på alt oppgaven spør om?|Did I answer everything the task asks?","Har jeg sagt tydelig hva jeg mener, og begrunnet det?|Did I say clearly what I think, and why?","Står verbet på plass 2 i alle helsetninger?|Is the verb in second place in every main clause?","Står «ikke» foran verbet i leddsetningene?|Does «ikke» come before the verb in subordinate clauses?","Har jeg sjekket og/å, de/dem og sin/hans?|Have I checked og/å, de/dem and sin/hans?","Har adjektivene riktig endelse (et stort hus, de store husene)?|Do adjectives have the right ending?"].map(s=>{const p=s.split("|");return '<li>'+bi(p[0],p[1])+'</li>'}).join("")+'</ul></section>';
+}
+async function saveText(kind,id,txt,exam,mins){
+  const task=kind==="e"?emailById[id]:argById[id];
+  return store.add("texts",{kind:kind,task:id,title:(kind==="e"?t("E-post: ","Email: "):t("Tekst: ","Text: "))+task.t,text:txt,words:words(txt),exam:!!exam,mins:mins||null,fb:[]});
+}
+function viewSavedText(){
+  const x=TEXTS[S.wview], task=x.kind==="e"?emailById[x.task]:argById[x.task], d=new Date(x.ts||0), mine=x.by===meId;
+  let h='<div class="row between"><button class="sbtn small ghost" data-act="wviewclose">← '+t("Tilbake","Back")+'</button>'+(mine?'<button class="sbtn small ghost danger" data-act="wdel">'+t("Slett","Delete")+'</button>':'')+'</div>';
+  h+='<section><div class="eyebrow">'+esc(x.by||"")+' · '+d.getDate()+'.'+(d.getMonth()+1)+'.'+d.getFullYear()+(x.exam?' · '+t("prøvesett","test set"):'')+(x.mins?' · '+x.mins+' min':'')+'</div><h2 style="font-size:1.5rem;margin-top:4px">'+esc(x.title||"")+'</h2></section>';
+  if(task) h+=x.kind==="e"?emailPrompt(task):argPrompt(task);
+  h+='<div class="wtext" lang="nb">'+esc(x.text||"")+'</div><div class="muted small">'+(x.words||0)+' '+t("ord","words")+'</div>';
+  h+=checkHtml(x.text||"",x.kind);
+  h+='<section class="scard"><div class="eyebrow" style="margin-bottom:6px">'+t("Tilbakemeldinger","Feedback")+'</div>';
+  (x.fb||[]).forEach(f=>{const fd=new Date(f.ts||0);h+='<div class="fb"><div class="who">'+esc(f.by||"")+' · '+fd.getDate()+'.'+(fd.getMonth()+1)+'</div><div>'+esc(f.text||"")+'</div></div>'});
+  if(!(x.fb||[]).length) h+='<p class="muted small" style="margin:0 0 8px">'+bi("Ingen ennå. Ros, rettelser og forslag er like velkomne.","None yet. Praise, corrections and suggestions are all welcome.")+'</p>';
+  h+='<textarea class="fbin" id="fbin" placeholder="'+t("Skriv en tilbakemelding …","Write some feedback …")+'"></textarea><div class="row" style="margin-top:8px"><button class="sbtn primary" data-act="wfb">'+t("Send tilbakemelding","Post feedback")+'</button></div></section>';
+  return h;
+}
+
+/* ---- the 2-hour test set ---- */
+function newWx(){
+  const e=pick(EMAIL), opts=shuffle(ARG.slice()).slice(0,2).map(a=>a.id);
+  S.wx={start:Date.now(),dur:7200,t1:e.id,opts:opts,t2:null,cur:1,done:false,confirm:false};
+  S.drafts.x1="";S.drafts.x2="";CHK=null;save();
+}
+function wxLeft(){return Math.max(0,Math.round(S.wx.dur-(Date.now()-S.wx.start)/1000))}
+function fmt(s){const hh=Math.floor(s/3600),m=Math.floor(s%3600/60),ss=s%60;return (hh?hh+":":"")+String(m).padStart(2,"0")+":"+String(ss).padStart(2,"0")}
+function viewWx(){
+  const E=S.wx; if(E.done) return viewWxResult();
+  let h='<div class="row between"><div><div class="eyebrow">'+t("Prøvesett skriving","Writing test set")+'</div><div class="seg" style="margin-top:6px"><button data-act="wxtab" data-v="1" aria-pressed="'+(E.cur===1)+'">'+t("Oppgave 1","Task 1")+' · '+words(S.drafts.x1)+'</button><button data-act="wxtab" data-v="2" aria-pressed="'+(E.cur===2)+'">'+t("Oppgave 2","Task 2")+' · '+words(S.drafts.x2)+'</button></div></div><div class="timer'+(wxLeft()<600?' low':'')+'" id="wtimer">'+fmt(wxLeft())+'</div></div>';
+  if(E.cur===1){h+=emailPrompt(emailById[E.t1])+editor("x1","e")}
+  else if(!E.t2){
+    h+='<section class="scard"><div class="eyebrow">'+t("Oppgave 2 · velg én","Task 2 · choose one")+'</div><p style="margin:6px 0 12px">'+t("Les begge, og velg den du har mest å si om.","Read both and choose the one you have most to say about.")+'</p><div class="tlist">'+
+      E.opts.map(id=>{const a=argById[id];return '<button class="titem" data-act="wxpick" data-v="'+id+'"><span><b>'+esc(a.t)+'</b><span class="sub" lang="nb">'+esc(a.q)+'</span></span><span class="st">'+t("Velg","Choose")+' →</span></button>'}).join("")+'</div></section>';
+  }else{h+=argPrompt(argById[E.t2])+editor("x2","a")}
+  h+='<div class="row between"><button class="sbtn primary" data-act="wxsubmit">'+t("Lever","Hand in")+'</button><button class="sbtn small ghost danger" data-act="wxabort">'+t("Avbryt prøvesettet","Abandon test set")+'</button></div>';
+  if(E.confirm){const miss=(!words(S.drafts.x1)?1:0)+(!E.t2||!words(S.drafts.x2)?1:0);
+    h+='<div class="confirm"><b>'+(miss?t("Du må svare på begge oppgavene for å få et resultat på prøven. Levere likevel?","You must answer both tasks to get a result on the test. Hand in anyway?"):t("Vil du levere nå? Har du lest over begge tekstene?","Hand in now? Have you checked both texts?"))+'</b><div class="row"><button class="sbtn primary" data-act="wxconfirm">'+t("Ja, lever","Yes, hand in")+'</button><button class="sbtn" data-act="wxcancel">'+t("Fortsett å skrive","Keep writing")+'</button></div></div>'}
+  h+=phraseBank(false);
+  return h;
+}
+async function finishWx(){
+  const E=S.wx; if(!E||E.done) return;
+  E.done=true; E.used=Math.min(E.dur,Math.round((Date.now()-E.start)/1000)); save();
+  const mins=Math.round(E.used/60);
+  if(words(S.drafts.x1)) await saveText("e",E.t1,S.drafts.x1,true,mins);
+  if(E.t2&&words(S.drafts.x2)) await saveText("a",E.t2,S.drafts.x2,true,mins);
+  render();
+}
+function viewWxResult(){
+  const E=S.wx;
+  let h='<section class="scard result"><div class="eyebrow">'+t("Levert","Handed in")+'</div><div class="big mono">'+fmt(E.used||0)+'</div><p class="muted" style="margin:0">'+t("brukt av 2:00:00. Tekstene er lagret i «Tekstene våre».","used of 2:00:00. The texts are saved in «Our texts».")+'</p>'+
+    '<div class="row" style="margin-top:12px"><button class="sbtn primary" data-act="wxdone">'+t("Ferdig","Done")+'</button><button class="sbtn" data-act="wexam">'+t("Nytt prøvesett","New test set")+'</button></div></section>';
+  h+='<h3 style="font-size:1.2rem">'+t("Oppgave 1","Task 1")+'</h3>'+checkHtml(S.drafts.x1||"","e");
+  if(E.t2) h+='<h3 style="font-size:1.2rem">'+t("Oppgave 2","Task 2")+'</h3>'+checkHtml(S.drafts.x2||"","a");
+  return h;
+}
+
+/* ════════════ SNAKKE ════════════ */
+const SP_TYPES={
+  men:{nb:"Si din mening",en:"Give your opinion",d:["Alene · 2–3 min, så oppfølgingsspørsmål","Alone · 2–3 min, then follow-up questions"],list:MENING,phases:[["talk",180,"Snakk","Speak"],["follow",120,"Oppfølging","Follow-up"]]},
+  sam:{nb:"Utveksle meninger",en:"Exchange opinions",d:["Med en partner · 5–7 min","With a partner · 5–7 min"],list:SAMTALE,phases:[["talk",420,"Snakk sammen","Talk together"]]},
+  paa:{nb:"Ta stilling til en påstand",en:"Take a stand on a statement",d:["Alene · tenketid, 2–3 min, så 2–3 min spørsmål","Alone · thinking time, 2–3 min, then 2–3 min questions"],list:PASTAND,phases:[["think",60,"Tenketid","Think"],["talk",180,"Snakk","Speak"],["follow",180,"Oppfølging","Follow-up"]]}
+};
+let SPT={ph:-1,end:0,over:false};   // the speaking clock: which phase, when it ends
+let REC={on:false,mr:null,chunks:[],url:null};
+function spItem(){const ty=SP_TYPES[S.sp.t];const it=ty.list[S.sp.i%ty.list.length];return typeof it==="string"?{q:it,f:[]}:it}
+function spLeft(){return Math.round((SPT.end-Date.now())/1000)}
+function viewSnakke(){
+  const ty=SP_TYPES[S.sp.t], it=spItem(), ph=SPT.ph;
+  let h='<section><div class="eyebrow">'+t("Muntlig prøve B1–B2","B1–B2 speaking test")+'</div><h2 style="font-size:1.6rem;margin:4px 0 6px">'+t("Snakk høyt, på tid","Speak aloud, against the clock")+'</h2><p class="muted" style="margin:0;max-width:62ch">'+
+    bi("Prøven tar 20–25 minutter og tas sammen med en annen kandidat. Sensor ser på flyt, uttale, ordforråd og grammatikk. Øv med noen i familien, eller alene med opptak.","The test takes 20–25 minutes with another candidate. The examiner looks at fluency, pronunciation, vocabulary and grammar. Practise with someone in the family, or alone with a recording.")+'</p></section>';
+  h+='<div class="stype">'+Object.keys(SP_TYPES).map(k=>{const x=SP_TYPES[k];return '<button data-act="sptype" data-v="'+k+'" aria-pressed="'+(S.sp.t===k)+'"><b>'+t(x.nb,x.en)+'</b><span>'+t(x.d[0],x.d[1])+'</span></button>'}).join("")+'</div>';
+  h+='<section class="scard" style="display:flex;flex-direction:column;gap:14px">';
+  h+='<div class="row between"><div class="eyebrow">'+(S.sp.t==="paa"?t("Påstand","Statement"):t("Spørsmål","Question"))+' '+((S.sp.i%ty.list.length)+1)+'/'+ty.list.length+'</div><div class="row"><button class="sbtn small ghost" data-act="spsay" aria-label="'+t("Les opp","Read aloud")+'">🔊 '+t("Hør","Listen")+'</button><button class="sbtn small" data-act="spnew">🎲 '+t("Ny oppgave","New task")+'</button></div></div>';
+  h+='<div class="claim" lang="nb">'+(S.sp.t==="paa"?'«'+it.q+'»':it.q)+'</div>';
+  if(S.sp.t==="paa") h+='<p class="muted small" style="margin:0">'+bi("Ta stilling: er du enig eller uenig? Begrunn meningen din med argumenter og eksempler.","Take a stand: do you agree or disagree? Back it up with arguments and examples.")+'</p>';
+  if(S.sp.t==="sam") h+='<p class="muted small" style="margin:0">'+bi("Snakk sammen to og to. Eksaminator stiller ikke oppfølgingsspørsmål her, så dere må holde samtalen i gang selv: spør hverandre, vis enighet og uenighet, og begrunn.","Talk in pairs. The examiner doesn't ask follow-up questions here, so keep the conversation going yourselves: ask each other, agree and disagree, give reasons.")+'</p>';
+  // phases
+  h+='<div class="phase">'+ty.phases.map((p,i)=>'<span class="'+(i===ph?'on':i<ph||ph>=ty.phases.length?'ok':'')+'">'+t(p[2],p[3])+' · '+Math.round(p[1]/60)+' min</span>').join("")+'</div>';
+  if(ph<0) h+='<div class="row"><button class="sbtn primary" data-act="spgo">▶ '+t("Start","Start")+' '+t(ty.phases[0][2],ty.phases[0][3]).toLowerCase()+'</button></div>';
+  else if(ph<ty.phases.length){
+    const p=ty.phases[ph], left=spLeft();
+    h+='<div class="bigtime'+(left<0?' over':'')+'" id="stimer">'+(left<0?'+':'')+fmt(Math.abs(left))+'</div>';
+    if(p[0]==="think") h+='<p class="muted small" style="margin:0">'+bi("Skriv ned noen stikkord på et ark: hva du mener, to argumenter, ett eksempel.","Jot down a few keywords on paper: what you think, two arguments, one example.")+'</p>';
+    if(p[0]==="follow"&&it.f.length) h+='<div><div class="eyebrow" style="margin-bottom:6px">'+t("Eksaminator spør","The examiner asks")+'</div><ul class="clean" lang="nb">'+it.f.map((f,i)=>'<li>'+f+' <button class="sbtn small ghost" data-act="spsayf" data-v="'+i+'" aria-label="'+t("Les opp","Read aloud")+'">🔊</button></li>').join("")+'</ul></div>';
+    const last=ph===ty.phases.length-1;
+    h+='<div class="row"><button class="sbtn primary" data-act="spgo">'+(last?t("Ferdig","Finish"):t("Videre:","Next:")+' '+t(ty.phases[ph+1][2],ty.phases[ph+1][3]).toLowerCase())+' →</button><button class="sbtn ghost" data-act="spreset">'+t("Start på nytt","Restart")+'</button></div>';
+  }else{
+    h+='<div class="verdict ok"><b>'+t("Bra jobbet!","Well done!")+'</b> '+bi("Hør på opptaket: Begrunnet du meningen din? Brukte du bindeord? Hvor stoppet du opp?","Listen to the recording: Did you give reasons? Use linking words? Where did you get stuck?")+'</div>'+
+      '<div class="row"><button class="sbtn primary" data-act="spnew">🎲 '+t("Ny oppgave","New task")+'</button><button class="sbtn" data-act="spreset">'+t("Samme oppgave igjen","Same task again")+'</button></div>';
+  }
+  h+='</section>';
+  // recording
+  const canRec=!!(navigator.mediaDevices&&window.MediaRecorder);
+  h+='<section class="scard"><div class="row between"><div><div class="eyebrow">'+t("Opptak","Recording")+'</div><div class="muted small">'+bi("Opptaket blir bare i denne nettleseren og lastes aldri opp.","The recording stays in this browser and is never uploaded.")+'</div></div>'+
+    (canRec?'<button class="sbtn'+(REC.on?' danger':'')+'" data-act="rec">'+(REC.on?'⏹ '+t("Stopp opptak","Stop recording"):'🎙️ '+t("Ta opp deg selv","Record yourself"))+'</button>':'<span class="muted small">'+t("Ikke støttet i denne nettleseren","Not supported in this browser")+'</span>')+'</div>'+
+    (REC.url&&!REC.on?'<audio controls src="'+REC.url+'" style="width:100%;margin-top:12px"></audio>':'')+'</section>';
+  h+=phraseBank(false);
+  return h;
+}
+function beep(){try{const a=new (window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.value=.15;o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.25);setTimeout(()=>a.close(),400)}catch(e){}}
+async function toggleRec(){
+  if(REC.on){REC.mr.stop();return}
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    REC.chunks=[]; REC.mr=new MediaRecorder(stream);
+    REC.mr.ondataavailable=e=>{if(e.data.size)REC.chunks.push(e.data)};
+    REC.mr.onstop=()=>{stream.getTracks().forEach(tr=>tr.stop());if(REC.url)URL.revokeObjectURL(REC.url);REC.url=URL.createObjectURL(new Blob(REC.chunks,{type:REC.mr.mimeType||"audio/webm"}));REC.on=false;render()};
+    REC.mr.start(); REC.on=true; render();
+  }catch(e){alert(t("Fikk ikke tilgang til mikrofonen.","Couldn't access the microphone."))}
+}
+
+/* ════════════ ORD (word cards) ════════════ */
+let K=null;
+function startCards(deck){
+  let pool=CARDS.filter(c=>deck==="all"||c.deck===deck); shuffle(pool); pool.sort((a,b)=>prio(a)-prio(b));
+  K={deck:deck,ids:pool.map(c=>c.id),i:0,flip:false,known:0};
+}
+function viewOrd(){
+  if(!K||K.deck!==S.deck) startCards(S.deck);
+  let h='<section><div class="chips">'+'<button class="chip" data-act="deck" data-v="all" aria-pressed="'+(S.deck==="all")+'">'+t("Alle","All")+'<span class="n">'+mastery(CARDS)+'/'+CARDS.length+'</span></button>'+
+    DECKS.map(d=>{const l=CARDS.filter(c=>c.deck===d.id);return '<button class="chip" data-act="deck" data-v="'+d.id+'" aria-pressed="'+(S.deck===d.id)+'">'+t(d.nb,d.en)+'<span class="n">'+mastery(l)+'/'+l.length+'</span></button>'}).join("")+'</div>'+
+    '<div class="row" style="margin-top:12px"><div class="seg"><button data-act="dir" data-v="nb" aria-pressed="'+(S.dir==="nb")+'">Norsk → English</button><button data-act="dir" data-v="en" aria-pressed="'+(S.dir==="en")+'">English → norsk</button></div></div></section>';
+  if(K.i>=K.ids.length) return h+'<section class="scard result"><div class="eyebrow">'+t("Bunken er ferdig","Deck finished")+'</div><div class="big">'+K.known+' / '+K.ids.length+'</div><p class="muted" style="margin:0">'+t("kort du kunne","cards you knew")+'</p><div class="row" style="margin-top:12px"><button class="sbtn primary" data-act="cardsre">'+t("Start på nytt","Start again")+'</button></div></section>';
+  const c=cardById[K.ids[K.i]], fwd=S.dir==="nb";
+  h+='<div class="row between"><span class="muted mono" style="font-size:.85rem">'+(K.i+1)+' / '+K.ids.length+'</span><span class="muted" style="font-size:.85rem">'+t(deckById[c.deck].nb,deckById[c.deck].en)+'</span></div>';
+  h+='<button class="fcard'+(K.flip?' flipped':'')+'" data-act="flip"><span class="side">'+(K.flip?t('Svar','Answer'):t('Trykk for å snu','Tap to flip'))+'</span>'+
+    '<span class="front"'+(fwd?' lang="nb"':'')+'>'+esc(fwd?c.nb:c.en)+'</span>'+
+    (K.flip?'<span class="ans"'+(fwd?'':' lang="nb"')+'>'+esc(fwd?c.en:c.nb)+'</span><span class="ex" lang="nb">'+esc(c.ex)+'</span>':'')+'</button>';
+  h+='<div class="row">'+(K.flip?'<button class="sbtn primary" data-act="cardyes">'+t("Kunne det","Knew it")+'</button><button class="sbtn" data-act="cardno">'+t("Øv mer","Need practice")+'</button>':'<button class="sbtn primary" data-act="flip">'+t("Vis svar","Show answer")+'</button><button class="sbtn ghost" data-act="cardskip">'+t("Hopp over","Skip")+'</button>')+
+    (canSpeak&&(fwd||K.flip)?'<button class="sbtn ghost" data-act="cardsay">🔊 '+t("Uttale","Pronounce")+'</button>':'')+'</div>';
+  h+='<p class="muted small" style="margin:0">'+t("Tastatur: mellomrom snur kortet.","Keyboard: space flips the card.")+'</p>';
+  return h;
+}
+
+const VIEWS={plan:viewPlan,gram:viewGram,lese:viewLese,lytte:viewLytte,skrive:viewSkrive,snakke:viewSnakke,ord:viewOrd};
+
+/* ---------- the one-second clock (writing test set + speaking timer) ---------- */
+let tickId=null;
+function startTicker(){
+  if(tickId) return;
+  tickId=setInterval(()=>{
+    const wx=S.wx&&!S.wx.done, sp=SPT.ph>=0&&SPT.ph<SP_TYPES[S.sp.t].phases.length;
+    if(!wx&&!sp){clearInterval(tickId);tickId=null;return}
+    if(wx){const r=wxLeft(),el=document.getElementById("wtimer");
+      if(el){el.textContent=fmt(r);el.classList.toggle("low",r<600)}
+      if(r<=0) finishWx();}
+    if(sp){const r=spLeft(),el=document.getElementById("stimer");
+      if(el){el.textContent=(r<0?"+":"")+fmt(Math.abs(r));el.classList.toggle("over",r<0)}
+      if(r<=0&&!SPT.over){SPT.over=true;beep()}}
+  },1000);
+}
+
+/* ---------- actions (every button has data-act="name" and maybe data-v="value") ---------- */
+function go(tab){if(tab!==S.tab){stopSpeak();if(LS)LS.playing=false}S.tab=tab;save();render();window.scrollTo(0,0)}
+const ACT={
+  lang(v){S.lang=v;save();render()},
+  tab(v){go(v)},
+  day(v){S.days[v]=!S.days[v];saveProgress();render()},
+  // grammar
+  gtopic(v){S.gr=v;save();render()},
+  gram(v){S.gSel=[v];if(v!=="all")S.gr=v;startDrill(S.gSel,false);go("gram")},
+  drillweak(){S.gSel=["all"];startDrill(["all"],true);go("gram")},
+  gagain(){startDrill(S.gSel,P&&P.weakOnly);render()},
+  gquit(){P=null;render();window.scrollTo(0,0)},
+  pick(v){
+    if(!P||P.ans!==null) return;
+    const a=+v, id=P.queue[P.i], ok=a===0;
+    P.ans=a; P.done++; if(ok)P.right++; record(id,ok);
+    if(!ok&&!P.requeued[id]){P.requeued[id]=1;P.queue.splice(Math.min(P.queue.length,P.i+5),0,id)}
+    render(); const n=document.getElementById("nextbtn"); if(n) n.focus({preventScroll:true});
+  },
+  next(){if(!P)return;P.i++;P.ans=null;
+    if(P.i<P.queue.length) P.order=shuffle(range(qById[P.queue[P.i]].o.length));
+    render();window.scrollTo(0,0)},
+  // reading
+  read(v){openRead(v);go("lese")},
+  readclose(){RD=null;render();window.scrollTo(0,0)},
+  rpick(v){const p=v.split(":"),n=+p[0],oi=+p[1];if(!RD||RD.ans[n]!==undefined)return;RD.ans[n]=oi;record(readById[RD.id].qs[n].id,oi===0);render()},
+  // listening
+  listen(v){openListen(v);go("lytte")},
+  lisclose(){stopSpeak();LS=null;render();window.scrollTo(0,0)},
+  lisplay(){const c=lisById[LS.id];const all=Object.keys(LS.ans).length===c.qs.length;
+    if(!all&&!LS.show&&LS.plays>=maxPlays(c))return;
+    if(!all&&!LS.show)LS.plays++;
+    LS.playing=true;render();
+    const id=LS.id; speak(c.lines,()=>{if(LS&&LS.id===id){LS.playing=false;render()}})},
+  lisstop(){stopSpeak();if(LS)LS.playing=false;render()},
+  lisshow(){LS.show=true;render()},
+  lpick(v){const p=v.split(":"),n=+p[0],oi=+p[1];if(!LS||LS.ans[n]!==undefined)return;LS.ans[n]=oi;record(lisById[LS.id].qs[n].id,oi===0);render()},
+  // writing
+  write(v){S.wt=null;S.wview=null;go("skrive");const el=document.querySelectorAll(".modlabel")[v==="a"?1:0];if(el)el.scrollIntoView({block:"start"})},
+  wtask(v){const p=v.split(":");S.wt={kind:p[0],id:p[1]};S.wview=null;CHK=null;save();render();window.scrollTo(0,0)},
+  wclose(){S.wt=null;CHK=null;save();render();window.scrollTo(0,0)},
+  wcheck(){CHK="p-"+S.wt.id;render();const c=document.getElementById("checkout");if(c)c.scrollIntoView({block:"start",behavior:"smooth"})},
+  wclear(){if(!confirm(t("Slette alt du har skrevet på denne oppgaven?","Delete everything you've written for this task?")))return;delete S.drafts["p-"+S.wt.id];CHK=null;save();render()},
+  async wsave(){const w=S.wt,key="p-"+w.id,txt=S.drafts[key]||"";
+    if(!words(txt)){alert(t("Skriv noe først.","Write something first."));return}
+    const id=await saveText(w.kind,w.id,txt,false,null);
+    delete S.drafts[key];S.wt=null;S.wview=id;CHK=null;save();render();window.scrollTo(0,0)},
+  wview(v){S.wview=v;S.wt=null;save();render();window.scrollTo(0,0)},
+  wviewclose(){S.wview=null;save();render();window.scrollTo(0,0)},
+  wdel(){if(!confirm(t("Slette denne teksten for godt?","Delete this text for good?")))return;store.remove("texts",S.wview);S.wview=null;save();render()},
+  wfb(){const el=document.getElementById("fbin"),txt=(el&&el.value||"").trim();if(!txt)return;
+    const x=TEXTS[S.wview];store.update("texts",S.wview,{fb:(x.fb||[]).concat({by:meId,ts:Date.now(),text:txt})});el.value=""},
+  wexam(){if(S.wx&&!S.wx.done&&!confirm(t("Starte et nytt prøvesett? Det du har skrevet nå, blir borte.","Start a new test set? What you've written now will be lost.")))return;newWx();S.wt=null;S.wview=null;go("skrive")},
+  wxtab(v){S.wx.cur=+v;S.wx.confirm=false;save();render()},
+  wxpick(v){S.wx.t2=v;save();render()},
+  wxsubmit(){S.wx.confirm=true;save();render();const c=document.querySelector(".confirm");if(c)c.scrollIntoView({block:"center"})},
+  wxcancel(){S.wx.confirm=false;save();render()},
+  wxconfirm(){finishWx();window.scrollTo(0,0)},
+  wxabort(){if(!confirm(t("Avbryte prøvesettet? Tekstene blir ikke lagret.","Abandon the test set? The texts won't be saved.")))return;S.wx=null;save();render()},
+  wxdone(){S.wx=null;S.drafts.x1="";S.drafts.x2="";save();render();window.scrollTo(0,0)},
+  // speaking
+  speak(v){S.sp={t:v,i:Math.floor(Math.random()*SP_TYPES[v].list.length)};SPT={ph:-1,end:0,over:false};save();go("snakke")},
+  sptype(v){stopSpeak();S.sp={t:v,i:Math.floor(Math.random()*SP_TYPES[v].list.length)};SPT={ph:-1,end:0,over:false};save();render()},
+  spnew(){stopSpeak();const n=SP_TYPES[S.sp.t].list.length;let i=S.sp.i;if(n>1)while(i===S.sp.i)i=Math.floor(Math.random()*n);S.sp.i=i;SPT={ph:-1,end:0,over:false};save();render()},
+  spreset(){SPT={ph:-1,end:0,over:false};render()},
+  spgo(){const ph=SP_TYPES[S.sp.t].phases;SPT.ph++;SPT.over=false;
+    if(SPT.ph<ph.length)SPT.end=Date.now()+ph[SPT.ph][1]*1000;
+    else{S.spk=(S.spk||0)+1;saveProgress()}
+    render()},
+  spsay(){speak([["n",spItem().q]])},
+  spsayf(v){speak([["m",spItem().f[+v]]])},
+  rec(){toggleRec()},
+  // word cards
+  deck(v){S.deck=v;K=null;save();go("ord")},
+  dir(v){S.dir=v;save();render()},
+  cardsre(){K=null;render()},
+  flip(){K.flip=!K.flip;render()},
+  cardyes(){record(K.ids[K.i],true);K.known++;K.i++;K.flip=false;render()},
+  cardno(){const id=K.ids[K.i];record(id,false);K.ids.splice(Math.min(K.ids.length,K.i+6),0,id);K.i++;K.flip=false;render()},
+  cardskip(){K.i++;K.flip=false;render()},
+  cardsay(){const c=cardById[K.ids[K.i]];speak([["n",c.nb]].concat(K.flip?[["n",c.ex]]:[]))}
+};
+document.addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(!b||b.disabled)return;const f=ACT[b.dataset.act];if(f)f(b.dataset.v,b)});
+// Settings in <select>/<input> elements (voice, speed, practice mode).
+document.addEventListener("change",e=>{const el=e.target.closest("[data-chg]");if(!el)return;
+  const k=el.dataset.chg;
+  if(k==="voice")S.voice=el.value; else if(k==="rate")S.rate=+el.value; else if(k==="lsfree")S.lsFree=el.checked;
+  save();render()});
+// Keyboard: 1–4 answer, Enter / → next (grammar), Space flips a word card.
+document.addEventListener("keydown",e=>{
+  if(e.target.closest("input,select,textarea")||e.metaKey||e.ctrlKey||e.altKey) return;
+  if((e.key===" "||e.key==="Enter")&&e.target.closest("button")) return;
+  const k=e.key;
+  if(S.tab==="gram"&&P&&P.i<P.queue.length){
+    if(P.ans===null&&/^[1-9]$/.test(k)&&+k<=P.order.length){ACT.pick(String(P.order[+k-1]));e.preventDefault()}
+    else if(P.ans!==null&&(k==="Enter"||k==="ArrowRight")){ACT.next();e.preventDefault()}
+  }else if(S.tab==="ord"&&K&&K.i<K.ids.length){
+    if(k===" "){ACT.flip();e.preventDefault()}
+  }
+});
+// Tidy up anything left over from an older visit.
+if(S.wx&&!S.wx.done&&(!emailById[S.wx.t1]||wxLeft()<=0)){if(emailById[S.wx.t1])finishWx();else S.wx=null}
+if(S.wt&&!(S.wt.kind==="e"?emailById[S.wt.id]:argById[S.wt.id])) S.wt=null;
+if(!SP_TYPES[S.sp.t]) S.sp={t:"paa",i:0};
+if(!chById[S.gr]) S.gr="ord";
+if(S.deck!=="all"&&!deckById[S.deck]) S.deck="kon";
+if(!VIEWS[S.tab]) S.tab="plan";
+render();
+})();
+</script>
+</body>
+</html>
