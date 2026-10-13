@@ -327,7 +327,8 @@ function viewPlan(){
   const total=Q.length, m=mastery(Q);
   const pct=Math.round(m/total*100);
   let h='<section class="hero"><div class="eyebrow">Fem dager igjen</div><h2>13 kapitler. 36 oppgaver. Minst 24 riktige.</h2>'+
-    '<p>'+bi("Alt her er laget fra pensum på samfunnskunnskap.no. Les et kapittel, øv på spørsmålene til du svarer riktig, og ta prøven under tid før den ekte dagen.","Everything here comes from the curriculum at samfunnskunnskap.no. Read a chapter, practise until you answer correctly, then take timed mock exams before the real day.")+'</p></section>';
+    '<p>'+bi("Alt her er laget fra pensum på samfunnskunnskap.no. Les et kapittel, øv på spørsmålene til du svarer riktig, og ta prøven under tid før den ekte dagen.","Everything here comes from the curriculum at samfunnskunnskap.no. Read a chapter, practise until you answer correctly, then take timed mock exams before the real day.")+'</p>'+
+    '<div class="row" style="margin-top:14px"><button class="sbtn primary" data-act="drilltough">🔥 Øv på de tøffeste ('+toughPool(["all"]).length+')</button></div></section>';
   h+='<section class="facts" aria-label="Om prøven">'+
     fact("36","oppgaver","tasks")+fact("3","svaralternativer, ett riktig","options, one correct")+
     fact("24","riktige for å bestå","correct to pass")+fact("60","minutter maks","minutes max")+fact("NO","prøven er på norsk","the test is in Norwegian")+'</section>';
@@ -386,6 +387,29 @@ function startDrill(sel,weakOnly){
   shuffle(pool); pool.sort((a,b)=>prio(a)-prio(b));
   P={queue:pool.map(x=>x.id),i:0,ans:null,order:shuffle([0,1,2]),right:0,done:0,requeued:{},weakOnly:!!weakOnly};
 }
+
+/* "Toughest" questions: a score for how hard a question is FOR YOU.
+     +3  you got it wrong the last time
+     +2  for every time you have got it wrong
+     -1  for every time you have got it right
+     +2  if it's about a number or a year (the fiddly ones people mix up)
+   Anything scoring above 0 counts as tough. So a numbers question you have
+   answered right twice drops out, and a miss you later fixed twice drops out too. */
+const HAS_NUM=/\d/;
+function toughness(x){
+  const s=S.stats[x.id]||{c:0,w:0,l:null};
+  const num=HAS_NUM.test(x.nb)||x.o.some(o=>HAS_NUM.test(o[0]));
+  return (s.l===0?3:0)+2*s.w-s.c+(num?2:0);
+}
+function toughPool(sel){
+  return Q.filter(x=>(sel.includes("all")||sel.includes(x.ch))&&toughness(x)>0);
+}
+const TOUGH_ROUND=30;   // questions per round, so a round fits in a short sitting
+function startTough(sel){
+  const pool=shuffle(toughPool(sel));          // shuffle first so equal scores come in random order
+  pool.sort((a,b)=>toughness(b)-toughness(a)); // toughest first
+  P={queue:pool.slice(0,TOUGH_ROUND).map(x=>x.id),i:0,ans:null,order:shuffle([0,1,2]),right:0,done:0,requeued:{},tough:true};
+}
 function viewOv(){
   if(!P) return viewOvSetup();
   if(P.i>=P.queue.length) return viewOvDone();
@@ -425,15 +449,19 @@ function viewOvSetup(){
   [1,2,3].forEach(mo=>{h+='<div class="modlabel">'+MOD[mo][0]+'</div><div class="chips">';
     CH.filter(c=>c.m===mo).forEach(c=>{const on=!sel.includes("all")&&sel.includes(c.id);
       h+='<button class="chip" data-act="ovsel" data-v="'+c.id+'" aria-pressed="'+on+'">'+c.nb+'<span class="n">'+mastery(byCh[c.id])+'/'+byCh[c.id].length+'</span></button>'});h+='</div>'});
+  const tough=toughPool(sel).length;
   h+='<div class="row" style="margin-top:18px"><button class="sbtn primary" data-act="ovstart"'+(pool.length?'':' disabled')+'>Start ('+pool.length+' spørsmål)</button>'+
+    '<button class="sbtn" data-act="ovstarttough"'+(tough?'':' disabled')+'>🔥 Bare de tøffeste ('+tough+')</button>'+
     '<button class="sbtn" data-act="ovstartweak"'+((weak+nw)?'':' disabled')+'>Bare feil og nye ('+(weak+nw)+')</button></div>'+
+    '<p class="muted" style="font-size:.85rem;margin:10px 0 0">'+bi("De tøffeste = spørsmål du har bommet på, og tall/årstall du ikke har svart riktig på to ganger. Verst først, "+TOUGH_ROUND+" om gangen.","Toughest = questions you've missed, plus numbers/years you haven't got right twice. Worst first, "+TOUGH_ROUND+" at a time.")+'</p>'+
     '<p class="muted" style="font-size:.85rem;margin:10px 0 0">'+weak+' bommet sist · '+nw+' ikke sett ennå</p></section>';
   return h;
 }
 function viewOvDone(){
   const pct=P.done?Math.round(P.right/P.done*100):0;
   return '<section class="scard result"><div class="eyebrow">Runden er ferdig</div><div class="big">'+P.right+' / '+P.done+'</div><p class="muted" style="margin:0">'+pct+' % riktig på første forsøk og repetisjoner</p>'+
-    '<div class="row" style="margin-top:12px"><button class="sbtn primary" data-act="ovagain">Øv igjen</button><button class="sbtn" data-act="drillweak">Bare feil og nye</button><button class="sbtn ghost" data-act="ovquit">Bytt kapitler</button></div></section>';
+    (P.tough?'<p class="muted" style="margin:4px 0 0">'+bi("Tøffe spørsmål igjen: "+toughPool(S.ovSel).length,"Tough questions left: "+toughPool(S.ovSel).length)+'</p>':'')+
+    '<div class="row" style="margin-top:12px"><button class="sbtn primary" data-act="ovagain">'+(P.tough?'Neste runde tøffe':'Øv igjen')+'</button><button class="sbtn" data-act="drilltough">🔥 De tøffeste</button><button class="sbtn" data-act="drillweak">Bare feil og nye</button><button class="sbtn ghost" data-act="ovquit">Bytt kapitler</button></div></section>';
 }
 
 /* ---------- PRØVE (mock exam) ---------- */
@@ -482,7 +510,7 @@ function viewResult(){
   let h='<section class="scard result"><div class="eyebrow">Resultat</div><div class="big mono">'+E.score+' / 36</div>'+
     '<span class="stamp '+(pass?'pass':'fail')+'">'+(pass?'Bestått':'Ikke bestått ennå')+'</span>'+
     '<p class="muted" style="margin:6px 0 0">'+bi("Tid brukt: "+fmt(E.used)+". Trygg grense i denne øvingen: "+PASS+" av 36.","Time used: "+fmt(E.used)+". Safe threshold here: "+PASS+" of 36.")+'</p>'+
-    '<div class="row" style="margin-top:12px"><button class="sbtn primary" data-act="examstart">Ny prøve</button><button class="sbtn" data-act="drillweak">Øv på feilene</button><button class="sbtn ghost" data-act="xclear">Tilbake</button></div></section>';
+    '<div class="row" style="margin-top:12px"><button class="sbtn primary" data-act="examstart">Ny prøve</button><button class="sbtn" data-act="drilltough">🔥 De tøffeste</button><button class="sbtn" data-act="drillweak">Øv på feilene</button><button class="sbtn ghost" data-act="xclear">Tilbake</button></div></section>';
   const keys=Object.keys(wrongBy).sort((a,b)=>wrongBy[b]-wrongBy[a]);
   if(keys.length){h+='<section class="scard"><div class="eyebrow" style="margin-bottom:8px">Feil per kapittel</div><div class="chips">'+keys.map(k=>'<button class="chip" data-act="read" data-v="'+k+'">'+chById[k].nb+'<span class="n">'+wrongBy[k]+'</span></button>').join("")+'</div></section>'}
   h+='<div class="grid36">'+E.ids.map((id,k)=>'<span class="gcell '+(E.ans[k]===0?'r':'w')+'">'+(k+1)+'</span>').join("")+'</div>';
@@ -542,7 +570,9 @@ const ACT={
     save();render()},
   ovstart(){startDrill(S.ovSel,false);render()},
   ovstartweak(){startDrill(S.ovSel,true);render()},
-  ovagain(){startDrill(S.ovSel,P&&P.weakOnly);render()},
+  ovagain(){if(P&&P.tough)startTough(S.ovSel);else startDrill(S.ovSel,P&&P.weakOnly);render()},
+  ovstarttough(){startTough(S.ovSel);render()},
+  drilltough(){S.ovSel=["all"];startTough(["all"]);go("ov")},
   ovquit(){P=null;render()},
   pick(v){
     if(!P||P.ans!==null) return;
