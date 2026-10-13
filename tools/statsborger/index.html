@@ -388,18 +388,15 @@ function startDrill(sel,weakOnly){
   P={queue:pool.map(x=>x.id),i:0,ans:null,order:shuffle([0,1,2]),right:0,done:0,requeued:{},weakOnly:!!weakOnly};
 }
 
-/* "Toughest" questions: a score for how hard a question is FOR YOU.
-     +3  you got it wrong the last time
-     +2  for every time you have got it wrong
-     -1  for every time you have got it right
-     +2  if it's about a number or a year (the fiddly ones people mix up)
-   Anything scoring above 0 counts as tough. So a numbers question you have
-   answered right twice drops out, and a miss you later fixed twice drops out too. */
+/* "Toughest" questions = the ones you got WRONG the last time you answered them,
+   plus number/year questions you haven't tried yet (the fiddly ones people mix up).
+   As soon as you answer one right, it leaves the list.
+   toughness() sets the order: most-missed first, then the untried number questions. */
 const HAS_NUM=/\d/;
 function toughness(x){
-  const s=S.stats[x.id]||{c:0,w:0,l:null};
-  const num=HAS_NUM.test(x.nb)||x.o.some(o=>HAS_NUM.test(o[0]));
-  return (s.l===0?3:0)+2*s.w-s.c+(num?2:0);
+  const s=S.stats[x.id];
+  if(!s) return HAS_NUM.test(x.nb)||x.o.some(o=>HAS_NUM.test(o[0])) ? 1 : 0;  // untried
+  return s.l===0 ? 1+s.w : 0;   // last answer wrong: more misses = tougher
 }
 function toughPool(sel){
   return Q.filter(x=>(sel.includes("all")||sel.includes(x.ch))&&toughness(x)>0);
@@ -453,7 +450,7 @@ function viewOvSetup(){
   h+='<div class="row" style="margin-top:18px"><button class="sbtn primary" data-act="ovstart"'+(pool.length?'':' disabled')+'>Start ('+pool.length+' spørsmål)</button>'+
     '<button class="sbtn" data-act="ovstarttough"'+(tough?'':' disabled')+'>🔥 Bare de tøffeste ('+tough+')</button>'+
     '<button class="sbtn" data-act="ovstartweak"'+((weak+nw)?'':' disabled')+'>Bare feil og nye ('+(weak+nw)+')</button></div>'+
-    '<p class="muted" style="font-size:.85rem;margin:10px 0 0">'+bi("De tøffeste = spørsmål du har bommet på, og tall/årstall du ikke har svart riktig på to ganger. Verst først, "+TOUGH_ROUND+" om gangen.","Toughest = questions you've missed, plus numbers/years you haven't got right twice. Worst first, "+TOUGH_ROUND+" at a time.")+'</p>'+
+    '<p class="muted" style="font-size:.85rem;margin:10px 0 0">'+bi("De tøffeste = spørsmål du bommet på sist, og tall/årstall du ikke har prøvd ennå. Svarer du riktig, forsvinner spørsmålet fra lista. Verst først, "+TOUGH_ROUND+" om gangen.","Toughest = questions you missed last time, plus numbers/years you haven't tried yet. Answer one right and it leaves the list. Worst first, "+TOUGH_ROUND+" at a time.")+'</p>'+
     '<p class="muted" style="font-size:.85rem;margin:10px 0 0">'+weak+' bommet sist · '+nw+' ikke sett ennå</p></section>';
   return h;
 }
