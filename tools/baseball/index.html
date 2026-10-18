@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Baseball Stats</title>
+
+<!-- ════════════════════════════════════════════════════════════════
+     BASEBALL STATS: Mitch's career numbers (college, UK and Norway).
+
+     The numbers are in data.js (one line per season). This page only
+     reads them: it works out averages (AVG, OBP, ERA…), adds a totals row,
+     and draws charts. Nothing is saved to the database.
+═════════════════════════════════════════════════════════════════ -->
+
+<link rel="stylesheet" href="../../shared/family.css">
+<style>
+.toolbar{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;}
+.group{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.label{color:var(--ink-soft);font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-right:2px;}
+.seg{border:2px solid var(--line);background:#fff;color:var(--forest);font-weight:700;
+  padding:6px 12px;border-radius:999px;font-size:.88rem;transition:.15s;}
+.seg:hover{border-color:var(--meadow);}
+.seg.on{background:var(--meadow);border-color:var(--meadow);color:#fff;}
+.toolbar select{border:2px solid var(--line);background:#fff;border-radius:10px;padding:5px 8px;font-size:.9rem;}
+.toolbar label{font-weight:700;font-size:.9rem;color:var(--ink-soft);display:flex;gap:6px;align-items:center;}
+[hidden]{display:none !important;}
+
+/* career summary chips */
+.chips{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px;}
+.chip{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:10px 14px;box-shadow:var(--shadow);min-width:92px;}
+.chip b{display:block;font-family:'Fredoka',sans-serif;font-size:1.35rem;color:var(--forest);font-weight:600;}
+.chip span{font-size:.75rem;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
+
+/* stats table: scrolls sideways on a phone */
+.tablewrap{overflow:auto;padding:0;}
+table{border-collapse:collapse;width:100%;white-space:nowrap;font-size:.9rem;}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);}
+th:nth-child(-n+3),td:nth-child(-n+3){text-align:left;}
+th{position:sticky;top:0;background:var(--paper);cursor:pointer;user-select:none;font-size:.72rem;
+  text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);font-weight:800;}
+th:hover{color:var(--forest);}
+th .arr{display:inline-block;width:10px;}
+td{cursor:copy;font-variant-numeric:tabular-nums;}
+tbody tr:hover td{background:#f3f7ef;}
+td:hover{outline:2px solid var(--meadow);outline-offset:-2px;}
+tr.total td{background:#eef4e8;font-weight:800;border-top:2px solid var(--line);}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin:-6px 0 18px;}
+
+/* charts */
+#charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;}
+@media(max-width:860px){#charts{grid-template-columns:minmax(0,1fr);}}
+#charts .card{margin:0;min-width:0;}
+.ptop{display:flex;justify-content:space-between;gap:6px 10px;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;}
+.ptop h3{margin:0 0 2px;}
+.psub{color:var(--ink-soft);font-size:.82rem;}
+.cwrap{position:relative;height:290px;}
+.cempty{color:var(--ink-soft);text-align:center;padding-top:120px;font-style:italic;}
+
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);opacity:0;
+  background:var(--forest);color:#fff;padding:9px 16px;border-radius:12px;pointer-events:none;
+  transition:.2s;font-weight:700;z-index:50;}
+#toast.show{opacity:1;transform:translateX(-50%);}
+</style>
+</head>
+<body data-tool="baseball">
+
+<main class="wrap">
+  <div class="page-head">
+    <span class="emoji">⚾</span><h1 id="name">Baseball Stats</h1>
+  </div>
+  <p class="hint" id="sub"></p>
+
+  <div class="chips" id="chips"></div>
+
+  <div class="card toolbar">
+    <div class="group" id="cats"></div>
+    <div class="group"><span class="label">Show</span><span id="levels" class="group"></span></div>
+    <div class="group"><span class="label">Competition</span><select id="comp"></select></div>
+    <div class="group" id="seasonG"><span class="label">Season</span><select id="season"></select></div>
+    <div class="group" id="totalsG"><label><input type="checkbox" id="totals" checked> Totals row</label></div>
+  </div>
+
+  <div class="card tablewrap" id="tablewrap"><table id="tbl"></table></div>
+  <div class="tools" id="tools">
+    <button class="btn sm" id="copyTsv" title="Paste straight into Excel or Google Sheets">Copy table</button>
+    <button class="btn sm ghost" id="copyCsv">Copy CSV</button>
+    <button class="btn sm ghost" id="copyMd">Copy Markdown</button>
+    <button class="btn sm ghost" id="dlCsv">Download CSV</button>
+  </div>
+  <div id="charts" hidden></div>
+  <p class="hint" id="hint" style="margin-top:14px"></p>
+</main>
+<div id="toast"></div>
+
+<script src="../../site.js"></script>
+<script src="../../shared/family.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script src="data.js"></script>
+<script>
+const D = window.BASEBALL;
+const $ = id => document.getElementById(id);
+
+// Filter groups: High School, College, then club seasons by country (only the ones that have numbers).
+const grp = r => r.level === 'Pro-Am club' ? r.country : r.level;
+const ALL_ROWS = D.batting.concat(D.pitching, D.fielding);
+const GROUPS = ['High School', 'College', 'Great Britain', 'Norway', ...new Set(ALL_ROWS.map(grp))]
+  .filter((g, i, a) => a.indexOf(g) === i && ALL_ROWS.some(r => grp(r) === g));
+
+// ---------- helpers ----------
+const n = v => (v == null ? 0 : v);
+const has = v => v != null;
+const sum = (rows, k) => rows.reduce((a, r) => a + n(r[k]), 0);
+const f3 = v => (v == null || !isFinite(v)) ? null : v.toFixed(3).replace(/^0\./, '.').replace(/^-0\./, '-.');
+const f2 = v => (v == null || !isFinite(v)) ? null : v.toFixed(2);
+const div = (a, b) => b ? a / b : null;
+const ipStr = o => has(o) ? `${Math.floor(o / 3)}.${o % 3}` : null;
+
+// ---------- column definitions ----------
+// Each stat column: [header, key or fn(row)->value]. Rate stats are computed from counting stats,
+// so the totals row can reuse the same functions on summed data.
+const ID = [['Year','season'],['Team','team'],['League','league']];
+const CATS = {
+  Batting: {
+    rows: D.batting,
+    cols: [...ID,
+      ...['g','gs','ab','r','h'].map(k=>[k.toUpperCase(),k]), ['2B','doubles'],['3B','triples'],['HR','hr'],['RBI','rbi'],['TB','tb'],
+      ['AVG', r => f3(div(r.h, r.ab))],
+      ['OBP', r => f3(div(n(r.h)+n(r.bb)+n(r.hbp), n(r.ab)+n(r.bb)+n(r.hbp)+n(r.sf)))],
+      ['SLG', r => f3(div(r.tb, r.ab))],
+      ['OPS', r => { const o = div(n(r.h)+n(r.bb)+n(r.hbp), n(r.ab)+n(r.bb)+n(r.hbp)+n(r.sf)), s = div(r.tb, r.ab);
+                    return (o==null||s==null) ? null : f3(o+s); }],
+      ['BB','bb'],['HBP','hbp'],['SO','so'],['GDP','gdp'],['SF','sf'],['SH','sh'],['SB','sb'],['CS','cs']],
+    sums: ['g','gs','ab','r','h','doubles','triples','hr','rbi','tb','bb','hbp','so','gdp','sf','sh','sb','cs'],
+  },
+  Pitching: {
+    rows: D.pitching,
+    cols: [...ID,
+      ['W','w'],['L','l'],
+      ['ERA9', r => f2(div(27 * r.er, r.ip_outs))],
+      ['APP','app'],['GS','gs'],['SV','sv'],['CG','cg'],['SHO','sho'],
+      ['IP', r => ipStr(r.ip_outs)],
+      ['H','h'],['R','r'],['ER','er'],['BB','bb'],['SO','so'],['2B','doubles'],['3B','triples'],['HR','hr'],
+      ['WHIP', r => f2(div(3 * (n(r.h)+n(r.bb)), r.ip_outs))],
+      ['K/9', r => f2(div(27 * r.so, r.ip_outs))],
+      ['BB/9', r => f2(div(27 * r.bb, r.ip_outs))],
+      ['WP','wp'],['HB','hb'],['BK','bk']],
+    sums: ['w','l','app','gs','sv','cg','sho','ip_outs','h','r','er','bb','so','doubles','triples','hr','wp','hb','bk'],
+  },
+  Fielding: {
+    rows: D.fielding,
+    cols: [...ID,
+      ['G','g'],['C','c'],['PO','po'],['A','a'],['E','e'],
+      ['FLD%', r => f3(div(n(r.po)+n(r.a), r.c))],
+      ['DP','dp'],['SBA','sba'],['CSB','csb'],['PB','pb'],['CI','ci']],
+    sums: ['g','c','po','a','e','dp','sba','csb','pb','ci'],
+  },
+};
+
+// ---------- state ----------
+const S = { cat: 'Batting', level: 'All', season: 'All', comp: 'All', totals: true, sortCol: null, sortDir: 1 };
+
+function currentRows() {
+  const c = CATS[S.cat];
+  let rows = c.rows.filter(r => (S.level === 'All' || grp(r) === S.level) && (S.comp === 'All' || r.competition === S.comp) && (S.season === 'All' || String(r.season) === S.season));
+  if (S.sortCol != null) {
+    const col = c.cols[S.sortCol];
+    const get = r => cell(col, r);
+    rows = [...rows].sort((a, b) => {
+      let x = get(a), y = get(b);
+      if (x == null || x === '') return 1;
+      if (y == null || y === '') return -1;
+      const nx = parseFloat(x), ny = parseFloat(y);
+      const r = (isNaN(nx) || isNaN(ny)) ? String(x).localeCompare(String(y)) : nx - ny;
+      return r * S.sortDir;
+    });
+  }
+  return rows;
+}
+function cell(col, row) {
+  const v = typeof col[1] === 'function' ? col[1](row) : row[col[1]];
+  return v == null ? null : v;
+}
+function totalsRow(rows) {
+  const c = CATS[S.cat];
+  const t = { season: 'Totals', team: '', league: '' };
+  c.sums.forEach(k => { t[k] = rows.some(r => has(r[k])) ? sum(rows, k) : null; });
+  return t;
+}
+// Table as array-of-arrays (headers first): the single source for display AND every copy format.
+function matrix() {
+  const c = CATS[S.cat], rows = currentRows();
+  const out = [c.cols.map(x => x[0])];
+  rows.forEach(r => out.push(c.cols.map(col => cell(col, r) ?? '')));
+  if (S.totals && rows.length) {
+    const t = totalsRow(rows);
+    out.push(c.cols.map((col, i) => i === 0 ? 'Totals' : (i < 3 ? '' : (cell(col, t) ?? ''))));
+  }
+  return out;
+}
+
+// ---------- career summary ----------
+function renderChips() {
+  const b = D.batting, p = D.pitching;
+  const ab = sum(b, 'ab'), h = sum(b, 'h'), outs = sum(p, 'ip_outs');
+  const seasons = new Set(ALL_ROWS.map(r => r.season)).size;
+  const chips = [
+    [seasons, 'Seasons'], [f3(div(h, ab)), 'Career AVG'], [sum(b, 'hr'), 'Home runs'], [sum(b, 'rbi'), 'RBI'],
+    [sum(p, 'w'), 'Wins'], [sum(p, 'so'), 'Strikeouts'], [f2(div(27 * sum(p, 'er'), outs)), 'Career ERA'],
+  ];
+  $('chips').innerHTML = chips.map(([v, l]) => `<div class="chip"><b>${v ?? '–'}</b><span>${l}</span></div>`).join('');
+}
+
+// ---------- render ----------
+function render() {
+  const isCharts = S.cat === 'Charts';
+  ['tablewrap', 'tools', 'totalsG', 'seasonG'].forEach(id => $(id).hidden = isCharts);
+  $('charts').hidden = !isCharts;
+  $('hint').textContent = isCharts
+    ? 'Charts follow the Show and Competition filters (the last three always show everything). Tap a chart for values · “Copy image” puts a picture on your clipboard.'
+    : 'Tap any number to copy it · tap a column header to sort · “Copy table” pastes straight into Excel / Google Sheets.';
+  if (isCharts) { renderCharts(); return; }
+  const m = matrix(), tbl = $('tbl');
+  if (m.length === 1) { tbl.innerHTML = '<tbody><tr><td class="empty" style="text-align:center">No numbers for this selection.</td></tr></tbody>'; return; }
+  const head = m[0].map((h, i) =>
+    `<th data-i="${i}">${h}<span class="arr">${S.sortCol === i ? (S.sortDir > 0 ? '▲' : '▼') : ''}</span></th>`).join('');
+  const body = m.slice(1).map((r, ri) => {
+    const isTot = S.totals && ri === m.length - 2;
+    return `<tr class="${isTot ? 'total' : ''}">${r.map(v => `<td>${Family.esc(v)}</td>`).join('')}</tr>`;
+  }).join('');
+  tbl.innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body}</tbody>`;
+}
+function renderControls() {
+  const comps = ['All', ...new Set(ALL_ROWS.map(r => r.competition))];
+  $('comp').innerHTML = comps.map(c => `<option ${c === S.comp ? 'selected' : ''}>${c}</option>`).join('');
+  const yrs = [...new Set(ALL_ROWS.map(r => r.season))].sort();
+  $('season').innerHTML = ['All', ...yrs].map(y => `<option ${String(y) === S.season ? 'selected' : ''}>${y}</option>`).join('');
+  $('cats').innerHTML = [...Object.keys(CATS), 'Charts'].map(k => `<button class="seg ${k === S.cat ? 'on' : ''}" data-cat="${k}">${k}</button>`).join('');
+  $('levels').innerHTML = ['All', ...GROUPS].map(l => `<button class="seg ${l === S.level ? 'on' : ''}" data-level="${l}">${l}</button>`).join('');
+}
+
+// ---------- copy ----------
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 1600);
+}
+async function copy(text, msg) {
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+  }
+  toast(msg);
+}
+const csvEsc = v => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
+const asTsv = m => m.map(r => r.join('\t')).join('\n');
+const asCsv = m => m.map(r => r.map(csvEsc).join(',')).join('\n');
+const asMd  = m => [m[0], m[0].map(() => '---'), ...m.slice(1)].map(r => `| ${r.join(' | ')} |`).join('\n');
+const rowsMsg = m => `Copied ${m.length - 1} rows`;
+
+$('copyTsv').onclick = () => { const m = matrix(); copy(asTsv(m), rowsMsg(m) + ', paste into Excel / Sheets'); };
+$('copyCsv').onclick = () => { const m = matrix(); copy(asCsv(m), rowsMsg(m) + ' as CSV'); };
+$('copyMd').onclick  = () => { const m = matrix(); copy(asMd(m), rowsMsg(m) + ' as Markdown'); };
+$('dlCsv').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([asCsv(matrix())], { type: 'text/csv' }));
+  a.download = `mitch_tyse_${S.cat.toLowerCase()}.csv`; a.click(); URL.revokeObjectURL(a.href);
+};
+
+// ---------- clicks (only inside the page, not the ☰ menu) ----------
+document.querySelector('main').addEventListener('click', e => {
+  const im = e.target.closest('button[data-img]'); if (im) { copyImage(im.dataset.img); return; }
+  const b = e.target.closest('button[data-cat],button[data-level]');
+  if (b) {
+    if (b.dataset.cat) { S.cat = b.dataset.cat; S.sortCol = null; }
+    if (b.dataset.level) S.level = b.dataset.level;
+    renderControls(); render(); return;
+  }
+  const th = e.target.closest('th');
+  if (th) {
+    const i = +th.dataset.i;
+    if (S.sortCol === i) S.sortDir *= -1; else { S.sortCol = i; S.sortDir = i < 3 ? 1 : -1; }
+    render(); return;
+  }
+  const td = e.target.closest('td');
+  if (td && td.textContent && !td.classList.contains('empty')) copy(td.textContent, `Copied “${td.textContent}”`);
+});
+$('comp').onchange = e => { S.comp = e.target.value; render(); };
+$('season').onchange = e => { S.season = e.target.value; render(); };
+$('totals').onchange = e => { S.totals = e.target.checked; render(); };
+
+
+// ---------- charts ----------
+// Site colours (deep meadow, peach and sky), plus a different dot shape per line so colour isn't the only clue.
+const PAL = ['#4f8a52', '#d9733f', '#3f86a8'];
+const SHAPES = ['circle', 'triangle', 'rect'];
+const tok = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const inst = [];
+if (window.Chart) Chart.defaults.font.family = "'Nunito', system-ui, sans-serif";
+
+const BK = ['ab','h','doubles','triples','hr','bb','hbp','sf','sh','tb','so'];
+function aggB(rows) {
+  const t = {}; BK.forEach(k => t[k] = sum(rows, k));
+  t.pa = t.ab + t.bb + t.hbp + t.sf + t.sh;
+  t.avg = div(t.h, t.ab); t.obp = div(t.h + t.bb + t.hbp, t.ab + t.bb + t.hbp + t.sf); t.slg = div(t.tb, t.ab);
+  t.ops = (t.obp == null || t.slg == null) ? null : t.obp + t.slg;
+  t.iso = (t.slg == null || t.avg == null) ? null : t.slg - t.avg;
+  t.bbp = div(t.bb, t.pa); t.kp = div(t.so, t.pa);
+  return t;
+}
+function aggP(rows) {
+  const t = {}; ['ip_outs','er','so','bb','h'].forEach(k => t[k] = sum(rows, k));
+  t.era9 = div(27 * t.er, t.ip_outs); t.k9 = div(27 * t.so, t.ip_outs); t.bb9 = div(27 * t.bb, t.ip_outs);
+  return t;
+}
+const filt = rows => rows.filter(r => (S.level === 'All' || grp(r) === S.level) && (S.comp === 'All' || r.competition === S.comp));
+const bySeason = rows => { const m = new Map(); rows.forEach(r => { if (!m.has(r.season)) m.set(r.season, []); m.get(r.season).push(r); }); return m; };
+const yearsRange = ys => { if (!ys.length) return []; const a = Math.min(...ys), b = Math.max(...ys); return Array.from({ length: b - a + 1 }, (_, i) => a + i); };
+const ipOf = o => `${Math.floor(o / 3)}.${o % 3}`;
+const pct = v => v == null ? '' : (v * 100).toFixed(1) + '%';
+
+function baseOpts(fmt, extra = {}) {
+  const text = tok('--ink'), muted = tok('--ink-soft');
+  return {
+    responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+    layout: { padding: { top: 4, right: 8 } },
+    plugins: {
+      legend: { display: extra.legend !== false, align: 'start', labels: { color: text, usePointStyle: true, boxWidth: 8, boxHeight: 8, padding: 14 } },
+      tooltip: { callbacks: { label: c => c.raw == null ? null : ` ${c.dataset.label}: ${fmt(c.raw)}`, ...(extra.tip || {}) },
+                 padding: 10, boxPadding: 4 },
+    },
+    scales: {
+      x: { grid: { display: false }, border: { display: false }, ticks: { color: muted, font: { size: 11 } } },
+      y: { beginAtZero: true, grid: { color: 'rgba(80,90,60,.10)' }, border: { display: false },
+           ticks: { color: muted, callback: v => fmt(v), maxTicksLimit: 6 } },
+    },
+  };
+}
+// Paints the card colour behind the chart so "Copy image" isn't see-through.
+const bgPlugin = { id: 'bg', beforeDraw(c) { const x = c.ctx; x.save(); x.globalCompositeOperation = 'destination-over'; x.fillStyle = tok('--paper'); x.fillRect(0, 0, c.width, c.height); x.restore(); } };
+
+function line(id, labels, series, fmt, extra) {
+  const surf = tok('--paper');
+  return new Chart($(id), { type: 'line', plugins: [bgPlugin], options: baseOpts(fmt, extra), data: { labels,
+    datasets: series.map((s, i) => ({ label: s.label, data: s.data, borderColor: PAL[i], backgroundColor: PAL[i], borderWidth: 2, tension: 0,
+      spanGaps: true, pointStyle: SHAPES[i], pointRadius: 5, pointHoverRadius: 7, pointBackgroundColor: PAL[i], pointBorderColor: surf, pointBorderWidth: 2 })) } });
+}
+function bar(id, labels, series, fmt, extra) {
+  const surf = tok('--paper');
+  return new Chart($(id), { type: 'bar', plugins: [bgPlugin], options: baseOpts(fmt, extra), data: { labels,
+    datasets: series.map((s, i) => ({ label: s.label, data: s.data, backgroundColor: PAL[i], borderColor: surf, borderWidth: 2,
+      borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: 'bottom', maxBarThickness: 34 })) } });
+}
+
+const PANELS = [
+  { id: 'c1', title: 'Slash line by season', sub: 'AVG / OBP / SLG. At-bats (AB) under each year.' },
+  { id: 'c2', title: 'Power: home runs & doubles', sub: 'Per season.' },
+  { id: 'c3', title: 'Isolated power (SLG − AVG)', sub: 'Extra-base hitting, apart from batting average.' },
+  { id: 'c4', title: 'Walks vs strikeouts', sub: 'Share of plate appearances.' },
+  { id: 'c5', title: 'Pitching per 9 innings', sub: 'ERA9, K/9, BB/9. Seasons under 5 IP are hidden; IP under each year.' },
+  { id: 'c6', title: 'Regular season vs NM i Baseball: OPS', sub: 'Ignores the filters. AB shown as regular vs NM.' },
+  { id: 'c7', title: 'Regular season vs NM i Baseball: ERA9', sub: 'Ignores the filters. IP shown as regular vs NM.' },
+  { id: 'c8', title: 'Batting by level / country', sub: 'Ignores the filters. AB under each group.' },
+];
+
+function renderCharts() {
+  inst.splice(0).forEach(c => c.destroy());
+  $('charts').innerHTML = PANELS.map(p => `<div class="card"><div class="ptop"><div><h3>${p.title}</h3><div class="psub">${p.sub}</div></div>
+    <button class="btn sm ghost" data-img="${p.id}">Copy image</button></div><div class="cwrap"><canvas id="${p.id}"></canvas><div class="cempty" id="${p.id}_e" hidden>No numbers for this selection.</div></div></div>`).join('');
+  const empty = id => { $(id).style.display = 'none'; $(id + '_e').hidden = false; };
+  if (!window.Chart) { PANELS.forEach(p => { empty(p.id); $(p.id + '_e').textContent = 'Charts couldn’t load (no internet?).'; }); return; }
+  const f3c = v => f3(v), int = v => Math.round(v), f2c = v => f2(v);
+
+  // batting by season (filters: Show + Competition)
+  const bm = new Map([...bySeason(filt(D.batting))].map(([y, r]) => [y, aggB(r)]).filter(([, a]) => a.ab > 0));
+  const yrs = yearsRange([...bm.keys()]);
+  const lab = yrs.map(y => bm.has(y) ? [String(y), `${bm.get(y).ab} AB`] : [String(y), 'no data']);
+  const col = k => yrs.map(y => bm.has(y) ? bm.get(y)[k] : null);
+  if (!yrs.length) ['c1', 'c2', 'c3', 'c4'].forEach(empty); else {
+    inst.push(line('c1', lab, [{ label: 'AVG', data: col('avg') }, { label: 'OBP', data: col('obp') }, { label: 'SLG', data: col('slg') }], f3c));
+    inst.push(bar('c2', lab, [{ label: 'HR', data: col('hr') }, { label: 'Doubles', data: col('doubles') }], int));
+    inst.push(line('c3', lab, [{ label: 'ISO', data: col('iso') }], f3c, { legend: false }));
+    inst.push(line('c4', lab, [{ label: 'BB%', data: col('bbp') }, { label: 'K%', data: col('kp') }], v => (v * 100).toFixed(0) + '%',
+      { tip: { label: c => c.raw == null ? null : ` ${c.dataset.label}: ${pct(c.raw)}` } }));
+  }
+
+  // pitching by season (filters: Show + Competition); at least 5 IP
+  const pm = new Map([...bySeason(filt(D.pitching))].map(([y, r]) => [y, aggP(r)]).filter(([, a]) => a.ip_outs >= 15));
+  const pyrs = yearsRange([...pm.keys()]);
+  if (!pyrs.length) empty('c5'); else {
+    const pl = pyrs.map(y => pm.has(y) ? [String(y), `${ipOf(pm.get(y).ip_outs)} IP`] : [String(y), 'no data']);
+    const pc = k => pyrs.map(y => pm.has(y) ? pm.get(y)[k] : null);
+    inst.push(line('c5', pl, [{ label: 'ERA9', data: pc('era9') }, { label: 'K/9', data: pc('k9') }, { label: 'BB/9', data: pc('bb9') }], f2c));
+  }
+
+  // regular season vs NM (Norway; ignores filters)
+  const nmYears = [...new Set(D.batting.filter(r => r.competition !== 'Regular season').map(r => r.season))].sort();
+  const pick = (rows, y, nm) => rows.filter(r => r.season === y && r.country === 'Norway' && (nm ? r.competition !== 'Regular season' : r.competition === 'Regular season'));
+  if (!nmYears.length) { empty('c6'); empty('c7'); } else {
+    const lb = nmYears.map(y => [String(y), `${aggB(pick(D.batting, y, false)).ab} vs ${aggB(pick(D.batting, y, true)).ab} AB`]);
+    inst.push(bar('c6', lb, [{ label: 'Regular season', data: nmYears.map(y => aggB(pick(D.batting, y, false)).ops) },
+                             { label: 'NM i Baseball', data: nmYears.map(y => aggB(pick(D.batting, y, true)).ops) }], f3c));
+    const lp = nmYears.map(y => [String(y), `${ipOf(aggP(pick(D.pitching, y, false)).ip_outs)} vs ${ipOf(aggP(pick(D.pitching, y, true)).ip_outs)} IP`]);
+    inst.push(bar('c7', lp, [{ label: 'Regular season', data: nmYears.map(y => aggP(pick(D.pitching, y, false)).era9) },
+                             { label: 'NM i Baseball', data: nmYears.map(y => aggP(pick(D.pitching, y, true)).era9) }], f2c));
+  }
+
+  // by level / country (ignores filters)
+  const gs = GROUPS.map(g => [g, aggB(D.batting.filter(r => grp(r) === g))]).filter(([, a]) => a.ab > 0);
+  if (!gs.length) empty('c8'); else
+    inst.push(bar('c8', gs.map(([g, a]) => [g, `${a.ab} AB`]), [
+      { label: 'AVG', data: gs.map(([, a]) => a.avg) }, { label: 'OBP', data: gs.map(([, a]) => a.obp) }, { label: 'SLG', data: gs.map(([, a]) => a.slg) }], f3c));
+}
+async function copyImage(id) {
+  const cv = $(id); if (!cv || cv.style.display === 'none') return;
+  cv.toBlob(async blob => {
+    try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); toast('Chart image copied'); }
+    catch { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `mitch_tyse_${id}.png`; a.click(); toast('Clipboard blocked, downloaded a picture instead'); }
+  });
+}
+
+// ---------- start ----------
+$('name').textContent = D.player.name;
+$('sub').textContent = `Bats ${D.player.bats} · Throws ${D.player.throws} · ${D.player.hometown}`;
+renderChips(); renderControls(); render();
+</script>
+</body>
+</html>

@@ -45,6 +45,10 @@ code readable and commented for a non-expert.
   `health_upload(upload_key, payload)` RPC; only a hash of the key is stored. The page drops the
   data into `dashboard-template.html` (a copy of garmin-ai's `dashboard_template.html`, no data in
   it) and shows it in a frame. Never commit health data to this public repo.
+- `tools/baseball/`: Mitch's career baseball stats (college, London Mets, Bergen Wet Sox incl. NM i
+  Baseball). View-only: the numbers are in `data.js` (one line per season; add new seasons there),
+  the page works out AVG/OBP/ERA etc., totals and Chart.js charts. Brought over from
+  `D:\Documents\Claude projects\Baseball Stat` (its SQLite DB/build scripts are no longer needed).
 - `tools/packing/`: shared packing checklists in `family_items` (tool `packing`: `lists`, `items`, `trip`).
 - `tools/energy/`: Tibber prices + usage per house, plus a Bills list. The page calls the `energy`
   edge function (`supabase/functions/energy/`), which reads Tibber/Elvia tokens from

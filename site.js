@@ -80,6 +80,13 @@ window.SITE = {
       color: 'sun'
     },
     {
+      id: 'baseball',
+      name: 'Baseball Stats',
+      emoji: '⚾',
+      description: 'Mitch’s career numbers from college, London and Bergen: batting, pitching, fielding and charts.',
+      color: 'sky'
+    },
+    {
       id: 'health',
       name: 'Health',
       emoji: '🫀',
