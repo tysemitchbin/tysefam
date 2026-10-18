@@ -74,6 +74,30 @@
 .tool.soon{border-style:dashed;box-shadow:none;background:transparent;justify-content:center;align-items:center;
   text-align:center;min-height:180px;}
 .tool.soon:hover{transform:none;box-shadow:none;border-color:var(--line);}
+/* the 📦 archive button in a card's corner: shows on hover (always, faintly, on phones) */
+.tool-slot{position:relative;display:flex;}
+.tool-slot .tool{flex:1;}
+.arch-btn{position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:10px;border:1px solid var(--line);
+  background:var(--paper);font-size:1rem;line-height:1;opacity:0;transition:opacity .15s,background .15s;}
+.tool-slot:hover .arch-btn,.arch-btn:focus-visible{opacity:1;}
+.tool-slot:hover .arch-btn{transform:translateY(-3px);}   /* lifts with the card */
+.arch-btn:hover{background:#eef0e8;}
+@media(hover:none){.arch-btn{opacity:.55;}}
+
+/* "Archived tools": where archived cards wait until they're brought back */
+.shelf{margin-top:18px;}
+.shelf summary{cursor:pointer;list-style:none;}
+.shelf summary::-webkit-details-marker{display:none;}
+.shelf summary h3{margin:0;}
+.shelf summary h3::after{content:"▸";margin-left:auto;color:var(--ink-soft);transition:transform .15s;}
+.shelf[open] summary h3::after{transform:rotate(90deg);}
+.shelf[open] summary{margin-bottom:12px;}
+.shelf .hint{margin:0 0 6px;}
+.shelf-row{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px dashed var(--line);}
+.shelf-row:last-child{border-bottom:none;}
+.shelf-row .ico{font-size:1.4rem;}
+.shelf-row .name{flex:1;min-width:0;font-weight:800;color:var(--forest);text-decoration:none;}
+
 .c-meadow {--c:var(--meadow-deep); --bg:#e3f1df;}
 .c-sky    {--c:#5aa3b5;            --bg:#e2f1f4;}
 .c-peach  {--c:var(--peach-deep);  --bg:#fdeede;}
@@ -117,6 +141,7 @@
   </div>
   <div id="comingUp"></div>
   <div class="tools" id="tools"></div>
+  <div id="archived"></div>
   <div class="foot">Made with <span class="heart">♥</span> for the family</div>
 </main>
 
@@ -135,18 +160,67 @@ document.getElementById('greeting').textContent = people.length ? `${part}, ${pe
 document.getElementById('today').textContent =
   new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
+/* ───────── the tool cards ─────────
+   Each person can archive tools they don't need: the 📦 button on a card tucks it into the
+   "Archived tools" box under the grid, and "Bring back" puts it back. Saved per person
+   (see Family.archived in shared/family.js), so it's the same on all their devices. */
 const COLORS = ['meadow', 'sky', 'peach', 'blossom', 'sun'];
 const grid = document.getElementById('tools');
-grid.innerHTML = site.tools.filter(t => !t.hidden).map((t, i) => {
-  const c = COLORS.includes(t.color) ? t.color : COLORS[i % COLORS.length];
-  return `<a class="tool c-${c}" href="tools/${encodeURIComponent(t.id)}/">
-      <div class="ico">${esc(t.emoji || '🧩')}</div>
-      <h3>${esc(t.name)}</h3>
-      <p>${esc(t.description || '')}</p>
-      <span class="go">Open →</span>
-    </a>`;
-}).join('') + `<div class="tool soon"><div class="ico" style="background:#eef0e8">🌱</div>
-    <p style="flex:0">More tools on the way…</p></div>`;
+const shelf = document.getElementById('archived');
+let archivedIds = Family.archivedNow();     // this device's copy first, so nothing flickers
+
+function drawTools() {
+  const visible = site.tools.filter(t => !t.hidden);
+  const out = visible.filter(t => archivedIds.includes(t.id));
+  grid.innerHTML = visible.map((t, i) => {
+    if (archivedIds.includes(t.id)) return '';
+    const c = COLORS.includes(t.color) ? t.color : COLORS[i % COLORS.length];
+    return `<div class="tool-slot">
+      <a class="tool c-${c}" href="tools/${encodeURIComponent(t.id)}/">
+        <div class="ico">${esc(t.emoji || '🧩')}</div>
+        <h3>${esc(t.name)}</h3>
+        <p>${esc(t.description || '')}</p>
+        <span class="go">Open →</span>
+      </a>
+      <button class="arch-btn" type="button" data-archive="${esc(t.id)}"
+        title="Archive: hide it from the home page" aria-label="Archive ${esc(t.name)}">📦</button>
+    </div>`;
+  }).join('') + `<div class="tool soon"><div class="ico" style="background:#eef0e8">🌱</div>
+      <p style="flex:0">More tools on the way…</p></div>`;
+
+  // The archive shelf: only there when something's on it.
+  const wasOpen = shelf.querySelector('details') ? shelf.querySelector('details').open : location.hash === '#archived';
+  shelf.innerHTML = !out.length ? '' : `<details class="card shelf"${wasOpen ? ' open' : ''}>
+      <summary><h3>📦 Archived tools <span class="tag">${out.length}</span></h3></summary>
+      <p class="hint">Hidden from your home page and the ☰ menu. Nothing in them is deleted.</p>
+      ${out.map(t => `<div class="shelf-row">
+        <span class="ico">${esc(t.emoji || '🧩')}</span>
+        <a class="name" href="tools/${encodeURIComponent(t.id)}/">${esc(t.name)}</a>
+        <button class="btn sm ghost" type="button" data-restore="${esc(t.id)}">Bring back</button>
+      </div>`).join('')}
+    </details>`;
+}
+
+async function saveArchived(ids) {
+  archivedIds = ids;
+  drawTools();
+  archivedIds = await Family.setArchived(ids);
+}
+grid.addEventListener('click', e => {
+  const b = e.target.closest('[data-archive]');
+  if (b) saveArchived([...archivedIds, b.dataset.archive]);
+});
+shelf.addEventListener('click', e => {
+  const b = e.target.closest('[data-restore]');
+  if (b) saveArchived(archivedIds.filter(id => id !== b.dataset.restore));
+});
+
+drawTools();
+// Then the saved list from Supabase, in case it was changed on another device.
+Family.archived().then(ids => {
+  if (JSON.stringify(ids) !== JSON.stringify(archivedIds)) { archivedIds = ids; drawTools(); }
+});
+if (location.hash === '#archived') shelf.scrollIntoView();
 
 /* ───────── "Coming up": the next few things on the shared calendar ─────────
    Only when someone's already signed in on this device and a calendar has been added

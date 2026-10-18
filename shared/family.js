@@ -14,6 +14,7 @@
      Family.peek()            the client only if someone is already signed in (no sign-in card)
      Family.call(fn, route, body)  call an edge function as the signed-in person
      Family.signOut()
+     Family.archived() / setArchived(ids)  the tools this person has archived (hidden from home + menu)
 
    Saving data:
      • Supabase filled in (site.js)  → family sign-in, live sync on every device
@@ -297,6 +298,52 @@
     return s;
   }
 
+  /* ───────── archived tools: each person can tuck away tools they don't use ─────────
+     A list of tool ids per person, saved in family_items (tool 'home', collection 'archived',
+     id = their name) so it follows them to every device. This device keeps a copy so the
+     home page and ☰ menu can hide them straight away, before Supabase has answered.
+       Family.archivedNow()          the copy on this device, right now: ['packing', …]
+       await Family.archived()       the saved list (fetched fresh when signed in)
+       await Family.setArchived([…]) save a new list
+     Never shows the sign-in card: when nobody is signed in it just uses this device. */
+  const ARCHIVE_KEY = 'family_archived';
+  function archivedNow() {
+    try { return JSON.parse(localStorage.getItem(ARCHIVE_KEY)) || []; } catch (e) { return []; }
+  }
+  function keepArchived(ids) {
+    try { localStorage.setItem(ARCHIVE_KEY, JSON.stringify(ids)); } catch (e) { /* private window: fine */ }
+  }
+  const archiveRow = sb => sb.from('family_items').select('data')
+    .eq('tool', 'home').eq('collection', 'archived').eq('id', member.name).maybeSingle();
+  async function saveArchivedCloud(sb, ids) {
+    const { error } = await sb.from('family_items').upsert(
+      { id: member.name, tool: 'home', collection: 'archived', data: { tools: ids } },
+      { onConflict: 'tool,collection,id' });
+    if (error) console.error('Family: could not save archived tools', error);
+  }
+  async function archived() {
+    const sb = await peek().catch(() => null);
+    if (!sb) return archivedNow();
+    const { data: row, error } = await archiveRow(sb);
+    if (error) { console.error('Family: could not load archived tools', error); return archivedNow(); }
+    if (!row) {
+      // Nothing saved for this person yet: keep whatever this device had and save it for them.
+      const ids = archivedNow();
+      if (ids.length) await saveArchivedCloud(sb, ids);
+      return ids;
+    }
+    const ids = (row.data && row.data.tools) || [];
+    keepArchived(ids);
+    return ids;
+  }
+  async function setArchived(ids) {
+    ids = [...new Set(ids)];
+    keepArchived(ids);
+    const sb = await peek().catch(() => null);
+    if (sb) await saveArchivedCloud(sb, ids);
+    return ids;
+  }
+
   /* ───────── page chrome: menu bar + sign-in card (self-contained styles) ───────── */
   const CSS = `
     .fam-bar{position:relative;z-index:200;display:flex;align-items:center;gap:10px;
@@ -318,6 +365,7 @@
     .fam-list a{display:flex;align-items:center;gap:9px;color:#3c4138;padding:9px 10px;border-radius:10px;}
     .fam-list a:hover{background:#eef6ea;}
     .fam-list a.cur{background:#7fa874;color:#fff;}
+    .fam-list a.fam-arch{color:#6f7468;font-weight:600;border-top:1px dashed #e9e2d2;border-radius:0 0 10px 10px;margin-top:4px;}
     .fam-auth{position:fixed;inset:0;z-index:300;background:rgba(251,247,238,.96);display:flex;
       align-items:center;justify-content:center;padding:16px;font-family:'Nunito',system-ui,sans-serif;color:#3c4138;}
     .fam-card{background:#fffdf7;border:1px solid #e9e2d2;border-radius:22px;padding:24px;max-width:400px;width:100%;
@@ -361,7 +409,6 @@
     const toolId = document.body && document.body.dataset.tool;
     if (!toolId) return;
     addStyles();
-    const tools = (SITE.tools || []).filter(t => !t.hidden || t.id === toolId);
     const bar = document.createElement('div');
     bar.className = 'fam-bar';
     bar.innerHTML = `
@@ -370,11 +417,18 @@
       <span class="fam-user"></span>
       <div class="fam-menu">
         <button type="button" aria-haspopup="true">☰ Tools</button>
-        <div class="fam-list">
-          <a href="${esc(url(''))}">🏔️ Home</a>
-          ${tools.map(t => `<a href="${esc(url('tools/' + t.id + '/'))}"${t.id === toolId ? ' class="cur"' : ''}>${esc(t.emoji || '🧩')} ${esc(t.name)}</a>`).join('')}
-        </div>
+        <div class="fam-list"></div>
       </div>`;
+    // The tool list, leaving out hidden and archived tools (but always the page you're on).
+    const fillList = archivedIds => {
+      const tools = (SITE.tools || []).filter(t => t.id === toolId || (!t.hidden && !archivedIds.includes(t.id)));
+      bar.querySelector('.fam-list').innerHTML = `
+        <a href="${esc(url(''))}">🏔️ Home</a>
+        ${tools.map(t => `<a href="${esc(url('tools/' + t.id + '/'))}"${t.id === toolId ? ' class="cur"' : ''}>${esc(t.emoji || '🧩')} ${esc(t.name)}</a>`).join('')}
+        ${archivedIds.length ? `<a class="fam-arch" href="${esc(url('#archived'))}">📦 Archived tools</a>` : ''}`;
+    };
+    fillList(archivedNow());
+    archived().then(fillList);
     document.body.prepend(bar);
     renderUser();
     const menu = bar.querySelector('.fam-menu');
@@ -405,5 +459,6 @@
   }
   addAppTags();
 
-  window.Family = { site: SITE, store, client: connect, peek, call, me, entries, esc, uid, url, signOut };
+  window.Family = { site: SITE, store, client: connect, peek, call, me, entries, esc, uid, url, signOut,
+    archived, archivedNow, setArchived };
 })();

@@ -8,8 +8,11 @@ code readable and commented for a non-expert.
 - `site.js`: `window.SITE`: site name, `people`, `supabase {url,key}`, and the `tools` registry.
   The home page and the ☰ menu are generated from `tools`.
 - `shared/family.js`: `window.Family`: `store(toolId)`, `me()`, `entries()`, `esc()`, `url()`, `signOut()`,
-  `client()`, `peek()` (client only if already signed in, never shows the sign-in card) and
-  `call(fn, route, body)` (call an edge function as the signed-in person).
+  `client()`, `peek()` (client only if already signed in, never shows the sign-in card),
+  `call(fn, route, body)` (call an edge function as the signed-in person) and
+  `archived()/archivedNow()/setArchived(ids)` (tools each person has archived: hidden from their home
+  page and ☰ menu, brought back from the "Archived tools" box on the home page; saved in `family_items`
+  tool `home`, collection `archived`, id = their name, with a copy in localStorage).
   It injects the menu bar on pages with `<body data-tool="…">`, shows the sign-in card when Supabase is
   configured, and adds the tab icon + app manifest links to every page that loads it.
 - `icons/` + `manifest.webmanifest`: the "Tyse" logo (letters are paths, no font needed) and the
