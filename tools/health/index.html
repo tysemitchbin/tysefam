@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Health</title>
+
+<!-- ════════════════════════════════════════════════════════════════
+     HEALTH: Mitch's Garmin recovery & training dashboard.
+
+     Where the data comes from:
+       The Garmin sync on Mitch's computer (D:\Documents\Claude projects\garmin-ai)
+       uploads garmin/data.json to the Supabase table `health_data` after every sync
+       (see supabase/health.sql). That table is NOT shared with the family: each
+       person can only read their own row, so nobody else sees it.
+
+     How the page works:
+       1. Sign in (the usual family sign-in card).
+       2. Read your own row from `health_data`.
+       3. Fetch dashboard-template.html (the charts, no data), drop the data into it,
+          and show it in a frame below.
+═════════════════════════════════════════════════════════════════ -->
+
+<link rel="stylesheet" href="../../shared/family.css">
+<style>
+#dash { display:block; width:100%; border:0; min-height:70vh; background:transparent; }
+.dash-wrap { max-width:1240px; margin:0 auto; padding:0 0 40px; }
+.wrap.narrow { padding-bottom:0; }
+</style>
+</head>
+<body data-tool="health">
+
+<main class="wrap narrow">
+  <div class="page-head">
+    <span class="emoji">🫀</span><h1>Health</h1>
+  </div>
+  <p class="hint">Recovery and training from your Garmin watch. Only you can see this page's data.</p>
+  <div id="status" class="card"><div class="empty"><span class="big">⏳</span>Loading your data…</div></div>
+</main>
+<div class="dash-wrap"><iframe id="dash" title="Recovery and training dashboard" hidden></iframe></div>
+
+<script src="../../site.js"></script>
+<script src="../../shared/family.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+
+function say(emoji, html) {
+  $('#status').hidden = false;
+  $('#status').innerHTML = `<div class="empty"><span class="big">${emoji}</span>${html}</div>`;
+}
+
+(async function load() {
+  const sb = await Family.client();          // shows the sign-in card if needed
+  if (!sb) return say('📴', 'This page needs the family sign-in (Supabase) switched on.');
+
+  // Your own row only: the database rules hide everyone else's.
+  const [{ data: row, error }, template] = await Promise.all([
+    sb.from('health_data').select('data, updated_at').maybeSingle(),
+    fetch('dashboard-template.html').then(r => r.ok ? r.text() : Promise.reject(new Error('dashboard-template.html: ' + r.status))),
+  ]).catch(e => [{ error: e }, null]);
+  if (error) return say('😕', 'Couldn’t load your data: ' + Family.esc(error.message || error));
+  if (!row) return say('⌚', 'No health data for you yet. It appears here after the Garmin sync on your computer runs.');
+
+  // The same swap the sync script does for the offline dashboard.html.
+  // "</" is escaped so nothing in the data can close the <script> tag early.
+  const json = JSON.stringify(row.data).replace(/<\//g, '<\\/');
+  let html = template.replace('/*__GARMIN_DATA__*/null', () => json);
+
+  // Blend it into the site: light theme unless you picked dark with its button,
+  // the family's cream background, Nunito text, and no second big title.
+  html = html.replace('<html lang="en">', '<html lang="en" data-theme="light">').replace('</head>', `
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap">
+    <style>
+      :root[data-theme="light"] { --page: #fbf7ee; --surface: #fffdf7; }
+      body { font-family: 'Nunito', system-ui, sans-serif; }
+      .page { padding-top: 4px; }
+      .top h1 { display: none; }
+    </style>
+  </head>`);
+
+  const frame = $('#dash');
+  // Grow the frame to fit the dashboard, so the page scrolls as one.
+  frame.addEventListener('load', () => {
+    const doc = frame.contentDocument;
+    const fit = () => { frame.style.height = doc.documentElement.scrollHeight + 'px'; };
+    new ResizeObserver(fit).observe(doc.body);
+    fit();
+    // Links in the dashboard (none today) open in the whole window, not inside the frame.
+    doc.querySelectorAll('a[href]').forEach(a => { a.target = '_top'; });
+  });
+  frame.srcdoc = html;
+  frame.hidden = false;
+  $('#status').hidden = true;
+})();
+</script>
+</body>
+</html>

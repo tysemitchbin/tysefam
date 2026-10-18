@@ -170,7 +170,7 @@ const shelf = document.getElementById('archived');
 let archivedIds = Family.archivedNow();     // this device's copy first, so nothing flickers
 
 function drawTools() {
-  const visible = site.tools.filter(t => !t.hidden);
+  const visible = site.tools.filter(t => !t.hidden && Family.forMe(t));
   const out = visible.filter(t => archivedIds.includes(t.id));
   grid.innerHTML = visible.map((t, i) => {
     if (archivedIds.includes(t.id)) return '';
@@ -217,9 +217,8 @@ shelf.addEventListener('click', e => {
 
 drawTools();
 // Then the saved list from Supabase, in case it was changed on another device.
-Family.archived().then(ids => {
-  if (JSON.stringify(ids) !== JSON.stringify(archivedIds)) { archivedIds = ids; drawTools(); }
-});
+// (Redrawn either way: by now we know who's signed in, which decides tools marked `only` in site.js.)
+Family.archived().then(ids => { archivedIds = ids; drawTools(); });
 if (location.hash === '#archived') shelf.scrollIntoView();
 
 /* ───────── "Coming up": the next few things on the shared calendar ─────────

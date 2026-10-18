@@ -7,7 +7,7 @@ code readable and commented for a non-expert.
 ## Layout
 - `site.js`: `window.SITE`: site name, `people`, `supabase {url,key}`, and the `tools` registry.
   The home page and the ☰ menu are generated from `tools`.
-- `shared/family.js`: `window.Family`: `store(toolId)`, `me()`, `entries()`, `esc()`, `url()`, `signOut()`,
+- `shared/family.js`: `window.Family`: `store(toolId)`, `me()`, `forMe(tool)`, `entries()`, `esc()`, `url()`, `signOut()`,
   `client()`, `peek()` (client only if already signed in, never shows the sign-in card),
   `call(fn, route, body)` (call an edge function as the signed-in person) and
   `archived()/archivedNow()/setArchived(ids)` (tools each person has archived: hidden from their home
@@ -38,6 +38,13 @@ code readable and commented for a non-expert.
   clips, writing and speaking tasks (all written for the tool). Listening uses the browser's own
   speech synthesis (needs a Norwegian voice on the device). Progress per person in collection
   `progress`; written texts + feedback shared in collection `texts`. Recordings never leave the browser.
+- `tools/health/`: Mitch's Garmin recovery/training dashboard (`only: ['Mitch']` in `site.js`, so
+  it's hidden from others' home page and menu). NOT family-shared: data is in `health_data`
+  (`supabase/health.sql`), one row per person, RLS = `owner = family_whoami()`. It's uploaded by
+  the sync script on Mitch's PC (`D:\Documents\Claude projects\garmin-ai\sync_garmin.py`) via the
+  `health_upload(upload_key, payload)` RPC; only a hash of the key is stored. The page drops the
+  data into `dashboard-template.html` (a copy of garmin-ai's `dashboard_template.html`, no data in
+  it) and shows it in a frame. Never commit health data to this public repo.
 - `tools/packing/`: shared packing checklists in `family_items` (tool `packing`: `lists`, `items`, `trip`).
 - `tools/energy/`: Tibber prices + usage per house, plus a Bills list. The page calls the `energy`
   edge function (`supabase/functions/energy/`), which reads Tibber/Elvia tokens from

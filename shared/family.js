@@ -7,6 +7,7 @@
    What you get on window.Family:
      Family.store('tool-id')  shared data that syncs between devices
      Family.me()              who is using this device (e.g. "Mitch")
+     Family.forMe(tool)       false for a site.js tool marked `only` for other people
      Family.entries(obj)      [id, item] pairs sorted oldest-first
      Family.esc(text)         make text safe to put in innerHTML
      Family.url('tools/x/')   link relative to the site root
@@ -41,6 +42,14 @@
     if (member) return member.name;
     return localStorage.getItem('family_me') || (SITE.people || [])[0] || 'Someone';
   }
+  // Remember who signed in on this device, so me() is right on the next visit before Supabase answers.
+  function setMember(m) {
+    member = m;
+    try { localStorage.setItem('family_me', m.name); } catch (e) { /* private window: fine */ }
+  }
+  /* Is this tool for the person on this device? Tools with `only: ['Mitch']` in site.js are
+     just for those people; everything else is for everyone. */
+  const forMe = tool => !tool.only || tool.only.includes(me());
 
   /* ───────── Supabase connection + family sign-in ───────── */
   let clientPromise = null, plainClient = null;
@@ -86,7 +95,7 @@
     if (!member) {
       const m = await lookupMember(sb);
       if (!m || m.notMember) return null;
-      member = m;
+      setMember(m);
     }
     return sb;
   }
@@ -135,7 +144,7 @@
   /* Shows the sign-in card until a family member is signed in. */
   async function signIn(sb) {
     let m = await lookupMember(sb);
-    if (m && !m.notMember) { member = m; renderUser(); return; }
+    if (m && !m.notMember) { setMember(m); renderUser(); return; }
     const ui = authCard();
     await new Promise(resolve => {
       const showNotMember = m => {
@@ -153,7 +162,7 @@
         const m = await lookupMember(sb);
         if (!m) return showForm();
         if (m.notMember) return showNotMember(m);
-        member = m; ui.close(); renderUser(); resolve();
+        setMember(m); ui.close(); renderUser(); resolve();
       };
       const showForm = (msg = '') => {
         ui.box.innerHTML = `
@@ -419,9 +428,9 @@
         <button type="button" aria-haspopup="true">☰ Tools</button>
         <div class="fam-list"></div>
       </div>`;
-    // The tool list, leaving out hidden and archived tools (but always the page you're on).
+    // The tool list, leaving out hidden, archived and other people's tools (but always the page you're on).
     const fillList = archivedIds => {
-      const tools = (SITE.tools || []).filter(t => t.id === toolId || (!t.hidden && !archivedIds.includes(t.id)));
+      const tools = (SITE.tools || []).filter(t => t.id === toolId || (!t.hidden && forMe(t) && !archivedIds.includes(t.id)));
       bar.querySelector('.fam-list').innerHTML = `
         <a href="${esc(url(''))}">🏔️ Home</a>
         ${tools.map(t => `<a href="${esc(url('tools/' + t.id + '/'))}"${t.id === toolId ? ' class="cur"' : ''}>${esc(t.emoji || '🧩')} ${esc(t.name)}</a>`).join('')}
@@ -459,6 +468,6 @@
   }
   addAppTags();
 
-  window.Family = { site: SITE, store, client: connect, peek, call, me, entries, esc, uid, url, signOut,
+  window.Family = { site: SITE, store, client: connect, peek, call, me, forMe, entries, esc, uid, url, signOut,
     archived, archivedNow, setArchived };
 })();

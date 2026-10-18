@@ -27,7 +27,8 @@ window.SITE = {
        emoji       card icon
        description one short line
        color       meadow | sky | peach | blossom | sun
-       hidden      true = keep it off the home page (e.g. while building it) */
+       hidden      true = keep it off the home page (e.g. while building it)
+       only        ['Mitch'] = show it only to these people (on the home page and ☰ menu) */
   tools: [
     {
       id: 'wanderlings',
@@ -77,6 +78,14 @@ window.SITE = {
       emoji: '⚡',
       description: 'Power prices, electricity use and the bills for both houses: Tibber, BKK and Elvia.',
       color: 'sun'
+    },
+    {
+      id: 'health',
+      name: 'Health',
+      emoji: '🫀',
+      description: 'Recovery and training from your Garmin watch: HRV, sleep, readiness and workouts.',
+      color: 'blossom',
+      only: ['Mitch']
     },
     {
       id: 'new-tool-template',
