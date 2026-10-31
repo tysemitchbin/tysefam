@@ -8,7 +8,8 @@
 <!-- ════════════════════════════════════════════════════════════════
      BABY MOVES: floor play and motor milestones, 5–18 months.
      Built from Mitch's doc "Baby Acrobatics: A Parent's Blueprint for
-     Motor Development". The words live in data.js; this file is the app.
+     Motor Development". The words live in data.js, the little diagrams
+     in illus.js; this file is the app.
 
      Seven tabs: Today · Stages · Clinics · Safety · Tracker · Kit & day · Red flags
 
@@ -154,7 +155,7 @@ ul.clean,ol.clean{margin:0;padding-left:20px;display:flex;flex-direction:column;
 .mini.later{opacity:.55}
 .mini.ok{border-left:5px solid var(--meadow)}
 .mini.watch{border-left:5px solid var(--sun-deep)}
-.mini.check{border-left:5px solid var(--bad)}
+.mini.flag{border-left:5px solid var(--bad)}   /* not .check: that's the tick box in family.css */
 .mini.skip{border-left:5px solid var(--bad)}
 .mini.limit{border-left:5px solid var(--sun-deep)}
 .mini.use{border-left:5px solid var(--meadow)}
@@ -199,6 +200,13 @@ table.t td.n{white-space:nowrap;font-weight:800;color:var(--forest)}
 .box.here{border-color:var(--hot);box-shadow:0 0 0 3px var(--hot-soft),var(--shadow)}
 
 .foot-actions{display:flex;justify-content:center}
+
+/* the little diagrams (drawn in illus.js), floated beside the words */
+.pic{float:right;width:150px;margin:0 0 6px 12px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.pic svg{display:block;width:100%;height:auto}
+.mini .pic{width:120px}
+.ex .body::after,.mini::after{content:"";display:block;clear:both}
+@media (max-width:560px){.pic{width:112px;margin-left:8px}.mini .pic{width:104px}}
 </style>
 </head>
 <body data-tool="baby-moves">
@@ -220,6 +228,7 @@ table.t td.n{white-space:nowrap;font-weight:800;color:var(--forest)}
 <script src="../../site.js"></script>
 <script src="../../shared/family.js"></script>
 <script src="data.js"></script>
+<script src="illus.js"></script>
 <script>
 (function () {
 'use strict';
@@ -228,6 +237,8 @@ const $ = s => document.querySelector(s);
 const esc = Family.esc;
 // md(): our own guide text → safe HTML. Escapes everything, then turns **this** into bold.
 const md = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+// pic(): the little diagram for this key from illus.js, or nothing if there isn't one.
+const pic = key => (window.ILLUS && ILLUS[key]) ? `<div class="pic">${ILLUS[key]}</div>` : '';
 
 /* ───────── saved data ───────── */
 const store = Family.store('baby-moves');
@@ -357,6 +368,7 @@ function exCard(stageN, idx, showNum) {
   return `<div class="ex${who ? ' done' : ''}">
     <button class="tick" data-act="done" data-k="${key}" aria-pressed="${!!who}" aria-label="Done today: ${esc(title)}"></button>
     <div class="body">
+      ${pic(key)}
       <div class="t">${showNum ? `<span class="num">${idx + 1}</span>` : ''}${esc(title)}</div>
       <p class="d">${md(how)}</p>
       ${who ? `<div class="who">✓ done today by ${esc(who)}</div>` : ''}
@@ -435,6 +447,7 @@ function drawToday() {
       <div class="ex${gWho ? ' done' : ''}">
         <button class="tick" data-act="done" data-k="${gKey}" aria-pressed="${!!gWho}" aria-label="Done today: ${esc(game[0])}"></button>
         <div class="body">
+          ${pic(gKey)}
           <div class="t">🎠 Movement game: ${esc(game[0])} <span class="pill">from ${game[1]} mo${game[3] ? ', ' + esc(game[3]) : ''}</span></div>
           <p class="d">${md(game[2])}</p>
           ${gWho ? `<div class="who">✓ done today by ${esc(gWho)}</div>` : ''}
@@ -544,17 +557,17 @@ function drawClinics() {
     body = `<section class="box"><h3>🎠 Safe “acrobatics”</h3><p>${md(P.lead)}</p></section>
     <section class="box"><h3>📏 Four rules for any movement game</h3><ol class="clean">${P.rules.map(r => `<li>${md(r)}</li>`).join('')}</ol></section>
     <section class="box"><h3>✅ The safe menu ${m != null ? `<span class="aside">for ${esc(babyName())} at ${m.toFixed(1)} months</span>` : ''}</h3>
-      <div class="cards">${P.menu.map(([name, from, how, extra]) => {
+      <div class="cards">${P.menu.map(([name, from, how, extra], i) => {
         const ready = m == null || m >= from;
-        return `<div class="mini${ready ? ' ok' : ' later'}"><h4>${esc(name)} <span class="pill${ready ? ' ok' : ''}">${ready && m != null ? 'ready now' : 'from ' + from + ' mo'}${extra ? ', ' + esc(extra) : ''}</span></h4>${md(how)}</div>`;
+        return `<div class="mini${ready ? ' ok' : ' later'}">${pic('g-' + i)}<h4>${esc(name)} <span class="pill${ready ? ' ok' : ''}">${ready && m != null ? 'ready now' : 'from ' + from + ' mo'}${extra ? ', ' + esc(extra) : ''}</span></h4>${md(how)}</div>`;
       }).join('')}</div></section>
     <section class="box" style="background:var(--bad-soft)"><h3>⛔ Still off the menu at 18 months</h3><p>${md(P.offMenu)}</p></section>`;
   } else {
     const C = G.crawling;
     body = `<section class="box"><h3>🐛 Crawling clinic</h3>${C.lead.map(p => `<p>${md(p)}</p>`).join('')}</section>
     <section class="box"><h3>👀 Patterns you may see</h3>
-      <div class="cards">${C.patterns.map(([name, looks, todo, tone]) =>
-        `<div class="mini ${tone}"><h4>${esc(name)} <span class="pill ${tone === 'ok' ? 'ok' : tone === 'watch' ? 'warn' : 'bad'}">${tone === 'ok' ? 'fine' : tone === 'watch' ? 'mention it' : 'get it checked'}</span></h4>
+      <div class="cards">${C.patterns.map(([name, looks, todo, tone], i) =>
+        `<div class="mini ${tone === 'check' ? 'flag' : tone}">${pic('c-' + i)}<h4>${esc(name)} <span class="pill ${tone === 'ok' ? 'ok' : tone === 'watch' ? 'warn' : 'bad'}">${tone === 'ok' ? 'fine' : tone === 'watch' ? 'mention it' : 'get it checked'}</span></h4>
           <div class="muted small">${esc(looks)}</div><p style="margin:.4em 0 0">${md(todo)}</p></div>`).join('')}</div></section>
     <section class="box"><h3>🧩 If crawling has not started</h3><ol class="clean">${C.notStarted.map(s => `<li>${md(s)}</li>`).join('')}</ol>
       <div class="note warn" style="margin-top:12px">${md(C.escalate)}</div></section>`;
