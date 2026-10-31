@@ -73,6 +73,13 @@ window.SITE = {
       color: 'peach'
     },
     {
+      id: 'baby-moves',
+      name: 'Baby Moves',
+      emoji: '🤸',
+      description: 'Floor play and motor milestones from 5 to 18 months: today’s exercises, safe movement games and a shared tracker.',
+      color: 'meadow'
+    },
+    {
       id: 'energy',
       name: 'Energy',
       emoji: '⚡',

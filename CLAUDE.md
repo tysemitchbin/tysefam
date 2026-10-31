@@ -49,6 +49,10 @@ code readable and commented for a non-expert.
   Baseball). View-only: the numbers are in `data.js` (one line per season; add new seasons there),
   the page works out AVG/OBP/ERA etc., totals and Chart.js charts. Brought over from
   `D:\Documents\Claude projects\Baseball Stat` (its SQLite DB/build scripts are no longer needed).
+- `tools/baby-moves/`: floor play and motor milestones, 5–18 months, from Mitch's doc "Baby Acrobatics".
+  `data.js` = the guide's words (stages, exercises, clinics, safety, equipment, tracker, red flags);
+  tracker keys in it are what ticks are saved under, so don't rename them. Shared in `family_items`
+  (tool `baby-moves`: `baby` (name, birthday, due date, stage), `skills`, `log` per day, `setup`).
 - `tools/packing/`: shared packing checklists in `family_items` (tool `packing`: `lists`, `items`, `trip`).
 - `tools/energy/`: Tibber prices + usage per house, plus a Bills list. The page calls the `energy`
   edge function (`supabase/functions/energy/`), which reads Tibber/Elvia tokens from

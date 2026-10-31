@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Baby Moves</title>
+
+<!-- ════════════════════════════════════════════════════════════════
+     BABY MOVES: floor play and motor milestones, 5–18 months.
+     Built from Mitch's doc "Baby Acrobatics: A Parent's Blueprint for
+     Motor Development". The words live in data.js; this file is the app.
+
+     Seven tabs: Today · Stages · Clinics · Safety · Tracker · Kit & day · Red flags
+
+     Saved in Family.store('baby-moves'), shared by everyone in the family:
+       baby  → 'main':        { name, born, due, stage }
+                 born / due   'YYYY-MM-DD'. due is only used if the baby came early
+                              (it gives the "corrected age" the guide asks for).
+                 stage        'auto' (worked out from the tracker) or 1–5
+       skills → <tracker key>: { date, by }   a milestone seen, and when (keys in data.js)
+       log    → 'YYYY-MM-DD':  { 's2-4': 'Mitch', 'g-1': 'Ellie', … }   exercises / games done that day
+                 (a value of null means it was unticked)
+       setup  → 'home':        { sp0: 'Mitch', … }   the "set the space up once" checklist
+     Which tab is open is remembered on this device only.
+═════════════════════════════════════════════════════════════════ -->
+
+<link rel="stylesheet" href="../../shared/family.css">
+<style>
+/* Colours come from shared/family.css (--meadow, --forest, --peach, --cream, --paper, --ink, --line…). */
+:root{
+  --accent:var(--meadow-deep); --accent-soft:#e3f1df;
+  --hot:var(--peach-deep); --hot-soft:#fdeede;
+  --bad:#c2453a; --bad-soft:#fdeceb; --warn:#a87a10; --warn-soft:#fcf3d2;
+  --sunk:#eef0e8; --rr:16px;
+}
+body{line-height:1.55}
+h1,h2,h3,h4{font-family:"Fredoka",system-ui,sans-serif;font-weight:600;color:var(--forest);line-height:1.2;margin:0}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+/* header: title + tabs, stuck to the top while you scroll */
+.top{position:sticky;top:0;z-index:10;background:var(--cream);border-bottom:1px solid var(--line)}
+.top-in{max-width:880px;margin:0 auto;padding:12px 16px 0;display:flex;flex-direction:column;gap:8px}
+.brand{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.brand-l{display:flex;align-items:center;gap:10px;min-width:0}
+.brand-l .mark{font-size:1.7rem;line-height:1}
+.brand h1{font-size:1.25rem}
+.brand small{display:block;font-size:.78rem;color:var(--ink-soft)}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:none;border:0;padding:8px 11px 10px;color:var(--ink-soft);font-weight:700;border-bottom:3px solid transparent;white-space:nowrap;font-size:.93rem}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--hot)}
+.tab:hover{color:var(--ink)}
+
+main.view{max-width:880px;margin:0 auto;padding:22px 16px 72px;display:flex;flex-direction:column;gap:20px}
+
+/* generic pieces */
+.box{background:var(--paper);border:1px solid var(--line);border-radius:var(--rr);padding:18px;box-shadow:var(--shadow)}
+.box > h3{font-size:1.15rem;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.box > h3 .aside{margin-left:auto;font-family:"Nunito",sans-serif;font-size:.8rem;font-weight:800;color:var(--ink-soft)}
+.eyebrow{font-size:.74rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft)}
+.muted{color:var(--ink-soft)}
+.small{font-size:.86rem}
+p{margin:.4em 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+ul.clean,ol.clean{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:2px solid var(--line);background:#fff;color:var(--forest);border-radius:999px;padding:6px 12px;font-weight:800;font-size:.86rem}
+.chip[aria-pressed="true"]{background:var(--meadow);border-color:var(--meadow);color:#fff}
+.note{border-radius:12px;padding:12px 14px;background:var(--sunk);font-size:.92rem}
+.note.warn{background:var(--warn-soft)}
+.note.bad{background:var(--bad-soft)}
+.note.good{background:var(--accent-soft)}
+.pill{display:inline-block;font-size:.72rem;font-weight:800;padding:2px 9px;border-radius:999px;background:var(--sunk);color:var(--ink-soft);white-space:nowrap;vertical-align:middle}
+.pill.ok{background:var(--accent-soft);color:var(--accent)}
+.pill.hot{background:var(--hot-soft);color:#b8693b}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.disclaimer{font-size:.82rem;color:var(--ink-soft);text-align:center;max-width:64ch;margin:0 auto}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;background:#fff;padding:3px;flex-wrap:wrap}
+.seg button{border:0;background:none;border-radius:999px;padding:6px 12px;font-size:.88rem;font-weight:800;color:var(--ink-soft)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+@media (max-width:560px){.seg{border-radius:18px}.brand small{display:none}}
+
+/* tick boxes (shared with family.css .check, but as real buttons) */
+.tick{flex:0 0 auto;width:28px;height:28px;border-radius:9px;border:2px solid var(--meadow);background:#fff;display:grid;place-items:center;padding:0;transition:.15s}
+.tick:hover{background:#eef6ea}
+.tick[aria-pressed="true"]{background:var(--meadow)}
+.tick[aria-pressed="true"]::after{content:"✓";color:#fff;font-weight:800}
+
+/* Today: the baby card */
+.hello{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+.hello .face{font-size:2.6rem;width:72px;height:72px;border-radius:50%;background:var(--blossom);display:grid;place-items:center}
+.hello h2{font-size:clamp(1.4rem,4vw,1.9rem)}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.form label{display:flex;flex-direction:column;gap:4px;font-weight:800;font-size:.82rem;color:var(--ink-soft)}
+.form input{border:2px solid var(--line);border-radius:12px;padding:9px 11px;background:#fff;min-width:0}
+.form input:focus{border-color:var(--meadow);outline:none}
+
+/* exercise cards (Today and Stages) */
+.exs{display:flex;flex-direction:column;gap:8px}
+.ex{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);background:#fff;border-radius:14px;padding:12px}
+.ex.done{background:#f5faf3}
+.ex .body{flex:1;min-width:0}
+.ex .t{font-weight:800;color:var(--forest)}
+.ex .num{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--hot-soft);color:#b8693b;font-size:.75rem;font-weight:800;margin-right:6px;vertical-align:1px}
+.ex .d{margin:.25em 0 0;font-size:.94rem}
+.ex .who{font-size:.74rem;font-weight:800;color:var(--accent)}
+
+/* the week strip */
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}
+.week .d{border-radius:12px;padding:6px 0;background:var(--sunk);font-size:.75rem;font-weight:800;color:var(--ink-soft)}
+.week .d b{display:block;font-family:"Fredoka",sans-serif;font-size:1.1rem;color:var(--ink-soft)}
+.week .d.some{background:var(--accent-soft)} .week .d.some b{color:var(--accent)}
+.week .d.lots{background:var(--meadow);color:#fff} .week .d.lots b{color:#fff}
+.week .d.today{outline:2px solid var(--hot);outline-offset:-2px}
+
+/* skill windows chart */
+.win{display:flex;flex-direction:column;gap:4px}
+.win-row,.win-axis{display:grid;grid-template-columns:170px 1fr 58px;gap:10px;align-items:center}
+.win-row{border:0;background:none;padding:3px 0;text-align:left;border-radius:8px;width:100%}
+.win-row:hover{background:var(--sunk)}
+.win-lbl{font-size:.88rem;font-weight:700}
+.win-rng{font-size:.78rem;color:var(--ink-soft);font-weight:700;text-align:right}
+.win-track{position:relative;height:18px;background:repeating-linear-gradient(90deg,var(--line) 0 1px,transparent 1px calc(100%/13))}
+.win-track i{position:absolute;top:2px;bottom:2px;border-radius:9px;background:rgba(127,168,116,.22);border:1.5px solid var(--meadow)}
+.win-row.key i{background:rgba(232,155,111,.25);border-color:var(--hot)}
+.win-row.key .win-lbl{color:#b8693b}
+.win-track .now{position:absolute;top:-4px;bottom:-4px;width:0;border-left:2px dashed var(--forest)}
+.win-ticks{position:relative;height:18px;font-size:.74rem;font-weight:800;color:var(--ink-soft)}
+.win-ticks span{position:absolute;transform:translateX(-50%)}
+@media (max-width:600px){
+  .win-row,.win-axis{grid-template-columns:1fr 46px;gap:2px 8px}
+  .win-lbl{grid-column:1 / -1}
+  .win-axis > span:first-child{display:none}
+  .win-ticks .odd{display:none}
+}
+
+/* stage picker */
+.stagebar{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.stagebtn{border:2px solid var(--line);background:#fff;border-radius:14px;padding:8px 4px;text-align:center;font-weight:800;color:var(--forest);line-height:1.2}
+.stagebtn .e{font-size:1.4rem;display:block}
+.stagebtn small{display:block;font-size:.72rem;color:var(--ink-soft);font-weight:700}
+.stagebtn[aria-pressed="true"]{border-color:var(--hot);background:var(--hot-soft)}
+.stagebtn.mine{box-shadow:inset 0 -4px 0 var(--meadow)}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.fact{border-radius:12px;background:var(--sunk);padding:12px 14px;font-size:.93rem}
+.fact .eyebrow{display:block;margin-bottom:4px}
+.fact.good{background:var(--accent-soft)}
+
+/* plain tables and card lists */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.mini{border:1px solid var(--line);background:#fff;border-radius:14px;padding:12px 14px;font-size:.93rem}
+.mini h4{font-size:1rem;margin-bottom:4px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.mini.later{opacity:.55}
+.mini.ok{border-left:5px solid var(--meadow)}
+.mini.watch{border-left:5px solid var(--sun-deep)}
+.mini.check{border-left:5px solid var(--bad)}
+.mini.skip{border-left:5px solid var(--bad)}
+.mini.limit{border-left:5px solid var(--sun-deep)}
+.mini.use{border-left:5px solid var(--meadow)}
+.mini.big{background:var(--bad-soft);grid-column:1 / -1}
+table.t{width:100%;border-collapse:collapse;font-size:.93rem}
+table.t th{text-align:left;font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);padding:6px 8px;border-bottom:2px solid var(--line)}
+table.t td{padding:9px 8px;border-bottom:1px dashed var(--line);vertical-align:top}
+table.t tr.here td{background:var(--hot-soft)}
+table.t td.n{white-space:nowrap;font-weight:800;color:var(--forest)}
+@media (max-width:560px){
+  table.t.stack thead{display:none}
+  table.t.stack tr{display:block;border-bottom:1px dashed var(--line);padding:8px 0}
+  table.t.stack td{display:block;border:0;padding:2px 8px}
+}
+
+/* safety */
+.never{display:flex;flex-direction:column;gap:8px}
+.never .n{display:flex;gap:12px;background:var(--bad-soft);border-radius:12px;padding:12px 14px}
+.never .n .x{font-size:1.2rem;line-height:1.3}
+.never .n b{color:#8f2f26}
+.checklist{display:flex;flex-direction:column}
+.checklist .it{display:flex;gap:12px;align-items:flex-start;padding:9px 2px;border-bottom:1px dashed var(--line)}
+.checklist .it:last-child{border-bottom:0}
+.checklist .it .txt{flex:1;min-width:0}
+.checklist .it.done .txt{color:var(--ink-soft)}
+.principles{counter-reset:p;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.principles details{border:1px solid var(--line);background:#fff;border-radius:14px;padding:12px 14px}
+.principles summary{cursor:pointer;font-weight:800;color:var(--forest);list-style:none;display:flex;gap:10px;align-items:baseline}
+.principles summary::-webkit-details-marker{display:none}
+.principles summary::before{counter-increment:p;content:counter(p);font-family:"Fredoka",sans-serif;font-size:1.3rem;color:var(--hot);line-height:1}
+.principles p{font-size:.93rem;margin:.5em 0 0}
+
+/* tracker */
+.tgroup{display:flex;flex-direction:column}
+.titem{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:9px 2px;border-bottom:1px dashed var(--line)}
+.titem:last-child{border-bottom:0}
+.titem .when{display:flex;align-items:center;gap:6px;font-size:.78rem;font-weight:800;color:var(--accent)}
+.titem input[type=date]{border:1px solid var(--line);border-radius:8px;padding:3px 6px;font-size:.8rem;color:var(--accent);background:#fff}
+@media (max-width:560px){.titem{grid-template-columns:auto 1fr}.titem .when{grid-column:2}}
+.bar{height:8px;border-radius:999px;background:var(--sunk);overflow:hidden;flex:1;min-width:80px}
+.bar > i{display:block;height:100%;background:var(--meadow);border-radius:999px}
+.box.here{border-color:var(--hot);box-shadow:0 0 0 3px var(--hot-soft),var(--shadow)}
+
+.foot-actions{display:flex;justify-content:center}
+</style>
+</head>
+<body data-tool="baby-moves">
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <div class="brand-l">
+        <span class="mark" aria-hidden="true">🤸</span>
+        <div><h1>Baby Moves</h1><small>Floor play and motor milestones, 5–18 months</small></div>
+      </div>
+      <span class="badge local" id="sync">…</span>
+    </div>
+    <nav class="tabs" role="tablist" id="tabs"></nav>
+  </div>
+</header>
+<main class="view" id="view" aria-live="polite"></main>
+
+<script src="../../site.js"></script>
+<script src="../../shared/family.js"></script>
+<script src="data.js"></script>
+<script>
+(function () {
+'use strict';
+const G = window.GUIDE;
+const $ = s => document.querySelector(s);
+const esc = Family.esc;
+// md(): our own guide text → safe HTML. Escapes everything, then turns **this** into bold.
+const md = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+
+/* ───────── saved data ───────── */
+const store = Family.store('baby-moves');
+let BABY = {}, SKILLS = {}, LOG = {}, SETUP = {};
+
+// What's open on this device (tab, which stage you're reading…). Never synced.
+const UI_KEY = 'baby-moves-ui';
+const S = { tab: 'today', stage: null, clinic: 'crawl', kit: 'All', editing: false, open: [] };
+try { Object.assign(S, JSON.parse(localStorage.getItem(UI_KEY)) || {}); } catch (e) { /* private window: fine */ }
+S.editing = false;
+function saveUI() { try { localStorage.setItem(UI_KEY, JSON.stringify({ tab: S.tab, stage: S.stage, clinic: S.clinic, kit: S.kit, open: S.open })); } catch (e) {} }
+
+store.ready.then(() => {
+  const cloud = store.mode === 'cloud';
+  $('#sync').className = 'badge ' + (cloud ? 'ok' : 'local');
+  $('#sync').textContent = cloud ? '☁️ Shared' : '📴 This device only';
+});
+store.watch('baby', items => { BABY = items.main || {}; softRender(); });
+store.watch('skills', items => { SKILLS = items; softRender(); });
+store.watch('log', items => { LOG = items; softRender(); });
+store.watch('setup', items => { SETUP = items.home || {}; softRender(); });
+
+/* ───────── dates and ages ───────── */
+const pad = n => String(n).padStart(2, '0');
+const dayKey = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const parseDay = s => { if (!s) return null; const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const today = () => { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); };
+const todayKey = () => dayKey(today());
+const niceDate = s => { const d = parseDay(s); return d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; };
+
+// Age from a date: whole months, the days left over, and a decimal for the chart.
+function age(fromStr) {
+  const b = parseDay(fromStr); if (!b) return null;
+  const t = today();
+  if (t < b) return { m: 0, days: 0, exact: (t - b) / 864e5 / 30.44, before: true };
+  let m = (t.getFullYear() - b.getFullYear()) * 12 + t.getMonth() - b.getMonth();
+  if (t.getDate() < b.getDate()) m--;
+  const anchor = new Date(b.getFullYear(), b.getMonth() + m, b.getDate());
+  const days = Math.max(0, Math.round((t - anchor) / 864e5));
+  return { m, days, exact: m + days / 30.44 };
+}
+function ageText(a) {
+  if (!a) return '';
+  if (a.before) return 'not here yet';
+  const w = Math.floor(a.days / 7);
+  const mo = a.m === 1 ? '1 month' : a.m + ' months';
+  if (a.m === 0) return w === 1 ? '1 week' : w + ' weeks';
+  return w ? mo + ', ' + w + (w === 1 ? ' week' : ' weeks') : mo;
+}
+/* The age the guide should use. Born 3+ weeks before the due date → corrected age
+   (counted from the due date) until about 2 years, as the guide says. */
+function babyAges() {
+  const actual = age(BABY.born);
+  if (!actual) return null;
+  const early = BABY.due && BABY.born ? (parseDay(BABY.due) - parseDay(BABY.born)) / 864e5 : 0;
+  const corrected = early >= 21 ? age(BABY.due) : null;
+  const useCorrected = corrected && actual.exact < 24;
+  return { actual, corrected: useCorrected ? corrected : null, work: useCorrected ? corrected : actual };
+}
+const babyName = () => (BABY.name || '').trim() || 'Baby';
+
+/* ───────── stages ───────── */
+// The stage the tracker points to: what the baby can already do, not their birthday.
+function trackedStage() {
+  let s = 1;
+  G.stageGates.forEach(g => { if (g.need.every(k => SKILLS[k])) s = Math.max(s, g.stage); });
+  return s;
+}
+const myStage = () => (BABY.stage && BABY.stage !== 'auto') ? Number(BABY.stage) : trackedStage();
+const ageStage = m => m == null ? null : m < 7 ? 1 : m < 9 ? 2 : m < 12 ? 3 : m < 15 ? 4 : 5;
+const skillText = k => { for (const g of G.tracker) for (const [key, txt] of g.items) if (key === k) return txt; return k; };
+
+/* ───────── the day's log ───────── */
+const doneToday = () => LOG[todayKey()] || {};
+const countDone = entry => Object.values(entry || {}).filter(v => typeof v === 'string').length;
+function toggleDone(key) {
+  const k = todayKey();
+  const was = doneToday()[key];
+  // set (not update): the day's record may not exist yet, and update only changes existing records.
+  store.set('log', k, Object.assign({}, LOG[k], { [key]: was ? null : Family.me() }));
+}
+// Today's three exercises: they rotate through the stage's list, a new three each day.
+function todaysExercises(stage) {
+  const ex = G.stages[stage - 1].exercises;
+  const dayNum = Math.floor(today().getTime() / 864e5);
+  const out = [];
+  for (let i = 0; out.length < Math.min(3, ex.length); i++) {
+    const idx = (dayNum * 3 + i) % ex.length;
+    if (!out.includes(idx)) out.push(idx);
+  }
+  return out;
+}
+
+/* ───────── drawing ───────── */
+const TABS = [
+  ['today', '🌞 Today'], ['stages', '🪜 Stages'], ['clinics', '🩺 Clinics'], ['safety', '🛡️ Safety'],
+  ['tracker', '✅ Tracker'], ['kit', '🧰 Kit & day'], ['flags', '🚩 Red flags']
+];
+const view = $('#view');
+
+function render() {
+  $('#tabs').innerHTML = TABS.map(([id, label]) =>
+    `<button class="tab" role="tab" data-act="tab" data-v="${id}" aria-selected="${S.tab === id}">${label}</button>`).join('');
+  const draw = { today: drawToday, stages: drawStages, clinics: drawClinics, safety: drawSafety, tracker: drawTracker, kit: drawKit, flags: drawFlags }[S.tab] || drawToday;
+  view.innerHTML = draw() + `<p class="disclaimer">${md(G.disclaimer)}</p>`;
+  // Re-open any fold-outs that were open before the redraw.
+  view.querySelectorAll('details[data-k]').forEach(d => { if (S.open.includes(d.dataset.k)) d.open = true; });
+}
+// Data changed on another device: redraw, but not while someone is typing in a box.
+let pending = false;
+function softRender() {
+  const a = document.activeElement;
+  if (a && view.contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) { pending = true; return; }
+  render();
+}
+view.addEventListener('focusout', () => { if (pending) { pending = false; setTimeout(softRender, 50); } });
+view.addEventListener('toggle', e => {
+  const k = e.target.dataset && e.target.dataset.k; if (!k) return;
+  S.open = S.open.filter(x => x !== k); if (e.target.open) S.open.push(k); saveUI();
+}, true);
+
+// One exercise card with its "done today" tick.
+function exCard(stageN, idx, showNum) {
+  const [title, how] = G.stages[stageN - 1].exercises[idx];
+  const key = 's' + stageN + '-' + idx;
+  const who = doneToday()[key];
+  return `<div class="ex${who ? ' done' : ''}">
+    <button class="tick" data-act="done" data-k="${key}" aria-pressed="${!!who}" aria-label="Done today: ${esc(title)}"></button>
+    <div class="body">
+      <div class="t">${showNum ? `<span class="num">${idx + 1}</span>` : ''}${esc(title)}</div>
+      <p class="d">${md(how)}</p>
+      ${who ? `<div class="who">✓ done today by ${esc(who)}</div>` : ''}
+    </div></div>`;
+}
+
+/* ── Today ── */
+function drawToday() {
+  const ages = babyAges();
+  let html = '';
+
+  // 1. Who the baby is (or the form to say so)
+  if (S.editing || !BABY.born) {
+    html += `<section class="box">
+      <h3>👶 ${BABY.born ? 'Edit baby details' : 'First, tell it about the baby'}</h3>
+      <p class="muted small">The birthday puts a “today” line on the chart and picks movement games that suit their age. Only fill in the due date if they came 3+ weeks early, for the corrected age.</p>
+      <div class="form" style="margin-top:10px">
+        <label>Name<input id="fName" maxlength="40" value="${esc(BABY.name || '')}" placeholder="Baby"></label>
+        <label>Birthday<input id="fBorn" type="date" value="${esc(BABY.born || '')}"></label>
+        <label>Due date (if early)<input id="fDue" type="date" value="${esc(BABY.due || '')}"></label>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" data-act="saveBaby">Save</button>
+        ${BABY.born ? '<button class="btn ghost" data-act="cancelEdit">Cancel</button>' : ''}
+      </div>
+    </section>`;
+  } else {
+    const a = ages;
+    html += `<section class="box hello">
+      <div class="face" aria-hidden="true">👶</div>
+      <div>
+        <div class="eyebrow">Today, ${today().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+        <h2>${esc(babyName())} is ${esc(ageText(a.actual))}</h2>
+        ${a.corrected ? `<div class="muted">Corrected age <b>${esc(ageText(a.corrected))}</b>. The guide uses this one until about 2 years.</div>` : ''}
+        ${a.work.exact < 5 && !a.work.before ? '<div class="muted small">The guide starts at 5 months; Stage 1 is still a good place to look.</div>' : ''}
+        ${a.work.exact > 18 ? '<div class="muted small">Past the guide’s 18 months. Stage 5 and the obstacle course still apply.</div>' : ''}
+        <button class="btn ghost sm" data-act="edit" style="margin-top:8px">✏️ Edit</button>
+      </div>
+    </section>`;
+  }
+
+  // 2. Which stage to work in
+  const st = myStage(), stage = G.stages[st - 1];
+  const auto = !BABY.stage || BABY.stage === 'auto';
+  const nextGate = G.stageGates.find(g => g.stage === st + 1);
+  const aStage = ages ? ageStage(ages.work.exact) : null;
+  html += `<section class="box">
+    <h3>${stage.emoji} Working in Stage ${st}: ${esc(stage.title)} <span class="aside">${stage.months} months</span></h3>
+    <p>${md(stage.lead)}</p>
+    <p class="muted small">${auto
+      ? 'Picked from what the tracker says ' + esc(babyName()) + ' can already do, not from their birthday.'
+      : 'You chose this stage. Switch back to “Auto” to let the tracker pick.'}
+      ${aStage && aStage !== st ? ' By age alone it would be Stage ' + aStage + '; that’s fine, the guide says to work from what they can do.' : ''}</p>
+    ${auto && nextGate ? `<div class="note" style="margin-top:10px">
+      <b>Ready for Stage ${nextGate.stage}?</b> Tick these when you see them:
+      <div class="checklist" style="margin-top:6px">${nextGate.need.map(k => trackerLine(k, true)).join('')}</div></div>` : ''}
+    <div class="row" style="margin-top:12px">
+      <span class="small muted" style="font-weight:800">Stage:</span>
+      <div class="seg">${['auto', 1, 2, 3, 4, 5].map(v =>
+        `<button data-act="setStage" data-v="${v}" aria-pressed="${String(BABY.stage || 'auto') === String(v)}">${v === 'auto' ? 'Auto' : v}</button>`).join('')}</div>
+    </div>
+  </section>`;
+
+  // 3. Today's three exercises + one movement game
+  const picks = todaysExercises(st);
+  const m = ages ? ages.work.exact : 5;
+  const games = G.play.menu.map((g, i) => [g, i]).filter(([g]) => g[1] <= Math.max(5, m));
+  const dayNum = Math.floor(today().getTime() / 864e5);
+  const [game, gi] = games[dayNum % games.length];
+  const gKey = 'g-' + gi, gWho = doneToday()[gKey];
+  html += `<section class="box">
+    <h3>🎯 Today’s floor play <span class="aside">${countDone(doneToday())} done today</span></h3>
+    <p class="muted small">Ten to fifteen minutes in two or three short bursts. A fresh three each day, rotating through Stage ${st}. Stop at the first “enough” sign.</p>
+    <div class="exs" style="margin-top:10px">
+      ${picks.map(i => exCard(st, i, true)).join('')}
+      <div class="ex${gWho ? ' done' : ''}">
+        <button class="tick" data-act="done" data-k="${gKey}" aria-pressed="${!!gWho}" aria-label="Done today: ${esc(game[0])}"></button>
+        <div class="body">
+          <div class="t">🎠 Movement game: ${esc(game[0])} <span class="pill">from ${game[1]} mo${game[3] ? ', ' + esc(game[3]) : ''}</span></div>
+          <p class="d">${md(game[2])}</p>
+          ${gWho ? `<div class="who">✓ done today by ${esc(gWho)}</div>` : ''}
+        </div></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn ghost sm" data-act="goStage" data-v="${st}">See all ${stage.exercises.length} Stage ${st} exercises →</button>
+      <button class="btn ghost sm" data-act="goTab" data-v="safety">🛡️ Safety rules</button>
+    </div>
+  </section>`;
+
+  // 4. The last seven days
+  const days = [];
+  for (let i = 6; i >= 0; i--) { const d = today(); d.setDate(d.getDate() - i); days.push(d); }
+  html += `<section class="box">
+    <h3>📅 The last seven days</h3>
+    <div class="week">${days.map(d => {
+      const n = countDone(LOG[dayKey(d)]);
+      return `<div class="d${n >= 3 ? ' lots' : n ? ' some' : ''}${dayKey(d) === todayKey() ? ' today' : ''}" title="${n} done">
+        ${d.toLocaleDateString('en-GB', { weekday: 'short' })}<b>${n || '·'}</b></div>`;
+    }).join('')}</div>
+    <p class="muted small" style="margin-top:8px">${md(G.skip ? '**Skipping is fine:** ' + G.skip : '')}</p>
+  </section>`;
+
+  // 5. The skill windows chart
+  html += `<section class="box">
+    <h3>🗺️ The windows overlap</h3>
+    <p class="muted small">The typical range for each skill, by age in months. First steps alone spread across eight months. Tap a row to open its stage.</p>
+    ${windowsChart(ages)}
+  </section>`;
+
+  // 6. Stop signs
+  html += `<section class="box">
+    <h3>✋ Stop when you see “enough”</h3>
+    <p>Turning the head away, going floppy or stiff, fussing, yawning, hiccups, glazed staring, or sudden stillness. Wait 20–30 minutes after a feed for tummy and tilting games.</p>
+    <p class="muted small"><b>The quiet rule:</b> ${md(G.quietRule)}</p>
+  </section>`;
+  return html;
+}
+
+function windowsChart(ages) {
+  const X = m => ((m - 5) / 13 * 100).toFixed(2) + '%';
+  const now = ages && !ages.work.before && ages.work.exact >= 5 && ages.work.exact <= 18 ? ages.work.exact : null;
+  const ticks = Array.from({ length: 14 }, (_, i) => 5 + i)
+    .map(m => `<span class="${m % 2 ? 'odd' : ''}" style="left:${X(m)}">${m}</span>`).join('');
+  return `<div class="win" role="img" aria-label="Typical age range for each motor skill, 5 to 18 months">
+    <div class="win-axis"><span></span><div class="win-ticks">${ticks}</div><span class="win-rng">${now != null ? 'today ⇣' : ''}</span></div>
+    ${G.windows.map(([label, a, b, stage]) => `
+      <button class="win-row${label === 'First steps' ? ' key' : ''}" data-act="goStage" data-v="${stage}">
+        <span class="win-lbl">${esc(label)}</span>
+        <span class="win-track"><i style="left:${X(a)};width:${((b - a) / 13 * 100).toFixed(2)}%"></i>
+          ${now != null ? `<span class="now" style="left:${X(now)}"></span>` : ''}</span>
+        <span class="win-rng">${a}–${b} mo</span>
+      </button>`).join('')}
+    ${now != null ? `<p class="muted small" style="margin:6px 0 0">Dashed line: ${esc(babyName())} today (${ages.corrected ? 'corrected ' : ''}${now.toFixed(1)} months).</p>` : ''}
+  </div>`;
+}
+
+/* ── Stages ── */
+function drawStages() {
+  const mine = myStage();
+  const n = S.stage || mine, st = G.stages[n - 1];
+  return `<section class="box">
+    <p class="muted small" style="margin-top:0">Work in the stage that matches what the baby can already do, not their birthday. The green underline is ${esc(babyName())}’s stage right now.</p>
+    <div class="stagebar">${G.stages.map(s => `
+      <button class="stagebtn${s.n === mine ? ' mine' : ''}" data-act="stage" data-v="${s.n}" aria-pressed="${s.n === n}">
+        <span class="e">${s.emoji}</span>${s.n}<small>${s.months} mo</small></button>`).join('')}</div>
+  </section>
+  <section class="box">
+    <div class="eyebrow">Stage ${st.n} · ${st.months} months</div>
+    <h2 style="font-size:1.6rem;margin:2px 0 8px">${st.emoji} ${esc(st.title)}</h2>
+    <p>${md(st.lead)}</p>
+    <div class="fact" style="margin-top:10px"><span class="eyebrow">What is developing</span>${md(st.developing)}</div>
+  </section>
+  <section class="box">
+    <h3>🎯 Exercises and games <span class="aside">tick = done today</span></h3>
+    <div class="exs">${st.exercises.map((_, i) => exCard(st.n, i, true)).join('')}</div>
+  </section>
+  <div class="facts">
+    <div class="fact"><span class="eyebrow">🏠 Set-up</span>${md(st.setup)}</div>
+    <div class="fact good"><span class="eyebrow">🌟 Good progress by the end</span>${md(st.progress)}</div>
+  </div>
+  <div class="row" style="justify-content:space-between">
+    ${n > 1 ? `<button class="btn ghost sm" data-act="stage" data-v="${n - 1}">← Stage ${n - 1}</button>` : '<span></span>'}
+    ${n < 5 ? `<button class="btn ghost sm" data-act="stage" data-v="${n + 1}">Stage ${n + 1} →</button>` : ''}
+  </div>`;
+}
+
+/* ── Clinics ── */
+function drawClinics() {
+  const seg = `<div class="seg" role="group" aria-label="Clinic">${[['crawl', '🐛 Crawling'], ['walk', '🚶 Walking'], ['play', '🎠 Movement play']].map(([id, l]) =>
+    `<button data-act="clinic" data-v="${id}" aria-pressed="${S.clinic === id}">${l}</button>`).join('')}</div>`;
+  let body = '';
+  if (S.clinic === 'walk') {
+    const W = G.walking;
+    const done = W.readiness.map((_, i) => ['m12-pull', 'm12-cruise', 'm12-lower', 'm12-stand', null, 'm15-squat'][i]);
+    body = `<section class="box"><h3>🚶 Walking clinic</h3><p>${md(W.lead)}</p></section>
+    <section class="box"><h3>🪜 Readiness signs, in order</h3>
+      <ol class="clean">${W.readiness.map((r, i) => `<li>${esc(r)} ${done[i] && SKILLS[done[i]] ? '<span class="pill ok">✓ seen</span>' : ''}</li>`).join('')}</ol>
+      <p class="muted small" style="margin-top:8px">“✓ seen” comes from the Tracker tab.</p></section>
+    <section class="box"><h3>🤝 How to help without getting in the way</h3><ul class="clean">${W.help.map(h => `<li>${md(h)}</li>`).join('')}</ul></section>
+    <section class="box"><h3>👟 Footwear</h3><p>${md(W.footwear)}</p></section>
+    <section class="box"><h3>😌 Things that look wrong and usually are not</h3><ul class="clean">${W.looksWrong.map(h => `<li>${md(h)}</li>`).join('')}</ul></section>
+    <section class="box"><h3>⏳ If walking is late</h3><p>${md(W.late)}</p></section>`;
+  } else if (S.clinic === 'play') {
+    const P = G.play, ages = babyAges(), m = ages ? ages.work.exact : null;
+    body = `<section class="box"><h3>🎠 Safe “acrobatics”</h3><p>${md(P.lead)}</p></section>
+    <section class="box"><h3>📏 Four rules for any movement game</h3><ol class="clean">${P.rules.map(r => `<li>${md(r)}</li>`).join('')}</ol></section>
+    <section class="box"><h3>✅ The safe menu ${m != null ? `<span class="aside">for ${esc(babyName())} at ${m.toFixed(1)} months</span>` : ''}</h3>
+      <div class="cards">${P.menu.map(([name, from, how, extra]) => {
+        const ready = m == null || m >= from;
+        return `<div class="mini${ready ? ' ok' : ' later'}"><h4>${esc(name)} <span class="pill${ready ? ' ok' : ''}">${ready && m != null ? 'ready now' : 'from ' + from + ' mo'}${extra ? ', ' + esc(extra) : ''}</span></h4>${md(how)}</div>`;
+      }).join('')}</div></section>
+    <section class="box" style="background:var(--bad-soft)"><h3>⛔ Still off the menu at 18 months</h3><p>${md(P.offMenu)}</p></section>`;
+  } else {
+    const C = G.crawling;
+    body = `<section class="box"><h3>🐛 Crawling clinic</h3>${C.lead.map(p => `<p>${md(p)}</p>`).join('')}</section>
+    <section class="box"><h3>👀 Patterns you may see</h3>
+      <div class="cards">${C.patterns.map(([name, looks, todo, tone]) =>
+        `<div class="mini ${tone}"><h4>${esc(name)} <span class="pill ${tone === 'ok' ? 'ok' : tone === 'watch' ? 'warn' : 'bad'}">${tone === 'ok' ? 'fine' : tone === 'watch' ? 'mention it' : 'get it checked'}</span></h4>
+          <div class="muted small">${esc(looks)}</div><p style="margin:.4em 0 0">${md(todo)}</p></div>`).join('')}</div></section>
+    <section class="box"><h3>🧩 If crawling has not started</h3><ol class="clean">${C.notStarted.map(s => `<li>${md(s)}</li>`).join('')}</ol>
+      <div class="note warn" style="margin-top:12px">${md(C.escalate)}</div></section>`;
+  }
+  return `<div>${seg}</div>${body}`;
+}
+
+/* ── Safety ── */
+function drawSafety() {
+  const doneN = G.space.filter((_, i) => SETUP['sp' + i]).length;
+  return `<section class="box"><h3>🛡️ The non-negotiables</h3>
+    <p class="muted small">The baby moves under their own power while you provide support, never force or momentum. These apply at every age.</p>
+    <div class="never" style="margin-top:10px">${G.never.map(([a, b]) => `<div class="n"><span class="x">🚫</span><div><b>${esc(a)}</b> ${md(b)}</div></div>`).join('')}</div>
+  </section>
+  <section class="box"><h3>🏠 Set the space up once <span class="aside">${doneN} of ${G.space.length} done</span></h3>
+    <p class="muted small">A shared checklist: tick things off as you sort them.</p>
+    <div class="checklist">${G.space.map((s, i) => {
+      const who = SETUP['sp' + i];
+      return `<div class="it${who ? ' done' : ''}"><button class="tick" data-act="setup" data-k="sp${i}" aria-pressed="${!!who}" aria-label="Done"></button>
+        <div class="txt">${md(s)}${who ? ` <span class="who-pill">${esc(who)}</span>` : ''}</div></div>`;
+    }).join('')}</div>
+  </section>
+  <section class="box"><h3>⏱️ During a session</h3><ul class="clean">${G.session.map(s => `<li>${md(s)}</li>`).join('')}</ul></section>
+  <section class="box" style="background:var(--warn-soft)"><h3>🤕 After a fall</h3><p>${md(G.afterFall)}</p></section>
+  <section class="box"><h3>💡 Nine principles that do the real work</h3>
+    <p class="muted small">Tap one to read it. The exercises are all applications of these.</p>
+    <div class="principles" style="margin-top:10px">${G.principles.map(([a, b], i) =>
+      `<details data-k="pr${i}"><summary>${esc(a)}</summary><p>${md(b)}</p></details>`).join('')}</div>
+    <p style="margin-top:12px"><b>The quiet rule behind all nine:</b> ${md(G.quietRule)}</p>
+  </section>
+  <section class="box"><h3>📖 About this guide</h3>${G.intro.map(p => `<p>${md(p)}</p>`).join('')}</section>`;
+}
+
+/* ── Tracker ── */
+// One tracker line: tick, the skill, and the date it was first seen (editable).
+function trackerLine(key, compact) {
+  const s = SKILLS[key];
+  return `<div class="${compact ? 'it' : 'titem'}${s ? ' done' : ''}">
+    <button class="tick" data-act="skill" data-k="${key}" aria-pressed="${!!s}" aria-label="Seen: ${esc(skillText(key))}"></button>
+    <div class="txt">${esc(skillText(key))}${compact && s ? ` <span class="pill ok">✓ ${esc(niceDate(s.date))}</span>` : ''}</div>
+    ${!compact && s ? `<label class="when">📅 <input type="date" data-act="skillDate" data-k="${key}" value="${esc(s.date || '')}" aria-label="Date first seen"><span class="who-pill">${esc(s.by || '')}</span></label>` : ''}
+  </div>`;
+}
+function drawTracker() {
+  const ages = babyAges(), m = ages ? ages.work.exact : null;
+  const nextBy = m == null ? null : (G.tracker.find(g => g.by >= m) || {}).by;
+  const total = G.tracker.reduce((n, g) => n + g.items.length, 0);
+  const seen = G.tracker.reduce((n, g) => n + g.items.filter(([k]) => SKILLS[k]).length, 0);
+  return `<section class="box"><h3>✅ Progress tracker <span class="aside">${seen} of ${total} seen</span></h3>
+    <p>${md(G.trackerLead)}</p>
+    <p class="muted small">Tap a box when you see a skill; today’s date goes in, and you can change it. Ticks are shared, and they move the stage on the Today tab.</p>
+  </section>
+  ${G.tracker.map(g => {
+    const n = g.items.filter(([k]) => SKILLS[k]).length;
+    return `<section class="box${g.by === nextBy ? ' here' : ''}">
+      <h3>By ${g.by} months ${g.by === nextBy ? '<span class="pill hot">coming up</span>' : ''}
+        <span class="aside row" style="gap:8px"><span class="bar" style="width:90px"><i style="width:${n / g.items.length * 100}%"></i></span>${n}/${g.items.length}</span></h3>
+      <div class="tgroup">${g.items.map(([k]) => trackerLine(k)).join('')}</div>
+    </section>`;
+  }).join('')}
+  <section class="box"><h3>🎥 Worth noting down</h3><p>${md(G.trackerNote)}</p></section>`;
+}
+
+/* ── Kit & day ── */
+function drawKit() {
+  const tone = v => v === 'Use' ? 'use' : v === 'Limit' ? 'limit' : 'skip';
+  const filters = ['All', 'Use', 'Limit', 'Skip'];
+  const list = G.equipment.filter(e => S.kit === 'All' || tone(e[1]) === S.kit.toLowerCase());
+  return `<section class="box"><h3>🧰 Equipment: use, limit, skip</h3>
+    <p>${md(G.equipmentLead)}</p>
+    <div class="chips" style="margin:10px 0 12px">${filters.map(f => `<button class="chip" data-act="kit" data-v="${f}" aria-pressed="${S.kit === f}">${f}</button>`).join('')}</div>
+    <div class="cards">${list.map(([item, verdict, why]) => {
+      const t = tone(verdict), big = verdict === 'Skip entirely';
+      return `<div class="mini ${t}${big ? ' big' : ''}"><h4>${esc(item)} <span class="pill ${t === 'use' ? 'ok' : t === 'limit' ? 'warn' : 'bad'}">${esc(verdict)}</span></h4>${md(why)}</div>`;
+    }).join('')}</div>
+  </section>
+  <section class="box"><h3>⚓ Anchor points that work</h3>
+    <p class="muted small">${md(G.rhythmLead)}</p>
+    <ul class="clean" style="margin-top:8px">${G.anchors.map(a => `<li>${md(a)}</li>`).join('')}</ul></section>
+  <section class="box"><h3>🗓️ A workable day</h3>
+    <table class="t stack"><thead><tr><th>When</th><th>What</th><th>Minutes</th></tr></thead>
+      <tbody>${G.day.map(([w, what, min]) => `<tr><td class="n">${esc(w)}</td><td>${esc(what)}</td><td><span class="pill ok">${esc(min)} min</span></td></tr>`).join('')}</tbody></table>
+    <p class="muted small" style="margin-top:10px">${md(G.dayNote)}</p></section>
+  <section class="box"><h3>🔁 Across the week</h3><ul class="clean">${G.week.map(a => `<li>${md(a)}</li>`).join('')}</ul>
+    <div class="note" style="margin-top:12px"><b>When to skip it:</b> ${md(G.skip)}</div></section>`;
+}
+
+/* ── Red flags ── */
+function drawFlags() {
+  const ages = babyAges(), m = ages ? ages.work.exact : null;
+  const nextBy = m == null ? null : (G.byAge.find(([a]) => a >= m) || [])[0];
+  const groupCount = by => { const g = G.tracker.find(x => x.by === by); return g ? g.items.filter(([k]) => SKILLS[k]).length + '/' + g.items.length : ''; };
+  return `<section class="box"><h3>🚩 Red flags and when to ask for help</h3><p>${md(G.redLead)}</p></section>
+  <section class="box" style="background:var(--bad-soft)"><h3>Ask at any age, without waiting for the next check-up</h3>
+    <ul class="clean">${G.anyAge.map(([a, b]) => `<li><b>${esc(a)}</b> ${md(b)}</li>`).join('')}</ul></section>
+  <section class="box"><h3>📆 By age</h3>
+    <table class="t stack"><thead><tr><th>Age</th><th>Raise it if</th><th>Tracker</th></tr></thead>
+    <tbody>${G.byAge.map(([a, txt]) => `<tr class="${a === nextBy ? 'here' : ''}"><td class="n">${a} months${a === nextBy ? ' <span class="pill hot">next</span>' : ''}</td><td>${md(txt)}</td>
+      <td><span class="pill">${groupCount(a)} seen</span></td></tr>`).join('')}</tbody></table>
+    <p class="muted small" style="margin-top:10px">“Seen” counts the skills ticked for that age in the Tracker. A few gaps are common; the list above the table is what to act on.</p></section>
+  <section class="box"><h3>👂 Alongside motor skills</h3><p>${md(G.alsoFlag)}</p></section>
+  <section class="box"><h3>☎️ Who to contact</h3><p>${md(G.whoToContact)}</p></section>
+  <section class="box" style="background:var(--accent-soft)"><h3>💚 One last thing</h3><p>${md(G.closing)}</p></section>`;
+}
+
+/* ───────── what taps do ───────── */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b || b.tagName === 'INPUT') return;
+  const v = b.dataset.v, k = b.dataset.k;
+  switch (b.dataset.act) {
+    case 'tab': case 'goTab':
+      S.tab = v; saveUI(); render(); window.scrollTo(0, 0); return;
+    case 'goStage':
+      S.tab = 'stages'; S.stage = Number(v); saveUI(); render(); window.scrollTo(0, 0); return;
+    case 'stage':
+      S.stage = Number(v); saveUI(); render(); return;
+    case 'clinic':
+      S.clinic = v; saveUI(); render(); return;
+    case 'kit':
+      S.kit = v; saveUI(); render(); return;
+    case 'edit':
+      S.editing = true; render(); $('#fName') && $('#fName').focus(); return;
+    case 'cancelEdit':
+      S.editing = false; render(); return;
+    case 'saveBaby': {
+      const born = $('#fBorn').value, due = $('#fDue').value;
+      if (!born) { alert('Please add the birthday.'); return; }
+      S.editing = false;
+      store.set('baby', 'main', Object.assign({}, BABY, { name: $('#fName').value.trim(), born, due }));
+      return;
+    }
+    case 'setStage':
+      store.set('baby', 'main', Object.assign({}, BABY, { stage: v }));
+      return;
+    case 'done':
+      toggleDone(k); return;
+    case 'setup':
+      store.set('setup', 'home', Object.assign({}, SETUP, { [k]: SETUP[k] ? null : Family.me() })); return;
+    case 'skill':
+      if (SKILLS[k]) {
+        if (confirm('Untick “' + skillText(k) + '”? Its date will be cleared.')) store.remove('skills', k);
+      } else {
+        store.set('skills', k, { date: todayKey(), by: Family.me() });
+      }
+      return;
+  }
+});
+// Changing the "first seen" date on a tracker item.
+view.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.act === 'skillDate' && t.value) store.update('skills', t.dataset.k, { date: t.value });
+});
+
+render();
+})();
+</script>
+</body>
+</html>
