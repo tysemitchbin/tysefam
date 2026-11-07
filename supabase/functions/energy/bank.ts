@@ -192,6 +192,12 @@ export async function saveBankPayments(db: SupabaseClient, payments: Payment[], 
   let added = 0, matched = 0;
   for (const p of payments) {
     if (bills.some(b => b.data.bankRef === p.ref)) continue;     // already saved
+    // The bank sometimes sends the same payment again under a different id (it happened
+    // in Oct 2026 and the bills showed up twice as big). Same account, company, day and
+    // amount = the same payment, so don't save it a second time.
+    const account = p.ref.split(':')[0];
+    if (bills.some(b => b.data.bankRef && String(b.data.bankRef).split(':')[0] === account
+      && b.data.company === p.company && b.data.paidOn === p.day && Number(b.data.paidAmount) === p.amount)) continue;
     const house = p.company === 'Tibber' ? tibberHouseFor(p.amount, tibberCost[p.period]) : gridHouse[p.company] || null;
     const part = p.company === 'Tibber' ? 'power' : 'grid';
     const fits = (d: any) => !house || !houseOf(d) || houseOf(d) === house;
