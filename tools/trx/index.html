@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TRX Training</title>
+
+<!-- ════════════════════════════════════════════════════════════════
+     TRX TRAINING: an exercise database with simple diagrams, ready-made
+     workouts, your own workouts and a timer that talks you through them.
+     The words live in data.js, the diagrams in illus.js; this file is the app.
+
+     Four tabs: Exercises · Workouts · Build · Log
+
+     Saved in Family.store('trx'), shared by everyone in the family:
+       workouts → <id>: { name, emoji, rounds, work, rest, roundRest, list: [exercise ids], ts, by }
+                        workouts the family made in the Build tab
+       log      → <id>: { name, wid, secs, date: 'YYYY-MM-DD', ts, by }
+                        one row per finished workout
+     Saved on this device only: the open tab, the exercise filters, the
+     workout you're building, and the sound/voice switches.
+═════════════════════════════════════════════════════════════════ -->
+
+<link rel="stylesheet" href="../../shared/family.css">
+<style>
+:root{
+  --accent:var(--peach-deep); --accent-soft:#fdeede;
+  --good:var(--meadow-deep); --good-soft:#e3f1df;
+  --sunk:#eef0e8; --rr:16px;
+}
+body{line-height:1.5}
+h1,h2,h3,h4{font-family:"Fredoka",system-ui,sans-serif;font-weight:600;color:var(--forest);line-height:1.2;margin:0}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
+p{margin:.4em 0}
+
+/* header: title + tabs, stuck to the top */
+.top{position:sticky;top:0;z-index:10;background:var(--cream);border-bottom:1px solid var(--line)}
+.top-in{max-width:980px;margin:0 auto;padding:12px 16px 0;display:flex;flex-direction:column;gap:8px}
+.brand{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.brand-l{display:flex;align-items:center;gap:10px;min-width:0}
+.brand-l .mark{font-size:1.7rem;line-height:1}
+.brand h1{font-size:1.25rem}
+.brand small{display:block;font-size:.78rem;color:var(--ink-soft)}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:none;border:0;padding:8px 12px 10px;color:var(--ink-soft);font-weight:700;border-bottom:3px solid transparent;white-space:nowrap;font-size:.95rem}
+@media(max-width:420px){.tab{padding:8px 7px 10px;font-size:.88rem}}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab:hover{color:var(--ink)}
+.tab .count[hidden]{display:none}
+.tab .count{display:inline-block;min-width:18px;padding:0 5px;margin-left:4px;border-radius:999px;background:var(--accent);color:#fff;font-size:.72rem;line-height:18px}
+
+main.view{max-width:980px;margin:0 auto;padding:20px 16px 72px;display:flex;flex-direction:column;gap:18px}
+.box{background:var(--paper);border:1px solid var(--line);border-radius:var(--rr);padding:18px;box-shadow:var(--shadow)}
+.box > h3{font-size:1.15rem;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.muted{color:var(--ink-soft)}
+.small{font-size:.86rem}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:2px solid var(--line);background:#fff;color:var(--forest);border-radius:999px;padding:5px 11px;font-weight:800;font-size:.85rem}
+.chip[aria-pressed="true"]{background:var(--meadow);border-color:var(--meadow);color:#fff}
+.pill{display:inline-block;font-size:.72rem;font-weight:800;padding:2px 9px;border-radius:999px;background:var(--sunk);color:var(--ink-soft);white-space:nowrap}
+.pill.l1{background:var(--good-soft);color:var(--good)}
+.pill.l2{background:#fcf3d2;color:#a87a10}
+.pill.l3{background:#fdeceb;color:#c2453a}
+.pill.len{background:#e4f2f5;color:#3d7f90}
+.field,select.field{border:2px solid var(--line);background:#fff;border-radius:12px;padding:9px 11px;outline:none;min-width:0}
+.field:focus{border-color:var(--meadow)}
+ul.clean,ol.clean{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px}
+.empty{text-align:center;color:var(--ink-soft);padding:22px 8px;font-style:italic}
+.empty .big{font-size:2rem;display:block;margin-bottom:6px;font-style:normal}
+
+/* the diagrams */
+svg.illus{display:block;width:100%;height:auto}
+.pic{background:#fff;border-radius:12px;border:1px solid var(--line)}
+
+/* basics box */
+details.basics summary{cursor:pointer;font-family:"Fredoka",sans-serif;font-weight:600;color:var(--forest);font-size:1.1rem;list-style:none;display:flex;align-items:center;gap:8px}
+details.basics summary::-webkit-details-marker{display:none}
+details.basics summary::after{content:"▾";margin-left:auto;color:var(--ink-soft);transition:.2s}
+details.basics[open] summary::after{transform:rotate(180deg)}
+.basics-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:12px}
+@media(max-width:720px){.basics-grid{grid-template-columns:1fr}}
+.lenlist{display:flex;flex-direction:column;gap:6px;margin-top:8px;font-size:.9rem}
+.lenlist b{display:inline-block;min-width:30px;color:#3d7f90}
+.tips{display:flex;flex-direction:column;gap:8px;font-size:.92rem}
+.tips b{color:var(--forest)}
+
+/* exercise grid */
+.filters{display:flex;flex-direction:column;gap:10px}
+.filters .row .field{flex:1 1 200px}
+.exgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.excard{background:var(--paper);border:1px solid var(--line);border-radius:var(--rr);padding:10px;box-shadow:var(--shadow);text-align:left;color:inherit;display:flex;flex-direction:column;gap:8px;transition:.15s;position:relative}
+.excard:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.excard .nmrow{display:flex;align-items:center;gap:8px}
+.excard .nm{font-family:"Fredoka",sans-serif;font-weight:600;color:var(--forest);font-size:1.05rem;flex:1;min-width:0}
+.excard .tags{display:flex;gap:5px;flex-wrap:wrap}
+.excard .mus{font-size:.82rem;color:var(--ink-soft)}
+.excard .plus{flex:0 0 auto;border:0;border-radius:999px;width:32px;height:32px;background:var(--accent);color:#fff;font-weight:800;font-size:1.1rem;box-shadow:var(--shadow)}
+.excard .plus:hover{filter:brightness(.95)}
+
+/* exercise detail popup */
+dialog{border:0;border-radius:20px;padding:0;max-width:640px;width:calc(100% - 24px);max-height:calc(100vh - 32px);background:var(--paper);box-shadow:var(--shadow-lg);color:var(--ink)}
+dialog::backdrop{background:rgba(60,65,56,.45)}
+.dlg{padding:18px;display:flex;flex-direction:column;gap:12px}
+.dlg-head{display:flex;align-items:flex-start;gap:10px}
+.dlg-head h2{font-size:1.4rem;flex:1}
+.xbtn{border:0;background:var(--sunk);border-radius:999px;width:34px;height:34px;font-size:1.1rem;color:var(--ink-soft);flex:0 0 auto}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.fact{background:var(--sunk);border-radius:12px;padding:8px 10px;font-size:.86rem}
+.fact span{display:block;font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft)}
+.dlg h4{font-size:1rem;margin-top:4px}
+.ezhd{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:520px){.ezhd{grid-template-columns:1fr}}
+.ezhd div{border-radius:12px;padding:10px 12px;font-size:.9rem}
+.ezhd .ez{background:var(--good-soft)} .ezhd .hd{background:var(--accent-soft)}
+.ezhd b{display:block;font-size:.78rem;text-transform:uppercase;letter-spacing:.05em}
+
+/* workout cards */
+.wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+.wcard{background:var(--paper);border:1px solid var(--line);border-radius:var(--rr);padding:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px}
+.wcard .hd{display:flex;align-items:center;gap:10px}
+.wcard .em{font-size:1.7rem;width:46px;height:46px;border-radius:14px;background:var(--accent-soft);display:grid;place-items:center;flex:0 0 auto}
+.wcard h3{font-size:1.1rem}
+.wcard .sub{font-size:.8rem;color:var(--ink-soft);font-weight:700}
+.wcard .mini{display:flex;gap:4px;flex-wrap:wrap}
+.wcard .mini span{font-size:.76rem;font-weight:700;background:var(--sunk);border-radius:8px;padding:2px 7px}
+.wcard .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;padding-top:4px}
+.section-title{display:flex;align-items:center;gap:8px;font-size:1.15rem}
+
+/* builder */
+.bform{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.bform label{display:flex;flex-direction:column;gap:4px;font-weight:800;font-size:.8rem;color:var(--ink-soft)}
+.bform label.wide{grid-column:1 / -1}
+.emojis{display:flex;gap:4px;flex-wrap:wrap}
+.emojis button{border:2px solid var(--line);background:#fff;border-radius:10px;font-size:1.2rem;width:40px;height:40px;padding:0}
+.emojis button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.blist{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.bitem{display:grid;grid-template-columns:24px 64px 1fr auto;gap:10px;align-items:center;border:1px solid var(--line);background:#fff;border-radius:12px;padding:6px 8px}
+.bitem .n{font-weight:800;color:var(--ink-soft);text-align:center}
+.bitem .t{font-weight:800;color:var(--forest);line-height:1.2}
+.bitem .t small{display:block;font-weight:700;color:var(--ink-soft);font-size:.75rem}
+.bitem .ctl{display:flex;gap:2px}
+.bitem .ctl button{border:0;background:var(--sunk);border-radius:8px;width:30px;height:30px;font-size:.9rem;color:var(--ink-soft)}
+.bitem .ctl button:hover{background:var(--line)}
+.bitem .ctl button:disabled{opacity:.35}
+.strapchg{font-size:.76rem;font-weight:800;color:#3d7f90;padding:0 0 0 40px}
+@media(max-width:420px){.bitem{gap:7px;padding:5px 6px}.bitem .ctl button{width:27px;height:30px}}
+.summary{display:flex;gap:8px;flex-wrap:wrap}
+.summary .pill{font-size:.8rem;padding:4px 11px}
+
+/* log */
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}
+.week .d{border-radius:12px;padding:6px 0;background:var(--sunk);font-size:.75rem;font-weight:800;color:var(--ink-soft)}
+.week .d b{display:block;font-family:"Fredoka",sans-serif;font-size:1.1rem}
+.week .d.some{background:var(--accent-soft);color:#b8693b}
+.week .d.today{outline:2px solid var(--accent);outline-offset:-2px}
+.people{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.person{background:var(--sunk);border-radius:14px;padding:12px}
+.person .big{font-family:"Fredoka",sans-serif;font-size:1.8rem;color:var(--forest)}
+.logrow{display:flex;gap:10px;align-items:center;padding:9px 2px;border-bottom:1px dashed var(--line)}
+.logrow:last-child{border-bottom:0}
+.logrow .em{font-size:1.3rem}
+.logrow .txt{flex:1;min-width:0}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(120px);background:var(--forest);color:#fff;font-weight:800;font-size:.88rem;padding:8px 16px;width:max-content;border-radius:999px;box-shadow:var(--shadow-lg);transition:.25s;z-index:400;max-width:calc(100% - 32px);text-align:center}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+/* ───── the workout player (full screen) ───── */
+.player{position:fixed;inset:0;z-index:500;background:var(--cream);display:none;flex-direction:column}
+.player.open{display:flex}
+.pl-top{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--paper)}
+.pl-top .nm{font-family:"Fredoka",sans-serif;font-weight:600;color:var(--forest);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-top .tog{border:2px solid var(--line);background:#fff;border-radius:999px;padding:4px 10px;font-weight:800;font-size:.85rem}
+.pl-top .tog[aria-pressed="false"]{opacity:.45}
+.pl-bar{height:6px;background:var(--sunk)}
+.pl-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s linear}
+.pl-main{flex:1;overflow:auto;display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px 16px;max-width:720px;width:100%;margin:0 auto}
+.pl-phase{font-family:"Fredoka",sans-serif;font-weight:700;letter-spacing:.12em;font-size:.95rem;padding:4px 14px;border-radius:999px;background:var(--sunk);color:var(--ink-soft)}
+.pl-phase.work{background:var(--accent);color:#fff}
+.pl-phase.rest{background:var(--sky);color:#2f6b7a}
+.pl-phase.ready{background:var(--sun);color:#7a5c00}
+.pl-phase.done{background:var(--meadow);color:#fff}
+.pl-time{font-family:"Fredoka",sans-serif;font-weight:600;font-size:clamp(4rem,18vw,7rem);line-height:1;color:var(--forest);font-variant-numeric:tabular-nums}
+.pl-ex{font-family:"Fredoka",sans-serif;font-weight:600;font-size:1.5rem;color:var(--forest);text-align:center}
+.pl-where{font-size:.85rem;color:var(--ink-soft);font-weight:700;text-align:center}
+.pl-pic{width:100%;max-width:560px}
+.pl-cue{font-size:.95rem;text-align:center;max-width:52ch}
+.pl-strap{background:#e4f2f5;color:#2f6b7a;border-radius:12px;padding:8px 14px;font-weight:800;text-align:center}
+.pl-side{background:var(--accent-soft);color:#b8693b;border-radius:12px;padding:6px 14px;font-weight:800}
+.pl-next{font-size:.88rem;color:var(--ink-soft);font-weight:700}
+.pl-ctl{display:flex;gap:12px;justify-content:center;padding:14px 16px calc(14px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--paper)}
+.pl-ctl button{border:0;border-radius:999px;width:56px;height:56px;font-size:1.3rem;background:var(--sunk);color:var(--forest)}
+.pl-ctl button.main{width:72px;height:72px;font-size:1.7rem;background:var(--accent);color:#fff}
+</style>
+</head>
+<body data-tool="trx">
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <div class="brand-l"><span class="mark">🏋️</span><div><h1>TRX Training</h1><small>Suspension-strap exercises, workouts and a timer</small></div></div>
+      <span id="sync" class="badge local">…</span>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="exercises">📖 Exercises</button>
+      <button class="tab" role="tab" data-tab="workouts">🔥 Workouts</button>
+      <button class="tab" role="tab" data-tab="build">🛠️ Build<span class="count" id="draftCount" hidden></span></button>
+      <button class="tab" role="tab" data-tab="log">📈 Log</button>
+    </nav>
+  </div>
+</header>
+
+<main class="view" id="view"></main>
+
+<dialog id="dlg"></dialog>
+<div class="toast" id="toast"></div>
+
+<!-- the full-screen timer -->
+<div class="player" id="player" aria-live="polite">
+  <div class="pl-top">
+    <span class="nm" id="plName"></span>
+    <button class="tog" id="plSound" title="Beeps">🔔</button>
+    <button class="tog" id="plVoice" title="Read the exercise names out loud">🗣️</button>
+  </div>
+  <div class="pl-bar"><i id="plBar"></i></div>
+  <div class="pl-main" id="plMain"></div>
+  <div class="pl-ctl">
+    <button id="plBack" title="Back">⏮</button>
+    <button id="plPlay" class="main" title="Pause">⏸</button>
+    <button id="plSkip" title="Skip">⏭</button>
+    <button id="plQuit" title="Stop">✕</button>
+  </div>
+</div>
+
+<script src="../../site.js"></script>
+<script src="../../shared/family.js"></script>
+<script src="data.js"></script>
+<script src="illus.js"></script>
+<script>
+const TOOL_ID = 'trx';
+const store = Family.store(TOOL_ID);
+const esc = Family.esc;
+const $ = s => document.querySelector(s);
+const D = window.TRX_DATA;
+const EX = Object.fromEntries(D.EXERCISES.map(e => [e.id, e]));   // look up an exercise by id
+const pic = (id, title, small) => window.TRX_ILLUS.draw(id, title, small);   // small = just the finish pose
+
+/* ───────── little helpers ───────── */
+// This device's own settings (tab, filters, draft…). Never breaks if storage is blocked.
+const local = {
+  get(k, d) { try { const v = localStorage.getItem('trx:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('trx:' + k, JSON.stringify(v)); } catch (e) { /* fine */ } }
+};
+const pad = n => String(n).padStart(2, '0');
+const dayKey = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const mins = secs => Math.max(1, Math.round(secs / 60)) + ' min';
+const clock = secs => Math.floor(secs / 60) + ':' + pad(Math.floor(secs % 60));
+const levelPill = l => `<span class="pill l${l}">${D.LEVELS[l]}</span>`;
+const lenPill = k => `<span class="pill len" title="${esc(D.LENGTHS[k].name)}">📏 ${esc(D.LENGTHS[k].name)}</span>`;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* ───────── saved data ───────── */
+let MINE = {};     // the family's own workouts
+let LOG = {};      // finished workouts
+store.ready.then(() => {
+  const cloud = store.mode === 'cloud';
+  $('#sync').className = 'badge ' + (cloud ? 'ok' : 'local');
+  $('#sync').textContent = cloud ? '☁️ Synced' : '📴 This device only';
+});
+store.watch('workouts', items => { MINE = items; if (TAB === 'workouts' || TAB === 'log') render(); });
+store.watch('log', items => { LOG = items; if (TAB === 'log') render(); });
+
+/* ───────── the timeline of a workout ─────────
+   Turns { rounds, work, rest, roundRest, list } into steps for the timer:
+     { kind: 'ready' | 'work' | 'rest', secs, ex, round, i }
+   (rest steps carry the exercise that comes next). */
+function timeline(w) {
+  const steps = [];
+  const list = (w.list || []).filter(id => EX[id]);
+  if (!list.length) return steps;
+  steps.push({ kind: 'ready', secs: 10, ex: list[0], round: 1, i: 0 });
+  for (let r = 1; r <= w.rounds; r++) {
+    list.forEach((id, i) => {
+      steps.push({ kind: 'work', secs: w.work, ex: id, round: r, i });
+      const lastInRound = i === list.length - 1, lastRound = r === w.rounds;
+      if (lastInRound && lastRound) return;
+      const secs = lastInRound ? (w.roundRest || w.rest) : w.rest;
+      const next = lastInRound ? list[0] : list[i + 1];
+      if (secs > 0) steps.push({ kind: 'rest', secs, ex: next, round: lastInRound ? r + 1 : r, i: lastInRound ? 0 : i + 1, between: lastInRound });
+    });
+  }
+  return steps;
+}
+const totalSecs = w => timeline(w).reduce((s, st) => s + st.secs, 0);
+// How many times you have to change the strap length, going through the list once.
+const strapChanges = list => list.filter(id => EX[id]).reduce((n, id, i, a) => n + (i && EX[id].len !== EX[a[i - 1]].len ? 1 : 0), 0);
+
+/* ───────── tabs ───────── */
+let TAB = local.get('tab', 'exercises');
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => go(b.dataset.tab));
+function go(tab) { TAB = tab; local.set('tab', tab); render(); window.scrollTo(0, 0); }
+function render() {
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === TAB));
+  const v = $('#view');
+  v.innerHTML = ({ exercises: viewExercises, workouts: viewWorkouts, build: viewBuild, log: viewLog }[TAB] || viewExercises)();
+  const n = DRAFT.list.length;
+  $('#draftCount').hidden = !n; $('#draftCount').textContent = n;
+}
+
+/* ═════════ EXERCISES ═════════ */
+let F = Object.assign({ q: '', cat: 'all', level: 0, len: 'all' }, local.get('filters', {}));
+function viewExercises() {
+  const chip = (key, val, label) => `<button class="chip" data-f="${key}" data-v="${val}" aria-pressed="${String(F[key]) === String(val)}">${label}</button>`;
+  return `
+  <details class="box basics"${local.get('basicsOpen', false) ? ' open' : ''}>
+    <summary>📏 Strap lengths and the basics</summary>
+    <div class="basics-grid">
+      <div>
+        <div class="pic">${window.TRX_ILLUS.lengths()}</div>
+        <div class="lenlist">${Object.entries(D.LENGTHS).map(([k, l]) => `<div><b>${k}</b> <strong>${esc(l.name)}.</strong> ${esc(l.how)}</div>`).join('')}</div>
+        <p class="small muted">${esc(D.LENGTH_NOTE)}</p>
+      </div>
+      <div class="tips">${D.BASICS.map(([t, d]) => `<div><b>${esc(t)}</b> ${esc(d)}</div>`).join('')}
+        <p class="small muted">In the diagrams the anchor is at the top and the yellow bits are the handles or foot cradles. Start on the left, finish on the right.</p>
+      </div>
+    </div>
+  </details>
+
+  <div class="filters">
+    <div class="row">
+      <input class="field" id="q" placeholder="🔎 Search: row, glutes, plank…" value="${esc(F.q)}">
+      <select class="field" id="flen" style="flex:0 1 200px">
+        <option value="all">Any strap length</option>
+        ${Object.entries(D.LENGTHS).map(([k, l]) => `<option value="${k}"${F.len === k ? ' selected' : ''}>${esc(l.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="chips">${chip('cat', 'all', 'All')}${Object.entries(D.CATS).map(([k, c]) => chip('cat', k, c.emoji + ' ' + c.name)).join('')}</div>
+    <div class="chips">${chip('level', 0, 'Any level')}${[1, 2, 3].map(l => chip('level', l, D.LEVELS[l])).join('')}</div>
+  </div>
+
+  <div id="exResults">${exResults()}</div>`;
+}
+// The cards that match the filters (redrawn on their own while you type in the search box).
+function exResults() {
+  const q = F.q.trim().toLowerCase();
+  const list = D.EXERCISES.filter(e =>
+    (F.cat === 'all' || e.cat === F.cat) && (!F.level || e.level === F.level) && (F.len === 'all' || e.len === F.len) &&
+    (!q || (e.name + ' ' + e.muscles + ' ' + D.CATS[e.cat].name).toLowerCase().includes(q)));
+  return `<p class="small muted" style="margin:0 0 10px">${list.length} of ${D.EXERCISES.length} exercises. Tap one for how to do it, or ＋ to add it to a workout.</p>
+  ${list.length ? `<div class="exgrid">${list.map(e => `
+    <div class="excard" role="button" tabindex="0" data-ex="${e.id}">
+      <div class="pic">${pic(e.id, e.name)}</div>
+      <div class="nmrow"><div class="nm">${esc(e.name)}</div><button class="plus" data-add="${e.id}" title="Add to the workout you're building" aria-label="Add ${esc(e.name)} to your workout">＋</button></div>
+      <div class="tags">${levelPill(e.level)}${lenPill(e.len)}<span class="pill">${D.CATS[e.cat].emoji} ${D.CATS[e.cat].name}</span>${e.hold ? '<span class="pill">Hold</span>' : ''}${e.sides ? '<span class="pill">Each side</span>' : ''}</div>
+      <div class="mus">${esc(e.muscles)}</div>
+    </div>`).join('')}</div>`
+    : '<div class="empty"><span class="big">🤷</span>Nothing matches. Try fewer filters.</div>'}`;
+}
+
+function showExercise(id) {
+  const e = EX[id]; if (!e) return;
+  const d = $('#dlg');
+  d.innerHTML = `<div class="dlg">
+    <div class="dlg-head"><h2>${esc(e.name)}</h2><button class="xbtn" data-close aria-label="Close">✕</button></div>
+    <div class="pic">${pic(e.id, e.name)}</div>
+    <div class="facts">
+      <div class="fact"><span>Strap</span>${esc(D.LENGTHS[e.len].name)} (${e.len})</div>
+      <div class="fact"><span>Position</span>${esc(D.POSITIONS[e.pos])}</div>
+      <div class="fact"><span>Level</span>${D.LEVELS[e.level]}${e.sides ? ' · each side' : ''}${e.hold ? ' · hold' : ''}</div>
+      <div class="fact"><span>Works</span>${esc(e.muscles)}</div>
+    </div>
+    <div><h4>Set up</h4><p>${esc(e.setup)}</p></div>
+    <div><h4>How to</h4><ol class="clean">${e.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div>
+    <div><h4>Think about</h4><ul class="clean">${e.cues.map(s => `<li>${esc(s)}</li>`).join('')}</ul></div>
+    <div class="ezhd"><div class="ez"><b>🌱 Easier</b>${esc(e.easier)}</div><div class="hd"><b>🔥 Harder</b>${esc(e.harder)}</div></div>
+    <div class="row"><button class="btn peach" data-add="${e.id}">＋ Add to my workout</button><button class="btn ghost" data-close>Close</button></div>
+  </div>`;
+  d.showModal();
+}
+$('#dlg').addEventListener('click', ev => {
+  if (ev.target === ev.currentTarget || ev.target.closest('[data-close]')) $('#dlg').close();
+  const add = ev.target.closest('[data-add]');
+  if (add) { addToDraft(add.dataset.add); $('#dlg').close(); }
+});
+
+/* ═════════ WORKOUTS ═════════ */
+function workoutCard(w, own) {
+  const list = (w.list || []).filter(id => EX[id]);
+  const secs = totalSecs(w);
+  const lvl = w.level || Math.round(list.reduce((s, id) => s + EX[id].level, 0) / (list.length || 1)) || 1;
+  return `<div class="wcard">
+    <div class="hd"><div class="em">${esc(w.emoji || '💪')}</div>
+      <div style="min-width:0"><h3>${esc(w.name || 'Untitled')}</h3>
+      <div class="sub">${mins(secs)} · ${w.rounds} round${w.rounds > 1 ? 's' : ''} · ${w.work}s on / ${w.rest}s off${own && w.by ? ' · by ' + esc(w.by) : ''}</div></div>
+    </div>
+    ${w.about ? `<p class="small" style="margin:0">${esc(w.about)}</p>` : ''}
+    <div class="row">${levelPill(lvl)}<span class="pill">${list.length} exercises</span><span class="pill len">📏 ${strapChanges(list)} strap change${strapChanges(list) === 1 ? '' : 's'}</span></div>
+    <div class="mini">${list.map(id => `<span>${esc(EX[id].name)}</span>`).join('')}</div>
+    <div class="acts">
+      <button class="btn sm peach" data-start="${own ? 'mine:' : 'ready:'}${w.id}">▶ Start</button>
+      <button class="btn sm ghost" data-peek="${own ? 'mine:' : 'ready:'}${w.id}">👀 See moves</button>
+      ${own ? `<button class="btn sm ghost" data-edit="${w.id}">✏️ Edit</button><button class="btn sm ghost" data-delw="${w.id}" title="Delete">🗑</button>`
+            : `<button class="btn sm ghost" data-copy="${w.id}">✏️ Copy and change</button>`}
+    </div>
+  </div>`;
+}
+function findWorkout(ref) {
+  const [kind, id] = ref.split(':');
+  if (kind === 'mine') return MINE[id] && Object.assign({ id }, MINE[id]);
+  if (kind === 'draft') return DRAFT;
+  return D.WORKOUTS.find(w => w.id === id);
+}
+function viewWorkouts() {
+  const mine = Family.entries(MINE).map(([id, w]) => Object.assign({ id }, w)).reverse();
+  return `
+  <h2 class="section-title">⭐ Our workouts</h2>
+  ${mine.length ? `<div class="wgrid">${mine.map(w => workoutCard(w, true)).join('')}</div>`
+    : `<div class="box empty"><span class="big">🛠️</span>No workouts of your own yet. Make one in the <a href="#" data-go="build">Build</a> tab, or copy a ready-made one below and change it.</div>`}
+  <h2 class="section-title" style="margin-top:8px">📋 Ready-made</h2>
+  <div class="wgrid">${D.WORKOUTS.map(w => workoutCard(w, false)).join('')}</div>
+  <p class="small muted">Tip: do the Warm-up first, and Stretch &amp; Unwind after. Every workout is ordered so you change the strap length as little as possible.</p>`;
+}
+function peekWorkout(w) {
+  const list = (w.list || []).filter(id => EX[id]);
+  const d = $('#dlg');
+  d.innerHTML = `<div class="dlg">
+    <div class="dlg-head"><h2>${esc(w.emoji || '')} ${esc(w.name)}</h2><button class="xbtn" data-close aria-label="Close">✕</button></div>
+    <p class="muted small" style="margin:0">${mins(totalSecs(w))} · ${w.rounds} × through the list · ${w.work}s work, ${w.rest}s rest${w.roundRest ? ', ' + w.roundRest + 's between rounds' : ''}</p>
+    <ol class="blist">${list.map((id, i) => `
+      ${i && EX[id].len !== EX[list[i - 1]].len ? `<li class="strapchg">📏 Change straps to ${esc(D.LENGTHS[EX[id].len].name)}</li>` : ''}
+      <li class="bitem" style="grid-template-columns:24px 64px 1fr"><span class="n">${i + 1}</span><span class="pic">${pic(id, EX[id].name, true)}</span>
+        <span class="t">${esc(EX[id].name)}<small>${esc(D.LENGTHS[EX[id].len].name)}${EX[id].sides ? ' · switch sides halfway' : ''}</small></span></li>`).join('')}</ol>
+    <div class="row"><button class="btn peach" data-close data-startw="1">▶ Start</button><button class="btn ghost" data-close>Close</button></div>
+  </div>`;
+  d.querySelector('[data-startw]').onclick = () => startWorkout(w);
+  d.showModal();
+}
+
+/* ═════════ BUILD ═════════ */
+const BLANK = () => ({ name: '', emoji: '💪', rounds: 3, work: 40, rest: 20, roundRest: 60, list: [], editing: null });
+let DRAFT = Object.assign(BLANK(), local.get('draft', {}));
+const saveDraft = () => { local.set('draft', DRAFT); };
+function addToDraft(id) {
+  DRAFT.list.push(id); saveDraft();
+  toast('＋ ' + EX[id].name + ' added (' + DRAFT.list.length + ' in your workout)');
+  render();
+}
+const EMOJIS = ['💪', '🔥', '🦵', '🧱', '⚡', '🌱', '⏱️', '🧘', '🏔️', '🐻'];
+function viewBuild() {
+  const w = DRAFT;
+  const list = w.list.filter(id => EX[id]);
+  const opts = Object.entries(D.CATS).map(([k, c]) =>
+    `<optgroup label="${c.emoji} ${c.name}">${D.EXERCISES.filter(e => e.cat === k).map(e => `<option value="${e.id}">${esc(e.name)} (${e.len})</option>`).join('')}</optgroup>`).join('');
+  const num = (k, label, min, max, stepv) =>
+    `<label>${label}<input class="field" type="number" inputmode="numeric" data-num="${k}" min="${min}" max="${max}" step="${stepv}" value="${w[k]}"></label>`;
+  return `
+  <div class="box">
+    <h3>${w.editing ? '✏️ Change a workout' : '🛠️ Build a workout'}</h3>
+    <div class="bform">
+      <label class="wide">Name<input class="field" id="bName" maxlength="60" placeholder="e.g. Saturday sweat" value="${esc(w.name)}"></label>
+      <label class="wide">Icon<div class="emojis">${EMOJIS.map(e => `<button type="button" data-emoji="${e}" aria-pressed="${w.emoji === e}">${e}</button>`).join('')}</div></label>
+      ${num('rounds', 'Rounds', 1, 10, 1)}${num('work', 'Work (seconds)', 10, 180, 5)}${num('rest', 'Rest (seconds)', 0, 120, 5)}${num('roundRest', 'Rest between rounds', 0, 300, 5)}
+    </div>
+  </div>
+
+  <div class="box">
+    <h3>📋 Exercises <span class="muted small" style="font-family:Nunito;font-weight:700">in order</span></h3>
+    <div class="row" style="margin-bottom:10px">
+      <select class="field" id="bPick" style="flex:1 1 220px"><option value="">Choose an exercise…</option>${opts}</select>
+      <button class="btn" id="bAdd">＋ Add</button>
+      <button class="btn ghost" data-go="exercises">📖 Browse with pictures</button>
+    </div>
+    ${list.length ? `<ol class="blist">${list.map((id, i) => `
+      ${i && EX[id].len !== EX[list[i - 1]].len ? `<li class="strapchg">📏 Change straps to ${esc(D.LENGTHS[EX[id].len].name)}</li>` : ''}
+      <li class="bitem"><span class="n">${i + 1}</span><span class="pic">${pic(id, EX[id].name, true)}</span>
+        <span class="t">${esc(EX[id].name)}<small>${esc(D.LENGTHS[EX[id].len].name)} · ${D.LEVELS[EX[id].level]}</small></span>
+        <span class="ctl"><button data-mv="${i}" data-d="-1" ${i ? '' : 'disabled'} aria-label="Move up">▲</button><button data-mv="${i}" data-d="1" ${i < list.length - 1 ? '' : 'disabled'} aria-label="Move down">▼</button><button data-rm="${i}" aria-label="Remove">✕</button></span></li>`).join('')}</ol>`
+      : '<div class="empty"><span class="big">🌱</span>No exercises yet. Pick one above, or tap ＋ on any exercise in the Exercises tab.</div>'}
+    ${list.length > 2 && strapChanges(list) > new Set(list.map(id => EX[id].len)).size - 1
+      ? `<p class="small" style="margin-top:10px">🔧 You change straps ${strapChanges(list)} times each round. <button class="btn sm sky" id="bGroup">Group by strap length</button></p>` : ''}
+  </div>
+
+  <div class="box">
+    <div class="summary">
+      <span class="pill">⏱️ ${list.length ? mins(totalSecs(w)) : '0 min'}</span>
+      <span class="pill">🔁 ${w.rounds} round${w.rounds > 1 ? 's' : ''}</span>
+      <span class="pill len">📏 ${strapChanges(list)} strap change${strapChanges(list) === 1 ? '' : 's'}</span>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn peach" id="bSave" ${list.length ? '' : 'disabled'}>💾 ${w.editing ? 'Save changes' : 'Save for the family'}</button>
+      <button class="btn" id="bStart" ${list.length ? '' : 'disabled'}>▶ Start now</button>
+      <button class="btn ghost" id="bClear">${w.editing ? 'Cancel' : 'Clear'}</button>
+    </div>
+  </div>`;
+}
+// Turn the number boxes into sensible whole numbers.
+function readNum(k, v) {
+  const lim = { rounds: [1, 10], work: [10, 180], rest: [0, 120], roundRest: [0, 300] }[k];
+  const n = Math.round(Number(v));
+  return isFinite(n) ? Math.min(lim[1], Math.max(lim[0], n)) : BLANK()[k];
+}
+async function saveWorkout() {
+  const w = DRAFT;
+  if (!w.list.length) return;
+  const obj = { name: w.name.trim() || 'My workout', emoji: w.emoji, rounds: w.rounds, work: w.work, rest: w.rest, roundRest: w.roundRest, list: w.list.slice() };
+  if (w.editing && MINE[w.editing]) await store.update('workouts', w.editing, obj);
+  else await store.add('workouts', obj);
+  DRAFT = BLANK(); saveDraft();
+  toast('💾 Saved: ' + obj.name);
+  go('workouts');
+}
+
+/* ═════════ LOG ═════════ */
+function viewLog() {
+  const rows = Family.entries(LOG).map(([id, l]) => Object.assign({ id }, l)).reverse();
+  const now = new Date();
+  const monday = new Date(now); monday.setHours(0, 0, 0, 0); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  const days = [...Array(7)].map((_, i) => { const d = new Date(monday); d.setDate(d.getDate() + i); return d; });
+  const thisWeek = rows.filter(r => r.date >= dayKey(monday));
+  const people = [...new Set([...(Family.site.people || []), ...rows.map(r => r.by)])].filter(Boolean);
+  return `
+  <div class="box">
+    <h3>📅 This week</h3>
+    <div class="week">${days.map(d => {
+      const k = dayKey(d), n = thisWeek.filter(r => r.date === k).length;
+      return `<div class="d${n ? ' some' : ''}${k === dayKey(now) ? ' today' : ''}">${'MTWTFSS'[(d.getDay() + 6) % 7]}<b>${n || '·'}</b></div>`;
+    }).join('')}</div>
+    <div class="people" style="margin-top:12px">${people.map(p => {
+      const mine = thisWeek.filter(r => r.by === p);
+      const all = rows.filter(r => r.by === p);
+      return `<div class="person"><div class="muted small" style="font-weight:800">${esc(p)}</div>
+        <div class="big">${mine.length}</div><div class="small">workout${mine.length === 1 ? '' : 's'} this week${mine.length ? ' · ' + mins(mine.reduce((s, r) => s + (r.secs || 0), 0)) : ''}</div>
+        <div class="small muted">${all.length} in total</div></div>`;
+    }).join('')}</div>
+  </div>
+  <div class="box">
+    <h3>📈 History</h3>
+    ${rows.length ? rows.slice(0, 60).map(r => `
+      <div class="logrow"><span class="em">${esc(r.emoji || '💪')}</span>
+        <div class="txt"><b>${esc(r.name)}</b> <span class="who-pill">${esc(r.by)}</span>
+          <div class="small muted">${new Date(r.ts).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })} · ${mins(r.secs || 0)}${r.partial ? ' · stopped early' : ''}</div></div>
+        <button class="del" data-dellog="${r.id}" title="Remove">🗑</button></div>`).join('')
+      : '<div class="empty"><span class="big">🏁</span>Finished workouts show up here. Start one from the Workouts tab!</div>'}
+  </div>`;
+}
+
+/* ───────── clicks and typing, for every tab ───────── */
+$('#view').addEventListener('click', ev => {
+  const t = ev.target.closest('button, a, [data-ex]');
+  if (!t) return;
+  const ds = t.dataset;
+  if (ds.go) { ev.preventDefault(); go(ds.go); return; }
+  if (ds.add) { ev.stopPropagation(); addToDraft(ds.add); return; }
+  if (ds.ex) { showExercise(ds.ex); return; }
+  if (ds.f) { F[ds.f] = ds.f === 'level' ? Number(ds.v) : ds.v; local.set('filters', F); render(); return; }
+  if (ds.start) { const w = findWorkout(ds.start); if (w) startWorkout(w); return; }
+  if (ds.peek) { const w = findWorkout(ds.peek); if (w) peekWorkout(w); return; }
+  if (ds.edit) { const w = MINE[ds.edit]; if (w) { DRAFT = Object.assign(BLANK(), w, { list: w.list.slice(), editing: ds.edit }); saveDraft(); go('build'); } return; }
+  if (ds.copy) { const w = D.WORKOUTS.find(x => x.id === ds.copy); if (w) { DRAFT = Object.assign(BLANK(), w, { name: w.name + ' (my way)', list: w.list.slice(), editing: null }); delete DRAFT.id; delete DRAFT.about; delete DRAFT.level; saveDraft(); go('build'); } return; }
+  if (ds.delw) { const w = MINE[ds.delw]; if (w && confirm('Delete the workout “' + (w.name || '') + '” for everyone?')) store.remove('workouts', ds.delw); return; }
+  if (ds.dellog) { if (confirm('Remove this from the log?')) store.remove('log', ds.dellog); return; }
+  if (ds.emoji) { DRAFT.emoji = ds.emoji; saveDraft(); render(); return; }
+  if (ds.mv) { const i = Number(ds.mv), j = i + Number(ds.d), L = DRAFT.list; [L[i], L[j]] = [L[j], L[i]]; saveDraft(); render(); return; }
+  if (ds.rm) { DRAFT.list.splice(Number(ds.rm), 1); saveDraft(); render(); return; }
+  switch (t.id) {
+    case 'bAdd': { const id = $('#bPick').value; if (id) addToDraft(id); return; }
+    case 'bGroup': {
+      // Keep the order you chose, but bring moves with the same strap length together.
+      const order = []; DRAFT.list.forEach(id => { if (!order.includes(EX[id].len)) order.push(EX[id].len); });
+      DRAFT.list = order.flatMap(len => DRAFT.list.filter(id => EX[id].len === len));
+      saveDraft(); render(); toast('Grouped by strap length'); return;
+    }
+    case 'bSave': saveWorkout(); return;
+    case 'bStart': startWorkout(Object.assign({}, DRAFT, { name: DRAFT.name.trim() || 'My workout' })); return;
+    case 'bClear': if (!DRAFT.list.length || DRAFT.editing || confirm('Clear this workout?')) { DRAFT = BLANK(); saveDraft(); render(); } return;
+  }
+});
+$('#view').addEventListener('keydown', ev => {
+  const card = ev.target.closest('[data-ex]');
+  if (card && ev.target === card && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); showExercise(card.dataset.ex); }
+});
+$('#view').addEventListener('input', ev => {
+  const t = ev.target;
+  if (t.id === 'q') {
+    F.q = t.value; local.set('filters', F);
+    clearTimeout(render.h); render.h = setTimeout(() => { $('#exResults').innerHTML = exResults(); }, 200);
+  }
+  if (t.id === 'bName') { DRAFT.name = t.value; saveDraft(); }
+});
+$('#view').addEventListener('change', ev => {
+  const t = ev.target;
+  if (t.id === 'flen') { F.len = t.value; local.set('filters', F); render(); }
+  if (t.dataset.num) { DRAFT[t.dataset.num] = readNum(t.dataset.num, t.value); saveDraft(); render(); }
+  if (t.id === 'bPick' && t.value) { addToDraft(t.value); }
+});
+$('#view').addEventListener('toggle', ev => { if (ev.target.matches('details.basics')) local.set('basicsOpen', ev.target.open); }, true);
+
+/* ═════════ THE TIMER ═════════
+   Steps through the timeline: a 10-second "get ready", then work and
+   rest in turn. Beeps on the last 3 seconds and when a phase changes,
+   and can read the next exercise out loud. Keeps the screen awake. */
+const PL = { w: null, steps: [], at: 0, left: 0, running: false, finished: false, endAt: 0, tick: null, done: 0, sideSaid: false, wake: null };
+let SOUND = local.get('sound', true), VOICE = local.get('voice', true);
+let audio = null;
+function beep(freq = 880, len = 0.12) {
+  if (!SOUND) return;
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.frequency.value = freq; o.connect(g); g.connect(audio.destination);
+    g.gain.setValueAtTime(0.25, audio.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + len);
+    o.start(); o.stop(audio.currentTime + len);
+  } catch (e) { /* no sound on this device */ }
+}
+function say(text) {
+  if (!VOICE || !window.speechSynthesis) return;
+  try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'en-GB'; u.rate = 1.02; speechSynthesis.speak(u); } catch (e) { /* fine */ }
+}
+async function keepAwake(on) {
+  try {
+    if (on && 'wakeLock' in navigator && !PL.wake) { PL.wake = await navigator.wakeLock.request('screen'); PL.wake.addEventListener('release', () => { PL.wake = null; }); }
+    if (!on && PL.wake) { await PL.wake.release(); PL.wake = null; }
+  } catch (e) { /* not allowed here: fine */ }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && PL.running) keepAwake(true); });
+
+function startWorkout(w) {
+  const steps = timeline(w);
+  if (!steps.length) { toast('That workout has no exercises yet.'); return; }
+  // wake the audio up now, while we're inside a tap (phones need that)
+  try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); } catch (e) { /* fine */ }
+  Object.assign(PL, { w, steps, at: 0, done: 0, running: true, finished: false });
+  $('#plName').textContent = (w.emoji ? w.emoji + ' ' : '') + (w.name || 'Workout');
+  $('#player').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  if ($('#dlg').open) $('#dlg').close();
+  keepAwake(true);
+  enterStep(0);
+  clearInterval(PL.tick); PL.tick = setInterval(tick, 200);
+}
+function enterStep(i) {
+  PL.at = i; PL.sideSaid = false;
+  const st = PL.steps[i];
+  PL.left = st.secs; PL.endAt = Date.now() + st.secs * 1000;
+  const e = EX[st.ex];
+  if (st.kind === 'work') { beep(1046, 0.35); say(e.name + (e.sides ? '. First side.' : '')); }
+  else if (st.kind === 'rest') {
+    beep(523, 0.35);
+    const prev = PL.steps[i - 1], chg = prev && EX[prev.ex].len !== e.len;
+    say('Rest. Next: ' + e.name + (chg ? '. Straps to ' + D.LENGTHS[e.len].name : ''));
+  } else say('Get ready. ' + e.name + '. Straps ' + D.LENGTHS[e.len].name);
+  drawPlayer();
+}
+function tick() {
+  if (!PL.running) return;
+  const st = PL.steps[PL.at];
+  const left = Math.max(0, Math.ceil((PL.endAt - Date.now()) / 1000));
+  if (left !== PL.left) {
+    if (left > 0 && left <= 3) beep(660, 0.1);
+    if (st.kind === 'work') PL.done += PL.left - left;
+    PL.left = left;
+    // one-side-at-a-time moves: switch sides halfway through
+    if (st.kind === 'work' && EX[st.ex].sides && !PL.sideSaid && left <= Math.floor(st.secs / 2)) {
+      PL.sideSaid = true; beep(880, 0.2); setTimeout(() => beep(880, 0.2), 250); say('Switch sides');
+    }
+    drawPlayer();
+  }
+  if (left <= 0) {
+    if (PL.at < PL.steps.length - 1) enterStep(PL.at + 1); else finish();
+  }
+}
+function drawPlayer() {
+  if (PL.finished) return;
+  const st = PL.steps[PL.at], e = EX[st.ex];
+  const listLen = (PL.w.list || []).filter(id => EX[id]).length;
+  const prevWork = PL.steps.slice(0, PL.at).reverse().find(s => s.kind === 'work');
+  const strapNote = st.kind !== 'work' && (!prevWork || EX[prevWork.ex].len !== e.len)
+    ? `<div class="pl-strap">📏 Straps: ${esc(D.LENGTHS[e.len].name)} · ${esc(D.POSITIONS[e.pos])}</div>` : '';
+  const nextWork = PL.steps.slice(PL.at + 1).find(s => s.kind === 'work');
+  const label = { ready: 'GET READY', work: 'WORK', rest: st.between ? 'ROUND REST' : 'REST' }[st.kind];
+  const sideNote = st.kind === 'work' && e.sides ? `<div class="pl-side">${PL.sideSaid ? '🔄 Second side' : '1️⃣ First side, switch halfway'}</div>` : '';
+  $('#plMain').innerHTML = `
+    <span class="pl-phase ${st.kind}">${label}${PL.running ? '' : ' · PAUSED'}</span>
+    <div class="pl-time">${clock(PL.left)}</div>
+    <div class="pl-where">Round ${st.round} of ${PL.w.rounds} · exercise ${st.i + 1} of ${listLen}</div>
+    <div class="pl-ex">${st.kind === 'work' ? '' : 'Next: '}${esc(e.name)}</div>
+    ${strapNote}${sideNote}
+    <div class="pl-pic pic">${pic(e.id, e.name)}</div>
+    <div class="pl-cue">${esc(st.kind === 'work' ? e.cues[0] : e.setup)}</div>
+    ${st.kind === 'work' && nextWork ? `<div class="pl-next">Then: ${esc(EX[nextWork.ex].name)}</div>` : ''}`;
+  const doneSecs = PL.steps.slice(0, PL.at).reduce((s, x) => s + x.secs, 0) + (st.secs - PL.left);
+  $('#plBar').style.width = (100 * doneSecs / PL.steps.reduce((s, x) => s + x.secs, 0)) + '%';
+  $('#plPlay').textContent = PL.running ? '⏸' : '▶';
+  $('#plPlay').title = PL.running ? 'Pause' : 'Carry on';
+  $('#plSound').setAttribute('aria-pressed', SOUND); $('#plVoice').setAttribute('aria-pressed', VOICE);
+}
+function pause(on) {
+  if (on && PL.running) { PL.running = false; PL.left = Math.max(0, Math.ceil((PL.endAt - Date.now()) / 1000)); }
+  else if (!on && !PL.running) { PL.running = true; PL.endAt = Date.now() + PL.left * 1000; }
+  drawPlayer();
+}
+function closePlayer() {
+  clearInterval(PL.tick); PL.running = false;
+  try { speechSynthesis.cancel(); } catch (e) { /* fine */ }
+  keepAwake(false);
+  $('#player').classList.remove('open');
+  document.body.style.overflow = '';
+  render();
+}
+function logIt(partial) {
+  const w = PL.w;
+  const secs = partial ? PL.done : totalSecs(w);
+  store.add('log', Object.assign({ name: w.name || 'Workout', emoji: w.emoji || '💪', wid: w.id || null, secs, date: dayKey(new Date()) }, partial ? { partial: true } : {}));
+}
+function finish() {
+  clearInterval(PL.tick); PL.running = false; PL.finished = true;
+  beep(784, 0.2); setTimeout(() => beep(1046, 0.4), 220);
+  say('Workout done. Great job!');
+  logIt(false);
+  $('#plBar').style.width = '100%';
+  $('#plMain').innerHTML = `
+    <span class="pl-phase done">DONE</span>
+    <div style="font-size:4rem">🎉</div>
+    <div class="pl-ex">Nice work, ${esc(Family.me())}!</div>
+    <div class="pl-where">${esc(PL.w.name || 'Workout')} · ${mins(totalSecs(PL.w))} · saved to the log</div>
+    <div class="row" style="justify-content:center;margin-top:10px">
+      <button class="btn" id="plLog">📈 See the log</button>
+      <button class="btn ghost" id="plClose">Close</button>
+    </div>`;
+  $('#plPlay').textContent = '↺'; $('#plPlay').title = 'Do it again';
+  $('#plLog').onclick = () => { TAB = 'log'; local.set('tab', 'log'); closePlayer(); };
+  $('#plClose').onclick = closePlayer;
+  keepAwake(false);
+}
+$('#plPlay').onclick = () => {
+  if (PL.finished) { startWorkout(PL.w); return; }   // "do it again"
+  pause(PL.running);
+};
+$('#plSkip').onclick = () => {
+  if (PL.finished) return;
+  if (PL.at < PL.steps.length - 1) enterStep(PL.at + 1); else finish();
+  if (!PL.running && !PL.finished) { PL.running = true; pause(true); }   // stay paused if you were
+};
+$('#plBack').onclick = () => {
+  if (PL.finished) return;
+  // first tap restarts this step; a quick second tap goes back one
+  const st = PL.steps[PL.at];
+  if (st && PL.left >= st.secs - 2 && PL.at > 0) enterStep(PL.at - 1); else enterStep(PL.at);
+  if (!PL.running) { PL.running = true; pause(true); }
+};
+$('#plQuit').onclick = () => {
+  if (PL.finished) { closePlayer(); return; }
+  pause(true);
+  if (!confirm('Stop this workout?')) { pause(false); return; }
+  if (PL.done >= 60 && confirm('Save what you did (' + mins(PL.done) + ') to the log?')) logIt(true);
+  closePlayer();
+};
+$('#plSound').onclick = () => { SOUND = !SOUND; local.set('sound', SOUND); drawPlayer(); };
+$('#plVoice').onclick = () => { VOICE = !VOICE; local.set('voice', VOICE); if (!VOICE) try { speechSynthesis.cancel(); } catch (e) { /* fine */ } drawPlayer(); };
+document.addEventListener('keydown', ev => {
+  if (!$('#player').classList.contains('open')) return;
+  if (ev.target.closest('button') && (ev.key === ' ' || ev.key === 'Enter')) return;   // the button handles it
+  if (ev.key === ' ') { ev.preventDefault(); $('#plPlay').click(); }
+  if (ev.key === 'ArrowRight') $('#plSkip').click();
+  if (ev.key === 'ArrowLeft') $('#plBack').click();
+  if (ev.key === 'Escape') $('#plQuit').click();
+});
+
+render();
+</script>
+</body>
+</html>

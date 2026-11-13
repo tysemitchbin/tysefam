@@ -80,6 +80,13 @@ window.SITE = {
       color: 'meadow'
     },
     {
+      id: 'trx',
+      name: 'TRX Training',
+      emoji: '🏋️',
+      description: 'Suspension-strap exercises with diagrams, ready-made workouts, your own workouts and a timer that talks you through them.',
+      color: 'peach'
+    },
+    {
       id: 'energy',
       name: 'Energy',
       emoji: '⚡',
