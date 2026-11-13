@@ -56,8 +56,9 @@ code readable and commented for a non-expert.
   (tool `baby-moves`: `baby` (name, birthday, due date, stage), `skills`, `log` per day, `setup`).
 - `tools/trx/`: TRX (suspension strap) exercise database, workouts and a workout timer.
   `data.js` = exercises (strap length, position, steps, cues, easier/harder) + ready-made workouts;
-  exercise ids are used by saved workouts and the diagrams, so don't rename them. `illus.js` = side-view
-  start → finish diagrams drawn from joint angles (how a pose is written is explained at its top).
+  exercise ids are used by saved workouts and the diagrams, so don't rename them. `illus.js` = start → finish
+  diagrams drawn from joint angles: side view for most, a front/above view (`v: 'front'`/`'top'`) for
+  sideways and twisting moves (how a pose is written is explained in the file).
   Shared in `family_items` (tool `trx`: `workouts` the family built, `log` of finished workouts). The
   timer beeps, can speak (browser speech), and keeps the screen awake; the draft being built is per device.
 - `tools/packing/`: shared packing checklists in `family_items` (tool `packing`: `lists`, `items`, `trip`).

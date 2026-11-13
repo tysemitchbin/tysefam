@@ -97,8 +97,85 @@
   const floor = () => `<line x1="4" y1="${FLOOR}" x2="156" y2="${FLOOR}" stroke="${C.floor}" stroke-width="2" stroke-linecap="round"/>`;
   const label = (x, t) => `<text x="${x}" y="11" font-size="8.5" font-family="Nunito, sans-serif" font-weight="800" fill="${C.line}" opacity=".55">${t}</text>`;
 
+  /* ───── the front view (and the view from above) ─────
+     For moves that go sideways or twist, which look wrong from the side.
+     Same idea as above, but now both legs and both arms are drawn the same,
+     the head has two eyes (or hair, seen from above) and the body has a width.
+     Side A is the figure's right-hand side of the picture when standing upright.
+       v: 'front' (or 'top' = seen from above, lying face down)
+       b: body angle, pelvis → neck (90 = upright)
+       A / B:   legs  [thigh, shin]      hip → knee, knee → foot
+       AA / BA: arms  [upper arm, forearm]  shoulder → elbow, elbow → hand
+       Any angle can be [angle, length 0–1] to shorten a limb that points
+       towards you (e.g. arms reaching forward to the anchor).
+       g: 'footA' 'footB' 'handA' 'handB' 'elbowA' 'elbowB' 'kneeA' 'kneeB' 'pelvis'
+       s: strap to 'h' both hands · 'ha' / 'hb' one hand · 'f' both feet · 'fa' / 'fb' one foot */
+  const FR = { thigh: 23, shin: 22, body: 26, uarm: 15, farm: 14, hip: 6, sh: 10 };
+  const GROUND_F = { footA: 109, footB: 109, handA: 109, handB: 109, elbowA: 108, elbowB: 108, kneeA: 108, kneeB: 108, pelvis: 100 };
+  const lim = v => Array.isArray(v) ? v : [v, 1];
+  function solveFront(p) {
+    const b = p.b ?? 90;
+    const J = { pelvis: [0, 0] };
+    J.hipA = step(J.pelvis, b - 90, FR.hip); J.hipB = step(J.pelvis, b + 90, FR.hip);
+    J.neck = step(J.pelvis, b, FR.body);
+    J.shA = step(J.neck, b - 90, FR.sh); J.shB = step(J.neck, b + 90, FR.sh);
+    J.head = step(J.neck, b + (p.n || 0), 10);
+    const two = (from, pair, l1, l2) => {
+      const [a1, k1] = lim(pair[0]), [a2, k2] = lim(pair[1]);
+      const mid = step(from, a1, l1 * k1);
+      return [mid, step(mid, a2, l2 * k2), a2];
+    };
+    let sa, sb;
+    [J.kneeA, J.footA, sa] = two(J.hipA, p.A || [-88, -90], FR.thigh, FR.shin);
+    [J.kneeB, J.footB, sb] = two(J.hipB, p.B || [-92, -90], FR.thigh, FR.shin);
+    [J.elbowA, J.handA] = two(J.shA, p.AA || [-80, -88], FR.uarm, FR.farm);
+    [J.elbowB, J.handB] = two(J.shB, p.BA || [-100, -92], FR.uarm, FR.farm);
+    // no ground joint given: whichever foot is lower stands on the floor
+    const g = p.g || (J.footA[1] >= J.footB[1] ? 'footA' : 'footB');
+    const want = [p.x ?? 80, p.y ?? GROUND_F[g] ?? 109];
+    const dx = want[0] - J[g][0], dy = want[1] - J[g][1];
+    Object.keys(J).forEach(k => { J[k] = [J[k][0] + dx, J[k][1] + dy]; });
+    J.toeA = step(J.footA, sa + 90, 5); J.toeB = step(J.footB, sb - 90, 5);
+    J.eyeA = step(step(J.head, b + (p.n || 0) - 90, 2.6), b + (p.n || 0), -0.5);
+    J.eyeB = step(step(J.head, b + (p.n || 0) + 90, 2.6), b + (p.n || 0), -0.5);
+    return J;
+  }
+  function frontPanel(p, tag) {
+    const J = solveFront(p);
+    const s = p.s || '', top = p.v === 'top';
+    const feet = s[0] === 'f';
+    const ax = p.ax ?? (feet ? (J.footA[0] + J.footB[0]) / 2 : 80);
+    let out = top ? '' : floor();
+    if (s && !top) out += anchor(ax);
+    // legs, then the body (a rounded shape from hips to shoulders), then the head
+    out += seg([J.hipB, J.kneeB, J.footB], C.leg, 6) + seg([J.hipA, J.kneeA, J.footA], C.leg, 6);
+    if (!top) out += seg([J.footB, J.toeB], C.line, 4) + seg([J.footA, J.toeA], C.line, 4);
+    out += `<polygon points="${[J.hipA, J.shA, J.shB, J.hipB].map(pt).join(' ')}" fill="${C.shirt}" stroke="${C.shirt}" stroke-width="5" stroke-linejoin="round"/>`;
+    out += `<circle cx="${r1(J.head[0])}" cy="${r1(J.head[1])}" r="7" fill="${top ? '#a07a58' : C.head}" stroke="${C.line}" stroke-width="1.5"/>`;
+    if (!top) out += [J.eyeA, J.eyeB].map(e => `<circle cx="${r1(e[0])}" cy="${r1(e[1])}" r="1.1" fill="${C.line}"/>`).join('');
+    out += [[J.shB, J.elbowB, J.handB], [J.shA, J.elbowA, J.handA]].map(a =>
+      seg(a, C.arm, 5) + `<circle cx="${r1(a[2][0])}" cy="${r1(a[2][1])}" r="2.4" fill="${C.head}" stroke="${C.line}" stroke-width="1"/>`).join('');
+    // the straps (from above, the strap goes straight up: just show the cradles and say so)
+    const ends = [];
+    if (s === 'h' || s === 'ha') ends.push([J.handA, 'hand']);
+    if (s === 'h' || s === 'hb') ends.push([J.handB, 'hand']);
+    if (s === 'f' || s === 'fa') ends.push([J.footA, 'foot']);
+    if (s === 'f' || s === 'fb') ends.push([J.footB, 'foot']);
+    if (top) {
+      out += ends.map(([e]) => `<ellipse cx="${r1(e[0])}" cy="${r1(e[1])}" rx="4.5" ry="3.2" fill="${C.handle}" stroke="${C.line}" stroke-width="1"/>`).join('');
+      if (ends.length) {
+        const e = ends[0][0];
+        out += `<text x="${r1(Math.max(4, e[0] - 30))}" y="${r1(e[1] + 3)}" font-size="7.5" font-family="Nunito, sans-serif" font-weight="800" fill="${C.line}" opacity=".6">↑ strap</text>`;
+      }
+    } else out += ends.map(([e, k]) => strapTo(ax, e, k)).join('');
+    // say which way we're looking, at the bottom so it doesn't bump into the anchor
+    out += `<text x="6" y="119" font-size="7.5" font-family="Nunito, sans-serif" font-weight="800" fill="${C.line}" opacity=".5">${top ? 'seen from above' : 'seen from the front'}</text>`;
+    return out + (tag ? label(6, tag) : '');
+  }
+
   /* One picture panel for one pose. */
   function panel(p, tag) {
+    if (p.v === 'front' || p.v === 'top') return frontPanel(p, tag);
     const J = solve(p);
     const s = p.s || '';
     const footStrap = s[0] === 'f';
@@ -240,7 +317,92 @@
     'hip-flexor-stretch': [
       { x: 60, a: [84, 6, 100, 100, 100], b: [190, 98], f: -1, ax: 140, s: 'f2' }],
     'hamstring-stretch': [
-      { g: 'foot2', x: 62, a: [172, 172, 52, -42, -42], b: [90, 90], s: 'f1' }]
+      { g: 'foot2', x: 62, a: [172, 172, 52, -42, -42], b: [90, 90], s: 'f1' }],
+    'calf-stretch': [
+      { g: 'foot2', x: 74, a: [106, 106, 104, 24, 24], b: [92, 92], ft: 40, s: S }],
+
+    /* ── More moves seen from the side ── */
+    'assisted-pull-up': [
+      { x: 70, a: [58, 168, 84, 86, 88], ax: 82, s: S },
+      { x: 70, a: [84, 98, 94, -62, 100], ft: -40, ax: 82, s: S }],
+    'single-leg-deadlift': [
+      { x: 86, a: up(95, 26), b: [82, 82], s: S },
+      { x: 86, a: [95, 102, 16, 18, 18], b: [-8, -8], s: S }],
+    'hamstring-runner': [
+      { g: 'shoulder', x: 116, a: [-14, -14, -14, 186, 180], f: -1, ax: 44, s: 'f' },
+      { g: 'shoulder', x: 116, a: [100, -50, -24, 186, 180], b: [-18, -18], f: -1, ax: 44, s: 'f' }],
+    'lunge-jump': [
+      { x: 88, a: [90, 180, 92, 26, 26], b: [8, 76], s: S },
+      { g: 'foot2', x: 96, y: 100, a: [30, 70, 92, 30, 30], b: [92, 118], ft2: -60, s: S }],
+    'burpee': [
+      { x: 60, a: [90, 90, 96, 250, 225], b: [205, 116], f: -1, ax: 140, s: 'f2' },
+      { g: 'hand', x: 34, a: [172, 172, 172, -90, -90], b: [176, 176], f: -1, ax: 140, s: 'f2' }],
+    'triceps-dip': [
+      { x: 122, a: [166, 166, 95, -90, -90], ax: 70, s: S },
+      { x: 122, a: [173, 173, 95, 236, -48], ax: 70, s: S }],
+    'w-fly': [
+      { x: 88, a: up(120, 27), s: S },
+      { x: 88, a: up(104, 214, 84), s: S }],
+    'swimmer-pull': [
+      { x: 88, a: up(122, 27), s: S },
+      { x: 88, a: up(104, -72), s: S }],
+    'atomic-pike': [
+      { g: 'hand', x: 118, y: 109, a: [-12, -12, -12, 160, -90], s: 'f' },
+      { g: 'hand', x: 118, a: [42, 42, -52, -90, -90], s: 'f' }],
+    'supine-plank': [
+      { g: 'elbow', x: 112, a: [-4, -4, -4, -90, 180], f: -1, s: 'f' }],
+    'single-leg-hip-press': [
+      { g: 'shoulder', x: 116, a: [32, -38, -4, 186, 180], b: [-96, -96], f: -1, ax: 56, s: 'f1' },
+      { g: 'shoulder', x: 116, a: [56, -34, -34, 186, 180], b: [-70, -70], f: -1, ax: 56, s: 'f1' }],
+    'single-leg-hamstring-curl': [
+      { g: 'shoulder', x: 116, a: [-14, -14, -14, 186, 180], b: [-48, -48], f: -1, ax: 44, s: 'f1' },
+      { g: 'shoulder', x: 116, a: [100, -50, -30, 186, 180], b: [-66, -66], f: -1, ax: 44, s: 'f1' }],
+    'single-leg-squat-row': [
+      { x: 86, a: [52, 176, 72, 38, 38], b: [178, 182], s: S },
+      { x: 86, a: up(102, 200, 24), b: [130, 130], s: S }],
+    'single-arm-chest-press': [
+      { x: 74, a: up(112, 198), b: [null, null, -80, -80], f: -1, s: 'h1' },
+      { x: 74, a: up(126, 40, 172), b: [null, null, -70, -70], f: -1, s: 'h1' }],
+
+    /* ── Sideways and twisting moves, seen from the front ── */
+    'side-plank': [
+      { v: 'front', g: 'elbowA', x: 118, b: 12, A: [192, 190], B: [190, 189], AA: [-90, [-90, .3]], BA: [90, 92], s: 'f' }],
+    'side-plank-crunch': [
+      { v: 'front', g: 'elbowA', x: 118, b: 12, A: [192, 190], B: [190, 189], AA: [-90, [-90, .3]], BA: [-30, -150], s: 'f' },
+      { v: 'front', g: 'elbowA', x: 118, b: 24, A: [[205, .45], [175, .7]], B: [[200, .45], [172, .7]], AA: [-90, [-90, .3]], BA: [-30, -150], s: 'f' }],
+    'oblique-crunch': [
+      { v: 'top', g: 'pelvis', x: 86, y: 60, b: 0, A: [184, 182], B: [176, 178], AA: [[-90, .3], [-90, .2]], BA: [[90, .3], [90, .2]], s: 'f' },
+      { v: 'top', g: 'pelvis', x: 86, y: 60, b: 6, A: [-40, 200], B: [-26, 196], AA: [[-90, .3], [-90, .2]], BA: [[90, .3], [90, .2]], s: 'f' }],
+    'spiderman-plank': [
+      { v: 'top', g: 'pelvis', x: 86, y: 60, b: 0, A: [184, 182], B: [176, 178], AA: [[-90, .3], [-90, .2]], BA: [[90, .3], [90, .2]], s: 'f' },
+      { v: 'top', g: 'pelvis', x: 86, y: 60, b: 0, A: [-62, 196], B: [176, 178], AA: [[-90, .3], [-90, .2]], BA: [[90, .3], [90, .2]], s: 'f' }],
+    'hip-drop': [
+      { v: 'front', x: 96, b: 92, A: [-89, -90], B: [-91, -90], AA: [138, 138], BA: [142, 142], ax: 34, s: 'h' },
+      { v: 'front', x: 96, b: 118, A: [-62, -62], B: [-64, -64], AA: [146, 146], BA: [150, 150], ax: 34, s: 'h' }],
+    'torso-rotation': [
+      { v: 'front', x: 104, b: 80, AA: [176, 172], BA: [[178, .7], [176, .7]], ax: 34, s: 'h' },
+      { v: 'front', x: 104, b: 80, AA: [[10, .7], [8, .7]], BA: [2, 4], ax: 34, s: 'h' }],
+    'side-lunge': [
+      { v: 'front', x: 92, b: 90, A: [-84, -90], B: [-96, -90], AA: [[-118, .42], [-118, .42]], BA: [[-62, .42], [-62, .42]], s: 'h' },
+      { v: 'front', x: 112, b: 94, A: [-25, -92], B: [-137, -137], AA: [[-118, .42], [-118, .42]], BA: [[-62, .42], [-62, .42]], s: 'h' }],
+    'crossing-balance-lunge': [
+      { v: 'front', x: 92, b: 90, A: [-84, -90], B: [-96, -90], AA: [[-118, .42], [-118, .42]], BA: [[-62, .42], [-62, .42]], s: 'h' },
+      { v: 'front', g: 'footA', x: 92, b: 96, A: [[-82, .65], -92], B: [-52, -66], AA: [[-118, .42], [-118, .42]], BA: [[-62, .42], [-62, .42]], s: 'h' }],
+    'skater': [
+      { v: 'front', g: 'footB', x: 60, b: 98, A: [-128, -112], B: [[-96, .7], -92], AA: [[-118, .42], [-118, .42]], BA: [[-62, .42], [-62, .42]], s: 'h' },
+      { v: 'front', g: 'footA', x: 104, b: 82, A: [[-84, .7], -88], B: [-52, -68], AA: [[-118, .42], [-118, .42]], BA: [[-62, .42], [-62, .42]], s: 'h' }],
+    'archer-row': [
+      { v: 'front', x: 92, b: 90, AA: [[-118, .42], [-118, .42]], BA: [[-62, .42], [-62, .42]], s: 'h' },
+      { v: 'front', x: 92, b: 90, AA: [4, [160, .5]], BA: [176, 176], s: 'h' }],
+    'clock-press': [
+      { v: 'front', x: 92, b: 90, AA: [[-78, .4], [-78, .4]], BA: [[-102, .4], [-102, .4]], s: 'h' },
+      { v: 'front', x: 92, b: 90, AA: [-8, -8], BA: [[-102, .4], [-102, .4]], s: 'h' }],
+    'side-body-stretch': [
+      { v: 'front', x: 104, b: 122, A: [-60, -128], B: [-66, -66], AA: [148, 148], BA: [152, 152], ax: 34, s: 'h' }],
+    'upper-back-twist': [
+      { v: 'front', x: 92, b: 90, A: [-80, -90], B: [-100, -90], AA: [18, 14], BA: [[-62, .42], [-62, .42]], s: 'hb' }],
+    'figure-4-stretch': [
+      { v: 'front', g: 'footB', x: 74, b: 90, A: [-22, 182], B: [[-96, .45], -92], AA: [[-118, .42], [-118, .42]], BA: [[-62, .42], [-62, .42]], s: 'h' }]
   };
 
   /* Draw the diagram for an exercise id. Returns '' if there isn't one.

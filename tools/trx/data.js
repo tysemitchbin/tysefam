@@ -51,7 +51,11 @@ window.TRX_DATA = {
     away:   'Stand facing away from the anchor',
     down:   'On the floor, face down, feet in the cradles',
     up:     'On the floor, face up, heels in the cradles',
-    under:  'Lie under the anchor, holding the handles'
+    under:  'Lie under the anchor, holding the handles',
+    side:   'Stand side-on to the anchor',
+    sideFloor: 'On the floor on your side, feet in the cradles',
+    squatUnder: 'Squat right under the anchor, arms up',
+    dip:    'Sit between the handles, hands by your hips'
   },
 
   BASICS: [
@@ -356,6 +360,250 @@ window.TRX_DATA = {
       steps: ['With a flat back, lean forward from your hips towards the raised foot.', 'Reach for your shin and hold. Switch legs halfway.'],
       cues: ['Flat back beats reaching further.', 'Standing knee soft.'],
       easier: 'Lower the cradle.', harder: 'Lean further forward.'
+    },
+    {
+      id: 'calf-stretch', name: 'Calf Stretch', cat: 'stretch', level: 1, len: 'FS', pos: 'toward', hold: true, sides: true,
+      muscles: 'Calves, Achilles',
+      setup: 'Face the anchor holding the handles. Step one foot forward and put the heel down with the toes pulled up.',
+      steps: ['Keep the front leg straight and lean back gently on the straps.', 'Feel the stretch in the back of the lower leg. Hold, switch legs halfway.'],
+      cues: ['Toes up, heel down.', 'Lean back from the ankles, not the waist.'],
+      easier: 'Toes up less.', harder: 'Lean back further.'
+    },
+
+    /* ───────── More pulls ───────── */
+    {
+      id: 'assisted-pull-up', name: 'Assisted Pull-up', cat: 'pull', level: 2, len: 'FS', pos: 'squatUnder',
+      muscles: 'Lats, biceps, upper back (legs help)',
+      setup: 'Squat right under the anchor and reach up to the handles with straight arms, palms facing forward or each other.',
+      steps: ['Start squatting low, arms straight up.', 'Pull with your arms and let your legs help you rise up until your hands are by your shoulders.', 'Lower slowly back down into the squat.'],
+      cues: ['Arms do most of the work; legs only help.', 'Pull your elbows down towards your back pockets.'],
+      easier: 'Push more with the legs.', harder: 'Use the legs as little as you can, or cross your ankles and kneel.'
+    },
+    {
+      id: 'w-fly', name: 'W Fly', cat: 'pull', level: 2, len: 'FS', pos: 'toward',
+      muscles: 'Rear shoulders, upper back, rotator cuff',
+      setup: 'Hold the handles with palms down, arms straight in front. Lean back until the straps are tight.',
+      steps: ['Start leaning back, arms straight.', 'Pull your elbows down and back to your sides while your hands go up and out, making a "W" with your arms.', 'Straighten your arms slowly to lower back.'],
+      cues: ['Hands finish higher than your elbows.', 'Squeeze your shoulder blades down and together.'],
+      easier: 'Stand more upright.', harder: 'Feet closer to the anchor.'
+    },
+    {
+      id: 'swimmer-pull', name: 'Swimmer Pull', cat: 'pull', level: 2, len: 'FS', pos: 'toward',
+      muscles: 'Lats, triceps, core',
+      setup: 'Hold the handles with palms down, arms straight out in front at shoulder height. Lean back until the straps are tight.',
+      steps: ['Start leaning back with straight arms.', 'Keeping the arms straight, sweep them down to your hips, like a big swimming stroke.', 'Let them rise back to shoulder height slowly.'],
+      cues: ['Arms stay straight all the way.', 'Body stays one straight line.'],
+      easier: 'Stand more upright.', harder: 'Feet closer to the anchor.'
+    },
+    {
+      id: 'archer-row', name: 'Archer Row', cat: 'pull', level: 3, len: 'FS', pos: 'toward', sides: true,
+      muscles: 'Back, rear shoulders, biceps, core',
+      setup: 'Hold the handles with palms down, arms straight in front. Lean back until the straps are tight.',
+      steps: ['Start leaning back with both arms straight.', 'Row one hand to your chest while the other arm opens straight out to the side, like drawing a bow.', 'Come back to the middle with control. Switch the rowing side halfway (or every rep).'],
+      cues: ['Most of your weight goes on the rowing arm.', 'Don\'t let the body twist.'],
+      easier: 'Stand more upright.', harder: 'Feet closer to the anchor.'
+    },
+
+    /* ───────── More pushes ───────── */
+    {
+      id: 'single-arm-chest-press', name: 'Single-Arm Chest Press', cat: 'push', level: 3, len: 'FL', pos: 'away', sides: true,
+      muscles: 'Chest, shoulders, triceps, core (anti-twist)',
+      setup: 'Lock the handles together and hold them in one hand. Face away from the anchor with the strap under your armpit, arm straight in front, and lean forward.',
+      steps: ['Start leaning forward with one straight arm.', 'Lower your chest towards your hand, elbow bending back by your side.', 'Press back up. Switch arms halfway.'],
+      cues: ['Shoulders and hips stay square: no twisting.', 'Wide feet help you balance.'],
+      easier: 'Stand more upright.', harder: 'Feet further back.'
+    },
+    {
+      id: 'clock-press', name: 'Clock Press', cat: 'push', level: 3, len: 'FL', pos: 'away', sides: true,
+      muscles: 'Chest, shoulders, core',
+      setup: 'Same start as the Chest Press: facing away, straps under your armpits, straight arms in front of your chest, leaning forward.',
+      steps: ['Start with both arms straight in front.', 'Lower forward as one arm sweeps out wide to the side, like a clock hand, while the other stays in front.', 'Press back to the middle. Switch arms halfway, or every rep.'],
+      cues: ['Only go as wide and low as you can control.', 'Keep your belly tight.'],
+      easier: 'Stand more upright and make the sweep smaller.', harder: 'Feet further back.'
+    },
+    {
+      id: 'triceps-dip', name: 'Triceps Dip', cat: 'arms', level: 3, len: 'FL', pos: 'dip',
+      muscles: 'Triceps, chest, shoulders',
+      setup: 'Sit on the floor between the handles with your legs out in front. Hold a handle in each hand beside your hips and push up to straight arms, lifting your bum.',
+      steps: ['Start with straight arms, bum lifted, heels on the floor.', 'Bend your elbows straight back and lower your body.', 'Press back up to straight arms.'],
+      cues: ['Elbows point back, not out.', 'Keep your chest up and shoulders down.', 'Hold the handles tight: they will wobble.'],
+      easier: 'Bend your knees and put your feet flat.', harder: 'Keep your legs straight, or lift one leg.'
+    },
+
+    /* ───────── More legs ───────── */
+    {
+      id: 'side-lunge', name: 'Side Lunge', cat: 'legs', level: 1, len: 'ML', pos: 'toward', sides: true,
+      muscles: 'Inner and outer thighs, glutes',
+      setup: 'Face the anchor holding the handles in front of your chest, feet together, straps tight.',
+      steps: ['Stand tall.', 'Take a big step out to the side and sit your hips back over that foot, keeping the other leg straight.', 'Push back to standing. Switch sides halfway, or every rep.'],
+      cues: ['Both feet point forward.', 'Bent knee follows the toes.', 'Chest up.'],
+      easier: 'A smaller step and a shallower bend.', harder: 'Go lower and use the straps less.'
+    },
+    {
+      id: 'crossing-balance-lunge', name: 'Crossing Balance Lunge', cat: 'legs', level: 2, len: 'ML', pos: 'toward', sides: true,
+      muscles: 'Glutes (especially the sides), thighs, balance',
+      setup: 'Face the anchor holding the handles in front of your chest, straps tight.',
+      steps: ['Stand tall.', 'Step one leg back and across behind the other, like a curtsy, and bend both knees.', 'Push through the front heel to stand. Switch sides halfway.'],
+      cues: ['Hips stay facing the anchor.', 'Front knee over the ankle.'],
+      easier: 'A smaller step.', harder: 'Finish by driving the back knee up to hip height.'
+    },
+    {
+      id: 'single-leg-deadlift', name: 'Single-Leg Deadlift', cat: 'legs', level: 2, len: 'FS', pos: 'toward', sides: true,
+      muscles: 'Hamstrings, glutes, balance',
+      setup: 'Face the anchor holding the handles with straight arms. Stand on one leg. (TRX calls this the "inverted hamstring".)',
+      steps: ['Stand tall on one leg.', 'Hinge forward at the hip, reaching your arms to the anchor while the free leg lifts straight out behind you.', 'Drive the hip forward to stand tall again. Switch legs halfway.'],
+      cues: ['Body and back leg make one long line.', 'Hips stay level, both pointing at the floor.'],
+      easier: 'Lean on the straps more and tap the back toe down.', harder: 'Go until your body is level with the floor.'
+    },
+    {
+      id: 'hamstring-runner', name: 'Hamstring Runner', cat: 'legs', level: 3, len: 'MC', pos: 'up',
+      muscles: 'Hamstrings, glutes, core',
+      setup: 'Lie on your back with your heels in the cradles and lift your hips, like the start of the Hamstring Curl.',
+      steps: ['Start with hips lifted and legs straight.', 'Pull one heel in towards your bum while the other leg stays straight.', 'Swap legs, like running, keeping the hips high.'],
+      cues: ['Hips stay up and level.', 'Steady rhythm: no swinging.'],
+      easier: 'Slower, with a pause between legs.', harder: 'Faster, for longer.'
+    },
+    {
+      id: 'single-leg-hip-press', name: 'Single-Leg Hip Press', cat: 'legs', level: 2, len: 'MC', pos: 'up', sides: true,
+      muscles: 'Glutes, hamstrings',
+      setup: 'Lie on your back with one heel in both cradles (lock them together), knee bent. Lift the other leg straight up.',
+      steps: ['Start with your bum just off the floor.', 'Press the heel down and lift your hips high.', 'Lower slowly. Switch legs halfway.'],
+      cues: ['Hips stay level: don\'t let one side drop.', 'Squeeze your bum at the top.'],
+      easier: 'Both heels in (the Hip Press).', harder: 'Hold at the top for a few seconds each rep.'
+    },
+    {
+      id: 'single-leg-hamstring-curl', name: 'Single-Leg Hamstring Curl', cat: 'legs', level: 3, len: 'MC', pos: 'up', sides: true,
+      muscles: 'Hamstrings, glutes, core',
+      setup: 'Lie on your back with one heel in both cradles (lock them together), hips lifted. Hold the other leg up out of the way.',
+      steps: ['Start with hips lifted and the working leg straight.', 'Pull the heel in towards your bum.', 'Straighten slowly, keeping the hips up. Switch legs halfway.'],
+      cues: ['Hips stay high and level.', 'Slow on the way out.'],
+      easier: 'Both legs (the Hamstring Curl).', harder: 'Pause with the knee bent.'
+    },
+
+    /* ───────── More core ───────── */
+    {
+      id: 'side-plank', name: 'Side Plank', cat: 'core', level: 2, len: 'MC', pos: 'sideFloor', hold: true, sides: true,
+      muscles: 'Side of the belly (obliques), hips, shoulders',
+      setup: 'Lie on your side with both feet in the cradles, the top foot just in front of the bottom one. Elbow under your shoulder.',
+      steps: ['Lift your hips so your body is a straight line.', 'Reach the top arm up (or rest it on your hip) and hold. Switch sides halfway.'],
+      cues: ['Hips up and forward: don\'t let them sag back.', 'Push the floor away with the bottom forearm.'],
+      easier: 'Do it on the floor with your knees bent.', harder: 'Stack the feet, or add the Side-Plank Crunch.'
+    },
+    {
+      id: 'side-plank-crunch', name: 'Side-Plank Crunch', cat: 'core', level: 3, len: 'MC', pos: 'sideFloor', sides: true,
+      muscles: 'Obliques, hip flexors, shoulders',
+      setup: 'Get into a Side Plank with both feet in the cradles, top hand behind your head or on your hip.',
+      steps: ['Hold a straight side plank.', 'Pull both knees in towards your chest, keeping the hips up.', 'Push the legs back out to a straight side plank. Switch sides halfway.'],
+      cues: ['Shoulder stays over the elbow.', 'Slow and controlled.'],
+      easier: 'Just hold the Side Plank.', harder: 'Do it on a straight arm.'
+    },
+    {
+      id: 'oblique-crunch', name: 'Oblique Crunch', cat: 'core', level: 3, len: 'MC', pos: 'down',
+      muscles: 'Obliques, abs, shoulders',
+      setup: 'Feet in the cradles, face down, and push up into a high plank on your hands.',
+      steps: ['Start in a straight-arm plank.', 'Twist your hips and pull both knees in towards one elbow.', 'Push back out to the plank, then go to the other side.'],
+      cues: ['Shoulders stay square over the hands; only the hips turn.', 'Exhale as the knees come in.'],
+      easier: 'Do straight Knee Tucks first.', harder: 'Go further round, or add a push-up between sides.'
+    },
+    {
+      id: 'spiderman-plank', name: 'Spider-Man Plank', cat: 'core', level: 3, len: 'MC', pos: 'down',
+      muscles: 'Obliques, hip flexors, shoulders',
+      setup: 'Feet in the cradles, face down, in a high plank on your hands (or forearms).',
+      steps: ['Start in a straight plank.', 'Take one foot out of line and bring that knee out to the side, up towards the elbow on the same side.', 'Return it and swap sides.'],
+      cues: ['Hips stay low and level.', 'The other leg stays still in its cradle.'],
+      easier: 'Do Mountain Climbers instead.', harder: 'Add a push-up between each knee.'
+    },
+    {
+      id: 'supine-plank', name: 'Supine Plank', cat: 'core', level: 2, len: 'MC', pos: 'up', hold: true,
+      muscles: 'Glutes, hamstrings, lower back, shoulders',
+      setup: 'Lie on your back with your heels in the cradles and your elbows on the floor under your shoulders.',
+      steps: ['Lift your hips so your body is a straight line from heels to shoulders.', 'Hold, breathing steadily.'],
+      cues: ['Squeeze your bum to keep the hips up.', 'Chest open, shoulders away from your ears.'],
+      easier: 'Bend the knees a little.', harder: 'Lift one leg out of its cradle.'
+    },
+    {
+      id: 'hip-drop', name: 'Hip Drop', cat: 'core', level: 2, len: 'FS', pos: 'side', sides: true,
+      muscles: 'Obliques, sides of the hips, lats',
+      setup: 'Stand side-on to the anchor, feet together, holding the handles with both hands up above your head.',
+      steps: ['Start standing tall, side-on, arms up.', 'Push your hips out away from the anchor so your body makes a curve, like a banana.', 'Pull the hips back under you to stand tall. Switch sides halfway.'],
+      cues: ['Arms stay straight.', 'The move is in your side, not a bend forward.'],
+      easier: 'Stand closer to the anchor.', harder: 'Stand further from the anchor, or cross the outside leg behind.'
+    },
+    {
+      id: 'torso-rotation', name: 'Torso Rotation', cat: 'core', level: 2, len: 'ML', pos: 'side', sides: true,
+      muscles: 'Obliques, core, shoulders',
+      setup: 'Lock the handles together and hold them with both hands. Stand side-on to the anchor with straight arms pointing at it, and lean away until the strap is tight.',
+      steps: ['Start with arms straight towards the anchor.', 'Turn your chest away from the anchor, sweeping the arms across in a rainbow.', 'Turn back to face the anchor with control. Switch sides halfway.'],
+      cues: ['Arms stay straight: the turn comes from your middle.', 'Let the hips and back foot turn with you.'],
+      easier: 'Stand more upright, smaller turn.', harder: 'Lean further away from the anchor.'
+    },
+
+    /* ───────── More power ───────── */
+    {
+      id: 'skater', name: 'Skater', cat: 'power', level: 2, len: 'ML', pos: 'toward',
+      muscles: 'Legs, glutes, balance, heart and lungs',
+      setup: 'Face the anchor holding the handles in front of your chest, straps tight.',
+      steps: ['Balance on one bent leg with the other foot crossed behind.', 'Leap sideways onto the other foot, crossing the first leg behind you.', 'Keep going side to side, like a speed skater.'],
+      cues: ['Land softly on a bent knee.', 'Use the straps for balance, not to pull.'],
+      easier: 'Step side to side instead of jumping.', harder: 'Bigger, faster jumps.'
+    },
+    {
+      id: 'lunge-jump', name: 'Lunge Jump', cat: 'power', level: 3, len: 'ML', pos: 'toward',
+      muscles: 'Legs, glutes, heart and lungs',
+      setup: 'Face the anchor holding the handles, arms out in front, and drop into a lunge.',
+      steps: ['Start in a lunge.', 'Jump up and swap legs in the air.', 'Land softly in a lunge with the other leg in front, and go again.'],
+      cues: ['Land quietly with a bent front knee.', 'Chest up.'],
+      easier: 'Step the legs through instead of jumping (alternating Reverse Lunges).', harder: 'Jump higher, go lower.'
+    },
+    {
+      id: 'burpee', name: 'Suspended Burpee', cat: 'power', level: 3, len: 'MC', pos: 'away', sides: true,
+      muscles: 'Everything, heart and lungs',
+      setup: 'Face away from the anchor with one foot in both cradles behind you (lock them together), like the Suspended Lunge.',
+      steps: ['Start standing on one leg.', 'Squat down, put your hands on the floor and hop the standing foot back so you are in a plank.', 'Hop it back in, stand up and finish with a small jump. Switch legs halfway.'],
+      cues: ['Hands under shoulders in the plank.', 'Land softly.'],
+      easier: 'Leave out the jump, or do a normal burpee without the strap.', harder: 'Add a push-up in the plank.'
+    },
+    {
+      id: 'atomic-pike', name: 'Atomic Pike', cat: 'power', level: 3, len: 'MC', pos: 'down',
+      muscles: 'Chest, arms, abs, shoulders',
+      setup: 'Feet in the cradles, face down, in a high plank on your hands.',
+      steps: ['Do one push-up.', 'At the top, lift your hips high into a pike with straight legs.', 'Lower back to the plank. That\'s one rep.'],
+      cues: ['Push the floor away in the pike.', 'Slow and controlled.'],
+      easier: 'Do the Atomic Push-up (knee tuck instead of pike).', harder: 'Pause at the top of the pike.'
+    },
+    {
+      id: 'single-leg-squat-row', name: 'Single-Leg Squat to Row', cat: 'power', level: 3, len: 'FS', pos: 'toward', sides: true,
+      muscles: 'Legs, glutes, back, balance',
+      setup: 'Face the anchor holding the handles with straight arms. Stand on one leg with the other foot just off the floor in front.',
+      steps: ['Sit down on one leg with straight arms.', 'Stand up and row your hands to your ribs as you rise.', 'Straighten the arms as you sit back down. Switch legs halfway.'],
+      cues: ['Standing knee in line with the toes.', 'Legs first, then arms, in one smooth move.'],
+      easier: 'Do the Squat to Row on two legs.', harder: 'Go deeper.'
+    },
+
+    /* ───────── More stretches ───────── */
+    {
+      id: 'side-body-stretch', name: 'Side Body Stretch', cat: 'stretch', level: 1, len: 'FS', pos: 'side', hold: true, sides: true,
+      muscles: 'Lats, obliques, sides of the hips',
+      setup: 'Stand side-on to the anchor, holding the handles above your head. Cross the outside leg behind the inside one.',
+      steps: ['Push your hips out away from the anchor and let your body curve.', 'Breathe into your side and hold. Switch sides halfway.'],
+      cues: ['Arms long and relaxed.', 'Gentle: never force it.'],
+      easier: 'Feet side by side.', harder: 'Stand a little further from the anchor.'
+    },
+    {
+      id: 'upper-back-twist', name: 'Upper-Back Twist', cat: 'stretch', level: 1, len: 'FS', pos: 'toward', hold: true, sides: true,
+      muscles: 'Upper back, chest, shoulders (rotation)',
+      setup: 'Face the anchor holding one handle with one hand, arm straight, leaning back a little.',
+      steps: ['Open the free arm out to the side and back, turning your chest to follow it.', 'Look at the free hand and hold, or move slowly in and out. Switch sides halfway.'],
+      cues: ['Hips stay facing the anchor; only the upper back turns.', 'Breathe out as you open.'],
+      easier: 'A smaller turn.', harder: 'Turn further and sit into a small squat.'
+    },
+    {
+      id: 'figure-4-stretch', name: 'Figure-4 Stretch', cat: 'stretch', level: 1, len: 'ML', pos: 'toward', hold: true, sides: true,
+      muscles: 'Glutes, outer hips',
+      setup: 'Face the anchor holding the handles in front of your chest. Cross one ankle over the other knee.',
+      steps: ['Sit back and down on the standing leg, as if onto a chair.', 'Feel it in the bum of the crossed leg and hold. Switch legs halfway.'],
+      cues: ['Chest up, back flat.', 'Let the straps take your weight.'],
+      easier: 'Sit back less.', harder: 'Sit deeper.'
     }
   ],
 
@@ -413,7 +661,31 @@ window.TRX_DATA = {
       id: 'stretch', name: 'Stretch & Unwind', emoji: '🧘', level: 1,
       about: 'Slow holds to finish a session or loosen up on a rest day.',
       rounds: 1, work: 45, rest: 10, roundRest: 0,
-      list: ['lat-stretch', 'chest-stretch', 'hip-flexor-stretch', 'hamstring-stretch', 'overhead-squat']
+      list: ['lat-stretch', 'side-body-stretch', 'upper-back-twist', 'chest-stretch', 'calf-stretch', 'figure-4-stretch', 'overhead-squat', 'hip-flexor-stretch', 'hamstring-stretch']
+    },
+    {
+      id: 'core-360', name: 'Core 360', emoji: '🌀', level: 2,
+      about: 'Twists, side planks and anti-rotation: the whole middle, not just the front.',
+      rounds: 3, work: 30, rest: 15, roundRest: 45,
+      list: ['hip-drop', 'torso-rotation', 'side-plank', 'oblique-crunch', 'spiderman-plank', 'supine-plank']
+    },
+    {
+      id: 'back-biceps', name: 'Back & Biceps', emoji: '🚣', level: 2,
+      about: 'Every kind of pull, all at one strap length, so no strap changes at all.',
+      rounds: 3, work: 40, rest: 20, roundRest: 60,
+      list: ['low-row', 'w-fly', 'swimmer-pull', 'archer-row', 'biceps-curl', 'assisted-pull-up']
+    },
+    {
+      id: 'one-leg', name: 'One Leg at a Time', emoji: '🦩', level: 2,
+      about: 'Single-leg strength and balance. Longer sets, because each one is done on both sides.',
+      rounds: 2, work: 50, rest: 15, roundRest: 60,
+      list: ['single-leg-deadlift', 'side-lunge', 'crossing-balance-lunge', 'pistol-squat', 'suspended-lunge', 'single-leg-hip-press', 'hamstring-runner']
+    },
+    {
+      id: 'cardio-blast', name: 'Cardio Blast', emoji: '💨', level: 3,
+      about: 'Jumps, skaters and burpees to get the heart going. Warm up first!',
+      rounds: 3, work: 30, rest: 20, roundRest: 60,
+      list: ['jump-squat', 'skater', 'lunge-jump', 'sprinter-start', 'burpee', 'mountain-climber']
     }
   ]
 };
