@@ -61,6 +61,14 @@ code readable and commented for a non-expert.
   sideways and twisting moves (how a pose is written is explained in the file).
   Shared in `family_items` (tool `trx`: `workouts` the family built, `log` of finished workouts). The
   timer beeps, can speak (browser speech), and keeps the screen awake; the draft being built is per device.
+- `tools/cookbook/`: the family recipe collection. Paste a link or a whole recipe. Links go to the
+  `recipes` edge function (`supabase/functions/recipes/`, verify_jwt ON, checks the guest list), which
+  fetches the page and reads its schema.org Recipe JSON-LD (or sends back the page text if there is none).
+  `guess.js` (`window.Cook`) reads pasted text and guesses meal, main protein, cuisine, time, difficulty,
+  cost and labels by keyword spotting (English + Norwegian); the edit box shows the guesses before saving.
+  Category ids in `Cook.CATS` are what's saved, so don't rename them. Shared in `family_items` (tool
+  `cookbook`, collection `recipes`: also `favs` per person and a `cooked` log). Filters and ingredient
+  ticks are per device.
 - `tools/packing/`: shared packing checklists in `family_items` (tool `packing`: `lists`, `items`, `trip`).
 - `tools/energy/`: Tibber prices + usage per house, plus a Bills list. The page calls the `energy`
   edge function (`supabase/functions/energy/`), which reads Tibber/Elvia tokens from

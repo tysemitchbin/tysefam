@@ -66,6 +66,13 @@ window.SITE = {
       color: 'meadow'
     },
     {
+      id: 'cookbook',
+      name: 'Cookbook',
+      emoji: '📖',
+      description: 'Our recipes: paste a link or a whole recipe and it’s sorted by meal, protein, cuisine, time, difficulty and cost.',
+      color: 'sun'
+    },
+    {
       id: 'packing',
       name: 'Packing',
       emoji: '🧳',

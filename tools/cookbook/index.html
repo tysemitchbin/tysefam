@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cookbook</title>
+
+<!-- ════════════════════════════════════════════════════════════════
+     COOKBOOK: the family's recipe collection.
+
+     Add a recipe by pasting either
+       • a link to a recipe page  → the `recipes` edge function (supabase/functions/recipes/)
+                                     fetches the page and reads the recipe out of it, or
+       • the whole recipe text     → read right here by guess.js.
+     guess.js then sorts it (meal, main protein, cuisine, time, difficulty, cost, labels) and
+     the edit box opens so the guesses can be checked before saving.
+
+     Saved in Family.store('cookbook'):
+       recipes → { title, source, image, description, servings, prepMin, cookMin, totalMin,
+                   ingredients: [lines], steps: [lines], notes,
+                   meal, protein, cuisine, difficulty, cost   (ids from Cook.CATS in guess.js),
+                   tags: ['Vegetarian', …], favs: { Mitch: true }, cooked: [{ by, ts }], ts, by }
+     A line ending in ":" in ingredients or steps ("For the sauce:") is shown as a little heading.
+     Search, filters and ticked-off ingredients stay on this device only.
+═════════════════════════════════════════════════════════════════ -->
+
+<link rel="stylesheet" href="../../shared/family.css">
+<style>
+textarea.field{width:100%;resize:vertical;line-height:1.4;}
+.acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
+.msg{font-weight:700;font-size:.9rem;color:var(--ink-soft);}
+.msg.bad{color:var(--peach-deep);}
+
+/* filters */
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
+.fgrid select,.sortsel{border:2px solid var(--line);background:#fff;border-radius:12px;padding:8px 10px;font-size:.9rem;font-weight:700;color:var(--forest);width:100%;}
+.fgrid select.on{border-color:var(--meadow);background:#eef6ea;}
+.frow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
+.chipbtn{border:2px solid var(--line);background:#fff;color:var(--forest);border-radius:999px;padding:6px 12px;font-weight:800;font-size:.85rem;}
+.chipbtn.on{background:var(--blossom-deep);border-color:var(--blossom-deep);color:#fff;}
+.count{font-weight:800;color:var(--ink-soft);font-size:.85rem;margin-left:auto;}
+.linkbtn{border:none;background:none;color:var(--meadow-deep);font-weight:800;text-decoration:underline;padding:4px;}
+
+/* recipe cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
+@media(min-width:600px){.grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px;}}
+.rc{display:flex;flex-direction:column;background:var(--paper);border:1px solid var(--line);border-radius:var(--r);
+  overflow:hidden;box-shadow:var(--shadow);color:var(--ink);text-decoration:none;position:relative;transition:.15s;}
+.rc:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);}
+.pic{position:relative;aspect-ratio:4/3;display:grid;place-items:center;font-size:2.6rem;background:#eef6ea;overflow:hidden;}
+.pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.pic.noimg img{display:none;}
+.m-breakfast,.m-baking{background:#fdf3d6;} .m-dessert{background:#fbe4ea;} .m-soup,.m-side{background:#fde9dc;}
+.m-drink,.m-snack{background:#e2f1f4;}
+.rc-body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;flex:1;}
+.rc-title{font-family:'Fredoka',sans-serif;font-weight:600;font-size:1.02rem;color:var(--forest);line-height:1.2;}
+.rc-tags{display:flex;flex-wrap:wrap;gap:4px;}
+.mini{font-size:.7rem;font-weight:800;padding:2px 7px;border-radius:999px;background:#eef0e8;color:var(--ink-soft);white-space:nowrap;}
+.rc-sub{font-size:.78rem;font-weight:700;color:var(--ink-soft);margin-top:auto;}
+.heart{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.9);border-radius:999px;padding:2px 7px;font-size:.85rem;}
+
+/* one recipe */
+.rv-top{display:flex;gap:8px;align-items:center;margin-bottom:12px;}
+.rv-head{padding:0;overflow:hidden;}
+.hero{width:100%;max-height:340px;object-fit:cover;display:block;}
+.rv-in{padding:18px;}
+.rv-in h1{margin:0 0 6px;font-size:1.7rem;color:var(--forest);line-height:1.15;}
+.rv-desc{color:var(--ink-soft);margin:0 0 12px;line-height:1.45;}
+.facts{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;}
+.fact{border:none;font:inherit;font-size:.82rem;font-weight:800;padding:5px 11px;border-radius:999px;background:#e3f1df;color:var(--meadow-deep);}
+button.fact:hover{filter:brightness(.95);}
+.fact.c-cost{background:#fdf3d6;color:#9a7a17;} .fact.c-difficulty{background:#fde9dc;color:#b86a3c;}
+.fact.c-cuisine{background:#e2f1f4;color:#3f7f8f;} .fact.c-tag{background:#fbe4ea;color:#b4566f;}
+.times{font-size:.85rem;color:var(--ink-soft);font-weight:700;margin:4px 0 8px;}
+.who-line{font-size:.82rem;color:var(--ink-soft);font-weight:700;}
+.rv-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:18px;align-items:start;margin-bottom:18px;}
+.rv-grid .card{margin:0;}
+@media(max-width:760px){.rv-grid{grid-template-columns:1fr;}}
+.serv{display:flex;align-items:center;gap:8px;font-weight:800;color:var(--forest);margin-bottom:8px;}
+.serv button{width:32px;height:32px;border-radius:50%;border:2px solid var(--line);background:#fff;font-weight:800;color:var(--forest);}
+.serv button:hover{border-color:var(--meadow);}
+.ing{display:flex;gap:10px;align-items:flex-start;padding:8px 2px;border-bottom:1px dashed var(--line);cursor:pointer;line-height:1.35;}
+.ing:last-child{border-bottom:none;}
+.ing.done .t{text-decoration:line-through;color:var(--ink-soft);}
+.sub{font-family:'Fredoka',sans-serif;font-weight:600;color:var(--forest);margin:12px 0 2px;}
+ol.steps{list-style:none;margin:0;padding:0;counter-reset:s;}
+ol.steps li.step{counter-increment:s;display:flex;gap:12px;padding:10px 6px;border-radius:12px;line-height:1.5;cursor:pointer;}
+ol.steps li.step::before{content:counter(s);flex:0 0 28px;height:28px;border-radius:50%;background:var(--meadow);color:#fff;
+  font-weight:800;display:grid;place-items:center;font-size:.9rem;}
+ol.steps li.step.done{color:var(--ink-soft);}
+ol.steps li.step.done::before{content:"✓";background:#c9d9c3;}
+ol.steps li.step:hover{background:#f6faf3;}
+.notes{white-space:pre-wrap;line-height:1.45;}
+
+/* the edit box */
+dialog{border:none;border-radius:20px;padding:0;max-width:680px;width:calc(100% - 16px);max-height:94vh;box-shadow:var(--shadow-lg);background:var(--paper);color:var(--ink);}
+dialog::backdrop{background:rgba(60,65,56,.35);}
+dialog form{padding:18px;display:flex;flex-direction:column;gap:12px;}
+dialog h3{margin:0;color:var(--forest);}
+dialog label{font-weight:800;font-size:.82rem;color:var(--ink-soft);display:flex;flex-direction:column;gap:5px;}
+dialog .field{width:100%;}
+.guessnote{background:#fdf3d6;border-radius:12px;padding:10px 12px;margin:0;font-weight:700;font-size:.9rem;color:#7d6414;}
+.guessnote.bad{background:#fde9dc;color:#a35a30;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.row4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;}
+@media(max-width:520px){.row2{grid-template-columns:1fr;}.row4{grid-template-columns:1fr 1fr;}}
+.taglist{display:flex;flex-wrap:wrap;gap:6px 12px;}
+.taglist label{flex-direction:row;align-items:center;gap:6px;font-size:.9rem;color:var(--ink);font-weight:700;}
+.dlg-acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;position:sticky;bottom:-18px;background:var(--paper);padding:10px 0 4px;}
+.dlg-acts .danger{background:#fff;color:var(--blossom-deep);border:2px solid #f6d3de;margin-right:auto;}
+</style>
+</head>
+<body data-tool="cookbook">
+
+<main class="wrap">
+  <div class="page-head">
+    <span class="emoji">📖</span><h1>Cookbook</h1>
+    <span style="flex:1"></span>
+    <span id="sync" class="badge local">…</span>
+  </div>
+
+  <!-- ───── the collection ───── -->
+  <section id="listView">
+    <p class="hint">Paste a link to a recipe, or copy a whole recipe from anywhere and paste it in. It gets sorted by meal, protein, cuisine, time, difficulty and cost for you.</p>
+
+    <div class="card">
+      <h3>➕ Add a recipe</h3>
+      <textarea id="paste" class="field" rows="3" placeholder="Paste a link (https://…) or the whole recipe: name, ingredients and steps"></textarea>
+      <div class="acts">
+        <button class="btn" id="addBtn">Add to cookbook</button>
+        <button class="btn ghost" id="blankBtn">✍️ Type one in</button>
+        <span class="msg" id="addMsg"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="addrow">
+        <input id="q" placeholder="🔍 Search recipes" title="Search names, ingredients and labels" autocomplete="off">
+        <button class="btn sky" id="surprise" title="Pick a random recipe from the ones showing">🎲 Surprise me</button>
+      </div>
+      <div class="fgrid" id="filters"></div>
+      <div class="frow">
+        <button class="chipbtn" id="favBtn">❤️ My favourites</button>
+        <select class="sortsel" id="sort" style="width:auto">
+          <option value="new">Newest first</option>
+          <option value="az">A to Z</option>
+          <option value="quick">Quickest first</option>
+          <option value="cooked">Made most often</option>
+        </select>
+        <button class="linkbtn" id="clear" hidden>Clear filters</button>
+        <span class="count" id="count"></span>
+      </div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <!-- ───── one recipe (filled in by showRecipe) ───── -->
+  <section id="recipeView" hidden></section>
+</main>
+
+<!-- ───── add / edit a recipe ───── -->
+<dialog id="ed">
+  <form id="edForm">
+    <h3 id="edHead">📝 New recipe</h3>
+    <p class="guessnote" id="edNote" hidden></p>
+    <label>Name<input class="field" name="title" required maxlength="140"></label>
+    <div class="row2">
+      <label>Link to the original<input class="field" name="source" placeholder="https://…" maxlength="600"></label>
+      <label>Picture link<input class="field" name="image" placeholder="https://…" maxlength="1000"></label>
+    </div>
+    <div class="row4">
+      <label>Serves<input class="field" name="servings" placeholder="4" maxlength="40"></label>
+      <label>Prep (min)<input class="field" name="prepMin" type="number" min="0" max="5000"></label>
+      <label>Cook (min)<input class="field" name="cookMin" type="number" min="0" max="5000"></label>
+      <label>Total (min)<input class="field" name="totalMin" type="number" min="0" max="5000"></label>
+    </div>
+    <div class="cats" id="edCats"></div>
+    <div>
+      <div style="font-weight:800;font-size:.82rem;color:var(--ink-soft);margin-bottom:6px">Labels</div>
+      <div class="taglist" id="edTags"></div>
+      <div class="addrow" style="margin:8px 0 0">
+        <input id="edNewTag" placeholder="Add your own label (e.g. Mormor’s)" maxlength="30">
+        <button type="button" class="btn ghost sm" id="edAddTag">Add</button>
+      </div>
+    </div>
+    <label>Ingredients, one per line<textarea class="field" name="ingredients" rows="8" placeholder="2 cups flour&#10;1 tsp salt&#10;For the sauce:&#10;…"></textarea></label>
+    <label>Steps, one per line<textarea class="field" name="steps" rows="8"></textarea></label>
+    <label>About it (optional)<textarea class="field" name="description" rows="2" maxlength="800"></textarea></label>
+    <label>Our notes (optional)<textarea class="field" name="notes" rows="3" placeholder="Less chilli for the little one, doubles well…"></textarea></label>
+    <div class="dlg-acts">
+      <button type="button" class="btn danger" id="edDel" hidden>🗑 Delete</button>
+      <button type="button" class="btn ghost" id="edGuess" title="Sort it again from the ingredients and steps above">✨ Guess again</button>
+      <button type="button" class="btn ghost" id="edCancel">Cancel</button>
+      <button type="submit" class="btn">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="../../site.js"></script>
+<script src="../../shared/family.js"></script>
+<script src="guess.js"></script>
+<script>
+const TOOL_ID = 'cookbook';
+const store = Family.store(TOOL_ID);
+const $ = s => document.querySelector(s);
+const esc = Family.esc;
+const CATS = Cook.CATS;
+const FILTERS = ['meal', 'protein', 'cuisine', 'time', 'difficulty', 'cost'];
+const SHORT = { meal: 'Meal', protein: 'Protein', cuisine: 'Cuisine', time: 'Time', difficulty: 'Difficulty', cost: 'Cost' };   // names that fit the filter boxes on a phone
+
+let recipes = {};        // id → recipe, kept up to date live
+let loaded = false;
+let wake = null;         // the "keep screen on" lock while cooking
+
+/* ───────── small helpers ───────── */
+const safeUrl = u => (/^https?:\/\/[^\s"'<>]+$/i.test(String(u || '').trim()) ? String(u).trim() : '');
+const timeOf = r => r.totalMin || ((r.prepMin || 0) + (r.cookMin || 0)) || 0;
+function fmtMin(m) {
+  if (!m) return '';
+  if (m < 60) return m + ' min';
+  const h = Math.floor(m / 60), rest = m % 60;
+  return rest ? `${h} h ${rest} min` : `${h} h`;
+}
+const fmtDate = ts => new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+const domain = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; } };
+// The same recipe link written slightly differently (tracking bits, trailing slash) counts as the same.
+const sameLink = u => String(u || '').toLowerCase().replace(/[?#].*$/, '').replace(/^https?:\/\/(www\.)?/, '').replace(/\/+$/, '');
+// What a recipe is, for one category: 'chicken' for protein; the time group for time.
+const valueOf = (r, cat) => cat === 'time' ? Cook.timeBucket(timeOf(r)) : r[cat] || '';
+const allTags = () => {
+  const set = new Set(Cook.TAGS);
+  Object.values(recipes).forEach(r => (r.tags || []).forEach(t => set.add(t)));
+  return [...set];
+};
+
+/* ───────── filters (remembered on this device) ───────── */
+const F = Object.assign({ q: '', tag: '', fav: false, sort: 'new', meal: '', protein: '', cuisine: '', time: '', difficulty: '', cost: '' },
+  (() => { try { return JSON.parse(localStorage.getItem('cookbook:filters')) || {}; } catch (e) { return {}; } })());
+const saveFilters = () => { try { localStorage.setItem('cookbook:filters', JSON.stringify(F)); } catch (e) { /* private window */ } };
+
+function matches(r) {
+  for (const k of FILTERS) if (F[k] && valueOf(r, k) !== F[k]) return false;
+  if (F.tag && !(r.tags || []).includes(F.tag)) return false;
+  if (F.fav && !(r.favs || {})[Family.me()]) return false;
+  if (F.q) {
+    const hay = [r.title, r.description, r.notes, ...(r.ingredients || []), ...(r.tags || []),
+      ...['meal', 'protein', 'cuisine'].map(k => Cook.find(k, r[k])?.label)].join(' ').toLowerCase();
+    if (!F.q.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w))) return false;
+  }
+  return true;
+}
+function shownRecipes() {
+  const list = Object.entries(recipes).filter(([, r]) => matches(r));
+  const by = {
+    new: (a, b) => (b[1].ts || 0) - (a[1].ts || 0),
+    az: (a, b) => (a[1].title || '').localeCompare(b[1].title || ''),
+    quick: (a, b) => (timeOf(a[1]) || 9999) - (timeOf(b[1]) || 9999),
+    cooked: (a, b) => (b[1].cooked || []).length - (a[1].cooked || []).length || (b[1].ts || 0) - (a[1].ts || 0),
+  };
+  return list.sort(by[F.sort] || by.new);
+}
+
+// One dropdown per category, each choice with how many recipes are in it (empty ones are left out).
+function drawFilters() {
+  const all = Object.values(recipes);
+  const box = $('#filters');
+  const selects = FILTERS.map(cat => {
+    const opts = CATS[cat].items.map(([id, emoji, label]) => {
+      const n = all.filter(r => valueOf(r, cat) === id).length;
+      return (n || F[cat] === id) ? `<option value="${id}"${F[cat] === id ? ' selected' : ''}>${emoji} ${esc(label)} (${n})</option>` : '';
+    }).join('');
+    return `<select data-cat="${cat}" class="${F[cat] ? 'on' : ''}" aria-label="${esc(CATS[cat].label)}">
+      <option value="">${SHORT[cat]}: any</option>${opts}</select>`;
+  });
+  const tags = allTags().map(t => {
+    const n = all.filter(r => (r.tags || []).includes(t)).length;
+    return (n || F.tag === t) ? `<option${F.tag === t ? ' selected' : ''}>${esc(t)}</option>` : '';
+  }).join('');
+  selects.push(`<select data-cat="tag" class="${F.tag ? 'on' : ''}" aria-label="Label"><option value="">Label: any</option>${tags}</select>`);
+  box.innerHTML = selects.join('');
+  box.querySelectorAll('select').forEach(s => s.onchange = () => { F[s.dataset.cat] = s.value; saveFilters(); drawList(); });
+  $('#favBtn').classList.toggle('on', F.fav);
+  $('#sort').value = F.sort;
+  $('#clear').hidden = !(FILTERS.some(k => F[k]) || F.tag || F.fav || F.q);
+}
+
+/* ───────── the collection ───────── */
+function picture(r) {
+  const meal = Cook.find('meal', r.meal), prot = Cook.find('protein', r.protein);
+  const emoji = (r.protein && r.protein !== 'none' && r.protein !== 'veg' ? prot?.emoji : meal?.emoji) || '🍽️';
+  const img = safeUrl(r.image);
+  return `<div class="pic m-${esc(r.meal || '')}${img ? '' : ' noimg'}">${emoji}
+    ${img ? `<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('noimg')">` : ''}</div>`;
+}
+
+function drawList() {
+  drawFilters();
+  const grid = $('#grid');
+  const total = Object.keys(recipes).length;
+  if (!loaded) { grid.innerHTML = '<div class="empty" style="grid-column:1/-1">Loading the cookbook…</div>'; return; }
+  if (!total) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><span class="big">🍳</span>No recipes yet. Paste a link or a recipe above to start the family cookbook.</div>`;
+    $('#count').textContent = '';
+    return;
+  }
+  const list = shownRecipes();
+  $('#count').textContent = list.length === total ? `${total} recipe${total === 1 ? '' : 's'}` : `${list.length} of ${total}`;
+  if (!list.length) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><span class="big">🔍</span>Nothing matches all of that. <button class="linkbtn" onclick="clearFilters()">Clear filters</button></div>`;
+    return;
+  }
+  const me = Family.me();
+  grid.innerHTML = list.map(([id, r]) => {
+    const diff = Cook.find('difficulty', r.difficulty), cost = Cook.find('cost', r.cost);
+    const cui = Cook.find('cuisine', r.cuisine), prot = Cook.find('protein', r.protein);
+    const t = timeOf(r);
+    return `<a class="rc" href="#r=${encodeURIComponent(id)}">
+      ${picture(r)}
+      ${(r.favs || {})[me] ? '<span class="heart">❤️</span>' : ''}
+      <div class="rc-body">
+        <div class="rc-title">${esc(r.title)}</div>
+        <div class="rc-tags">
+          ${t ? `<span class="mini">⏱️ ${fmtMin(t)}</span>` : ''}
+          ${diff ? `<span class="mini">${diff.emoji} ${esc(diff.label)}</span>` : ''}
+          ${cost ? `<span class="mini" title="${esc(cost.label)}">${cost.emoji}</span>` : ''}
+        </div>
+        <div class="rc-sub">${[cui && cui.id !== 'other' ? cui.emoji + ' ' + cui.label : '', prot ? prot.emoji + ' ' + prot.label.replace(/ \(.*\)$/, '') : ''].filter(Boolean).map(esc).join(' · ')}</div>
+      </div>
+    </a>`;
+  }).join('');
+}
+
+function clearFilters() {
+  FILTERS.forEach(k => { F[k] = ''; });
+  F.tag = ''; F.fav = false; F.q = ''; $('#q').value = '';
+  saveFilters(); drawList();
+}
+$('#clear').onclick = clearFilters;
+$('#favBtn').onclick = () => { F.fav = !F.fav; saveFilters(); drawList(); };
+$('#sort').onchange = e => { F.sort = e.target.value; saveFilters(); drawList(); };
+$('#q').value = F.q;
+$('#q').oninput = e => { F.q = e.target.value; saveFilters(); drawList(); };
+$('#surprise').onclick = () => {
+  const list = shownRecipes();
+  if (!list.length) return;
+  location.hash = 'r=' + encodeURIComponent(list[Math.floor(Math.random() * list.length)][0]);
+};
+
+/* ───────── one recipe ───────── */
+const ticks = {};        // recipe id → { i3: true, s1: true }: what's been ticked off while cooking (this device only)
+const servingsNow = {};  // recipe id → servings being cooked for
+
+function showRecipe(id) {
+  const r = recipes[id];
+  const box = $('#recipeView');
+  if (!r) { box.innerHTML = `<div class="empty"><span class="big">🤷</span>That recipe isn’t here (maybe it was deleted). <a href="#">See all recipes</a></div>`; return; }
+  const me = Family.me();
+  const tk = ticks[id] = ticks[id] || {};
+  const base = Cook.servingsNumber(r.servings);
+  const serves = servingsNow[id] || base;
+  const factor = base ? serves / base : 1;
+  const img = safeUrl(r.image), src = safeUrl(r.source);
+  const favs = Object.keys(r.favs || {}).filter(n => r.favs[n]);
+  const cooked = r.cooked || [];
+  const last = cooked[cooked.length - 1];
+
+  // Category chips: tap one to see every recipe like it.
+  const chips = ['meal', 'protein', 'cuisine', 'time', 'difficulty', 'cost'].map(cat => {
+    const c = Cook.find(cat, valueOf(r, cat));
+    return c ? `<button class="fact c-${cat}" data-cat="${cat}" data-val="${c.id}" title="${esc(CATS[cat].label)}: show all like this">${c.emoji} ${esc(c.label)}</button>` : '';
+  }).join('') + (r.tags || []).map(t => `<button class="fact c-tag" data-cat="tag" data-val="${esc(t)}">🏷️ ${esc(t)}</button>`).join('');
+
+  const times = [r.prepMin && `Prep ${fmtMin(r.prepMin)}`, r.cookMin && `Cook ${fmtMin(r.cookMin)}`, timeOf(r) && `Total ${fmtMin(timeOf(r))}`].filter(Boolean).join(' · ');
+
+  const ingredients = (r.ingredients || []).map((line, i) => Cook.isHeading(line)
+    ? `<div class="sub">${esc(line.replace(/:$/, ''))}</div>`
+    : `<div class="ing${tk['i' + i] ? ' done' : ''}" data-tick="i${i}"><div class="check${tk['i' + i] ? ' done' : ''}"></div><span class="t">${esc(Cook.scale(line, factor))}</span></div>`).join('');
+  const steps = (r.steps || []).map((line, i) => Cook.isHeading(line)
+    ? `<li class="sub">${esc(line.replace(/:$/, ''))}</li>`
+    : `<li class="step${tk['s' + i] ? ' done' : ''}" data-tick="s${i}">${esc(line)}</li>`).join('');
+
+  box.innerHTML = `
+    <div class="rv-top">
+      <a class="btn ghost sm" href="#">← All recipes</a>
+      <span style="flex:1"></span>
+      <button class="btn ghost sm" id="rvEdit">✏️ Edit</button>
+    </div>
+    <div class="card rv-head">
+      ${img ? `<img class="hero" src="${esc(img)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}
+      <div class="rv-in">
+        <h1>${esc(r.title)}</h1>
+        ${r.description ? `<p class="rv-desc">${esc(r.description)}</p>` : ''}
+        <div class="facts">${chips}</div>
+        ${times ? `<div class="times">⏱️ ${esc(times)}</div>` : ''}
+        <div class="who-line">
+          ${src ? `From <a href="${esc(src)}" target="_blank" rel="noopener noreferrer">${esc(domain(src))} ↗</a> · ` : ''}
+          added by ${esc(r.by || '?')}${r.ts ? ', ' + fmtDate(r.ts) : ''}
+          ${cooked.length ? ` · made ${cooked.length === 1 ? 'once' : cooked.length + ' times'} (last ${fmtDate(last.ts)} by ${esc(last.by)})` : ''}
+        </div>
+        <div class="acts">
+          <button class="chipbtn${favs.includes(me) ? ' on' : ''}" id="rvFav">❤️ ${favs.length ? esc(favs.join(' & ')) : 'Favourite'}</button>
+          <button class="chipbtn" id="rvCooked">✅ We made this today</button>
+          ${'wakeLock' in navigator ? `<button class="chipbtn${wake ? ' on' : ''}" id="rvWake">📱 ${wake ? 'Screen stays on' : 'Keep screen on'}</button>` : ''}
+        </div>
+      </div>
+    </div>
+    <div class="rv-grid">
+      <div class="card">
+        <h3>🧺 Ingredients</h3>
+        ${base ? `<div class="serv"><button id="servLess" aria-label="Fewer servings">−</button>
+          <span>Serves ${serves}${factor !== 1 ? ` <span class="mini">×${Math.round(factor * 100) / 100}</span>` : ''}</span>
+          <button id="servMore" aria-label="More servings">+</button></div>`
+          : r.servings ? `<div class="serv">Makes ${esc(r.servings)}</div>` : ''}
+        ${ingredients || '<div class="empty">No ingredients written down.</div>'}
+      </div>
+      <div class="card">
+        <h3>👩‍🍳 Steps</h3>
+        ${steps ? `<ol class="steps">${steps}</ol>` : `<div class="empty">No steps written down.${src ? ` <a href="${esc(src)}" target="_blank" rel="noopener noreferrer">See the original ↗</a>` : ''}</div>`}
+      </div>
+    </div>
+    ${r.notes ? `<div class="card"><h3>📝 Our notes</h3><div class="notes">${esc(r.notes)}</div></div>` : ''}`;
+
+  box.querySelector('#rvEdit').onclick = () => openEditor(r, id);
+  box.querySelectorAll('[data-tick]').forEach(el => el.onclick = () => { tk[el.dataset.tick] = !tk[el.dataset.tick]; showRecipe(id); });
+  box.querySelectorAll('.fact[data-cat]').forEach(b => b.onclick = () => {
+    FILTERS.forEach(k => { F[k] = ''; }); F.tag = ''; F.fav = false; F.q = ''; $('#q').value = '';
+    F[b.dataset.cat] = b.dataset.val; saveFilters(); location.hash = '';
+  });
+  box.querySelector('#rvFav').onclick = () => store.update('recipes', id, { favs: Object.assign({}, r.favs, { [me]: !(r.favs || {})[me] }) });
+  box.querySelector('#rvCooked').onclick = () => {
+    const today = new Date().toDateString();
+    if (last && new Date(last.ts).toDateString() === today && !confirm('Already marked as made today. Count it again?')) return;
+    store.update('recipes', id, { cooked: [...cooked, { by: me, ts: Date.now() }] });
+  };
+  if (base) {
+    box.querySelector('#servLess').onclick = () => { servingsNow[id] = Math.max(1, serves - 1); showRecipe(id); };
+    box.querySelector('#servMore').onclick = () => { servingsNow[id] = serves + 1; showRecipe(id); };
+  }
+  const w = box.querySelector('#rvWake');
+  if (w) w.onclick = async () => { await setWake(!wake); showRecipe(id); };
+}
+
+/* Keep the phone screen on while cooking (asked again when coming back to the page). */
+async function setWake(on) {
+  try {
+    if (on && !wake) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { if (document.visibilityState === 'visible') wake = null; }); }
+    if (!on && wake) { const w = wake; wake = null; await w.release(); }
+  } catch (e) { wake = null; }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && wake && wake.released) { wake = null; setWake(true); } });
+
+/* ───────── which page: the collection, or #r=<id> for one recipe ───────── */
+function route() {
+  const m = location.hash.match(/^#r=(.+)$/);
+  $('#listView').hidden = !!m;
+  $('#recipeView').hidden = !m;
+  if (m) showRecipe(decodeURIComponent(m[1]));
+  else { if (wake) setWake(false); drawList(); }
+}
+let lastHash = location.hash;
+window.addEventListener('hashchange', () => { route(); if (location.hash !== lastHash) window.scrollTo(0, 0); lastHash = location.hash; });
+
+/* ───────── adding a recipe ───────── */
+function say(text, bad) { const m = $('#addMsg'); m.textContent = text; m.className = 'msg' + (bad ? ' bad' : ''); }
+// The paste is just a link? (one "word" that looks like a web address)
+function onlyLink(text) {
+  const t = text.trim();
+  if (/\s/.test(t)) return '';
+  if (/^https?:\/\/\S+\.\S+/i.test(t)) return t;
+  if (/^www\.\S+\.\S+/i.test(t)) return 'https://' + t;
+  return '';
+}
+
+async function addFromPaste() {
+  const raw = $('#paste').value;
+  if (!raw.trim()) { say('Paste a link or a recipe in the box first.', true); return; }
+  const link = onlyLink(raw);
+  let draft, note = '', bad = false;
+
+  if (link) {
+    const already = Object.entries(recipes).find(([, r]) => r.source && sameLink(r.source) === sameLink(link));
+    if (already) { say('That one’s already in the cookbook!'); location.hash = 'r=' + encodeURIComponent(already[0]); return; }
+    say('📡 Reading the recipe page…');
+    $('#addBtn').disabled = true;
+    try {
+      const out = await Family.call('recipes', 'import', { url: link });
+      if (out.found === 'schema') {
+        draft = Cook.fromSchema(out.recipe);
+      } else {
+        // No tidy copy on the page: read its text the same way as a pasted recipe.
+        draft = Cook.parseText(out.text || '');
+        const meta = out.recipe || {};
+        if (meta.title) draft.title = meta.title.replace(/\s*[|–—-]\s*[^|–—-]{2,40}$/, '');   // drop " | Site name"
+        draft.image = meta.image || '';
+        draft.description = meta.description || draft.description;
+      }
+      draft.source = out.source || link;
+      if (!draft.ingredients.length && !draft.steps.length) {
+        note = 'We couldn’t find the recipe on that page (some sites hide it). Copy the recipe text from the page and paste it into the boxes below.';
+        bad = true;
+      }
+    } catch (e) {
+      say(e.message === 'not_family' ? 'Please sign in again.' : '😕 ' + e.message, true);
+      $('#addBtn').disabled = false;
+      return;
+    }
+    $('#addBtn').disabled = false;
+  } else {
+    draft = Cook.parseText(raw);
+    if (!draft.ingredients.length && !draft.steps.length) {
+      note = 'We couldn’t tell which lines are ingredients and which are steps. Sort them into the boxes below.';
+      bad = true;
+      draft.steps = raw.split('\n').map(s => s.trim()).filter(Boolean).slice(1);
+    }
+  }
+  say('');
+  Object.assign(draft, Cook.guess(draft));
+  if (!note) note = `✨ Sorted for you${draft.timeGuessed ? ' (the time is a rough guess)' : ''}. Check it looks right, then save.`;
+  openEditor(draft, null, note, bad);
+}
+$('#addBtn').onclick = addFromPaste;
+$('#paste').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addFromPaste(); });
+// A pasted link goes straight in, no button needed.
+$('#paste').addEventListener('paste', () => setTimeout(() => { if (onlyLink($('#paste').value)) addFromPaste(); }, 0));
+$('#blankBtn').onclick = () => openEditor({ title: '', ingredients: [], steps: [], meal: 'dinner', tags: [] }, null, '');
+
+/* ───────── the edit box ───────── */
+const ed = $('#ed'), form = $('#edForm');
+let editing = null;      // id of the recipe being edited (null = a new one)
+let edTags = [];         // labels ticked in the edit box
+
+function catSelects(r) {
+  $('#edCats').innerHTML = ['meal', 'protein', 'cuisine', 'difficulty', 'cost'].map(cat => `
+    <label>${esc(CATS[cat].label)}<select class="field" name="${cat}">
+      <option value="">—</option>
+      ${CATS[cat].items.map(([id, emoji, label]) => `<option value="${id}"${r[cat] === id ? ' selected' : ''}>${emoji} ${esc(label)}</option>`).join('')}
+    </select></label>`).join('');
+}
+function tagBoxes() {
+  const names = [...new Set([...allTags(), ...edTags])];
+  $('#edTags').innerHTML = names.map(t => `<label><input type="checkbox" value="${esc(t)}"${edTags.includes(t) ? ' checked' : ''}> ${esc(t)}</label>`).join('');
+  $('#edTags').querySelectorAll('input').forEach(c => c.onchange = () => {
+    edTags = c.checked ? [...edTags, c.value] : edTags.filter(t => t !== c.value);
+  });
+}
+$('#edAddTag').onclick = () => {
+  const t = $('#edNewTag').value.trim().replace(/\s+/g, ' ');
+  if (!t) return;
+  if (!edTags.includes(t)) edTags.push(t);
+  $('#edNewTag').value = '';
+  tagBoxes();
+};
+$('#edNewTag').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#edAddTag').click(); } });
+
+function openEditor(r, id, note, bad) {
+  editing = id;
+  form.reset();
+  $('#edHead').textContent = id ? '✏️ Edit recipe' : '📝 New recipe';
+  $('#edNote').hidden = !note;
+  $('#edNote').textContent = note || '';
+  $('#edNote').className = 'guessnote' + (bad ? ' bad' : '');
+  $('#edDel').hidden = !id;
+  for (const k of ['title', 'source', 'image', 'servings', 'description', 'notes']) form[k].value = r[k] || '';
+  for (const k of ['prepMin', 'cookMin', 'totalMin']) form[k].value = r[k] || '';
+  form.ingredients.value = (r.ingredients || []).join('\n');
+  form.steps.value = (r.steps || []).join('\n');
+  catSelects(r);
+  edTags = [...(r.tags || [])];
+  tagBoxes();
+  ed.showModal();
+  ed.scrollTop = 0;
+  if (!r.title) form.title.focus();
+}
+
+const lines = text => String(text || '').split('\n').map(s => s.trim()).filter(Boolean);
+const minutesField = v => { const n = Math.round(+v); return n > 0 ? n : null; };
+function readForm() {
+  const prepMin = minutesField(form.prepMin.value), cookMin = minutesField(form.cookMin.value);
+  return {
+    title: form.title.value.trim(),
+    source: safeUrl(form.source.value),
+    image: safeUrl(form.image.value),
+    servings: form.servings.value.trim(),
+    prepMin, cookMin,
+    totalMin: minutesField(form.totalMin.value) || ((prepMin || 0) + (cookMin || 0)) || null,
+    ingredients: lines(form.ingredients.value),
+    steps: lines(form.steps.value),
+    description: form.description.value.trim(),
+    notes: form.notes.value.trim(),
+    meal: form.meal.value, protein: form.protein.value, cuisine: form.cuisine.value,
+    difficulty: form.difficulty.value, cost: form.cost.value,
+    tags: edTags,
+  };
+}
+
+// "Guess again": sort it afresh from what's in the boxes now (your own labels are kept).
+$('#edGuess').onclick = () => {
+  const r = readForm();
+  const g = Cook.guess(r);
+  catSelects(g);
+  if (!form.totalMin.value) form.totalMin.value = g.totalMin || '';
+  const own = edTags.filter(t => !Cook.TAGS.includes(t));
+  edTags = [...new Set([...g.tags, ...own])];
+  tagBoxes();
+  $('#edNote').hidden = false;
+  $('#edNote').className = 'guessnote';
+  $('#edNote').textContent = '✨ Sorted again from the ingredients and steps.';
+};
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  const r = readForm();
+  if (!r.title) { form.title.focus(); return; }
+  ed.close();
+  if (editing) {
+    await store.update('recipes', editing, r);
+    location.hash = 'r=' + encodeURIComponent(editing);
+    route();
+  } else {
+    const id = await store.add('recipes', Object.assign(r, { favs: {}, cooked: [] }));
+    $('#paste').value = '';
+    location.hash = 'r=' + encodeURIComponent(id);
+  }
+});
+$('#edCancel').onclick = () => ed.close();
+// Catch up on anything that changed while the box was open.
+ed.addEventListener('close', () => route());
+$('#edDel').onclick = async () => {
+  if (!editing || !confirm(`Delete “${recipes[editing]?.title || 'this recipe'}” from the cookbook?`)) return;
+  const id = editing;
+  ed.close();
+  location.hash = '';
+  await store.remove('recipes', id);
+};
+
+/* ───────── start ───────── */
+store.ready.then(() => {
+  const cloud = store.mode === 'cloud';
+  $('#sync').className = 'badge ' + (cloud ? 'ok' : 'local');
+  $('#sync').textContent = cloud ? '☁️ Synced' : '📴 This device only';
+});
+store.watch('recipes', items => {
+  recipes = items;
+  loaded = true;
+  // Don't redraw a recipe under someone's fingers while they edit it.
+  if (!ed.open) route();
+});
+route();
+</script>
+</body>
+</html>

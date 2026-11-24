@@ -1,0 +1,518 @@
+/* ════════════════════════════════════════════════════════════════
+   COOKBOOK: reading recipes and sorting them into categories.
+
+   window.Cook gives the Cookbook page:
+     Cook.CATS              every category and its choices (labels + emoji)
+     Cook.parseText(text)   pasted recipe text → { title, ingredients, steps, … }
+     Cook.fromSchema(r)     a recipe read from a web page (by the `recipes` edge function) → same shape
+     Cook.guess(recipe)     fills in cost, difficulty, protein, cuisine, meal, tags and total time
+     Cook.timeBucket(min)   45 → 'medium'  (which "time to make" group a recipe is in)
+     Cook.scale(line, x)    "2 cups flour", 1.5 → "3 cups flour"  (for changing the servings)
+
+   The guessing is just keyword spotting (English and Norwegian), so it's sometimes wrong:
+   the page always shows the guesses for checking before saving, and they can be edited later.
+   Saved recipes keep the choice ids below (e.g. protein: 'chicken'), so don't rename the ids;
+   changing a label or emoji is fine.
+═════════════════════════════════════════════════════════════════ */
+(function () {
+
+  /* ───────── the categories ───────── */
+  const CATS = {
+    meal: { label: 'Meal', items: [
+      ['breakfast', '🥞', 'Breakfast'], ['lunch', '🥪', 'Lunch'], ['dinner', '🍽️', 'Dinner'],
+      ['soup', '🍲', 'Soup'], ['salad', '🥗', 'Salad'], ['side', '🥔', 'Side dish'],
+      ['snack', '🥨', 'Snack & starter'], ['dessert', '🍰', 'Dessert'], ['baking', '🥖', 'Baking & bread'],
+      ['drink', '🍹', 'Drink'] ] },
+    protein: { label: 'Main protein', items: [
+      ['chicken', '🐔', 'Chicken & poultry'], ['beef', '🐄', 'Beef'], ['pork', '🐖', 'Pork'],
+      ['lamb', '🐑', 'Lamb'], ['game', '🦌', 'Game (reindeer, elk…)'], ['fish', '🐟', 'Fish'],
+      ['seafood', '🦐', 'Shellfish'], ['eggs', '🥚', 'Eggs'], ['beans', '🫘', 'Beans & lentils'],
+      ['tofu', '🌱', 'Tofu & soy'], ['cheese', '🧀', 'Cheese & dairy'], ['veg', '🥦', 'Veggies (no meat)'],
+      ['none', '🍬', 'None (sweets, drinks)'] ] },
+    cuisine: { label: 'Cuisine', items: [
+      ['nordic', '🇳🇴', 'Norwegian & Nordic'], ['italian', '🇮🇹', 'Italian'], ['mexican', '🇲🇽', 'Mexican'],
+      ['american', '🇺🇸', 'American'], ['british', '🇬🇧', 'British'], ['french', '🇫🇷', 'French'],
+      ['spanish', '🇪🇸', 'Spanish'], ['greek', '🇬🇷', 'Greek'], ['middle-eastern', '🧆', 'Middle Eastern'],
+      ['indian', '🇮🇳', 'Indian'], ['chinese', '🇨🇳', 'Chinese'], ['japanese', '🇯🇵', 'Japanese'],
+      ['korean', '🇰🇷', 'Korean'], ['thai', '🇹🇭', 'Thai'], ['vietnamese', '🇻🇳', 'Vietnamese'],
+      ['other', '🌍', 'Other / mixed'] ] },
+    time: { label: 'Time to make', items: [
+      ['quick', '⚡', 'Under 20 min'], ['short', '⏱️', '20–45 min'], ['medium', '⏳', '45–90 min'],
+      ['long', '🕰️', 'Over 1½ hours'] ] },
+    difficulty: { label: 'Difficulty', items: [
+      ['easy', '🟢', 'Easy'], ['medium', '🟡', 'Some effort'], ['hard', '🔴', 'A project'] ] },
+    cost: { label: 'Cost', items: [
+      ['cheap', '💰', 'Cheap'], ['mid', '💰💰', 'Middling'], ['pricey', '💰💰💰', 'Pricey'] ] },
+  };
+  // Little extra labels that can be ticked on any recipe (people can add their own too).
+  const TAGS = ['Vegetarian', 'Vegan', 'Kid-friendly', 'One-pot', 'Slow cooker', 'Air fryer',
+    'Grill', 'Make ahead', 'Freezes well', 'Weeknight', 'Party', 'Christmas'];
+
+  // Look up one choice: Cook.find('protein', 'beef') → { id, emoji, label }
+  function find(cat, id) {
+    const it = (CATS[cat]?.items || []).find(i => i[0] === id);
+    return it ? { id: it[0], emoji: it[1], label: it[2] } : null;
+  }
+
+  function timeBucket(min) {
+    if (!min) return '';
+    return min < 20 ? 'quick' : min <= 45 ? 'short' : min <= 90 ? 'medium' : 'long';
+  }
+
+  /* ───────── keyword spotting ─────────
+     words('chicken', 'kylling') matches "chicken thighs" and "kyllingfilet" (Norwegian glues
+     words together), because a word only has to START with one of them. Add \\b to a word
+     when it must end there too (so 'ham\\b' doesn't match "hamburger"). */
+  const words = (...list) => new RegExp('(?:^|[^a-zæøåäöüéèáàíóúñç])(?:' + list.join('|') + ')', 'i');
+
+  const MEAT = {
+    chicken: words('chicken', 'kylling', 'turkey', 'kalkun', 'duck', 'andebryst', 'andelår', 'poussin', 'hønse'),
+    beef: words('beef', 'steak', 'sirloin', 'ribeye', 'rib-eye', 'brisket', 'oxtail', 'storfe', 'okse', 'biff\\b',
+      'biffer', 'entrecote', 'mørbrad', 'kjøttdeig', 'karbonadedeig', 'kjøttkake', 'meatball', 'kjøttbolle',
+      'veal', 'kalv', 'short rib', 'chuck\\b', 'flank', 'burger patt', 'roast beef'),
+    pork: words('pork', 'bacon', 'ham\\b', 'hams\\b', 'gammon', 'prosciutto', 'pancetta', 'guanciale', 'chorizo',
+      'sausage', 'salami', 'pepperoni', 'lardon', 'svin', 'flesk', 'skinke', 'ribbe\\b', 'pølse', 'medister',
+      'pulled pork', 'spareribs', 'nakkekotelett', 'koteletter', 'serrano'),
+    lamb: words('lamb', 'lamme', 'mutton', 'fårikål', 'fårekjøtt', 'pinnekjøtt'),
+    game: words('reindeer', 'reinsdyr', 'reinskav', 'finnbiff', 'venison', 'elk\\b', 'moose', 'elg\\b', 'elgkjøtt',
+      'elgstek', 'hjort', 'vilt', 'rabbit', 'hare\\b', 'kanin', 'grouse', 'rype'),
+    fish: words('fish', 'fisk', 'salmon', 'laks', 'cod\\b', 'torsk', 'skrei', 'haddock', 'hyse', 'pollock', 'sei\\b',
+      'tuna', 'tunfisk', 'trout', 'ørret', 'røye', 'mackerel', 'makrell', 'halibut', 'kveite', 'herring', 'sild',
+      'sardine', 'anchov', 'ansjos', 'monkfish', 'breiflabb', 'steinbit', 'sea bass', 'tilapia', 'lutefisk', 'klippfisk'),
+    seafood: words('shrimp', 'prawn', 'reke', 'scampi', 'scallop', 'kamskjell', 'mussel', 'blåskjell', 'skjell',
+      'crab', 'krabbe', 'lobster', 'hummer', 'squid', 'calamari', 'blekksprut', 'octopus', 'clam', 'oyster\\b', 'østers\\b'),
+  };
+  const OTHER_PROTEIN = {
+    eggs: words('eggs?\\b', 'egg(?:e|ene)?\\b', 'omelet', 'frittata', 'shakshuka', 'quiche', 'eggerøre'),
+    beans: words('bean', 'bønne', 'lentil', 'linse', 'chickpea', 'kikert', 'dal\\b', 'dhal', 'daal', 'split pea',
+      'hummus', 'falafel', 'black-eyed', 'kidney'),
+    tofu: words('tofu', 'tempeh', 'seitan', 'edamame', 'soy mince', 'soyadeig'),
+    cheese: words('halloumi', 'paneer', 'ricotta', 'cottage cheese', 'cheese', 'ost\\b', 'oste', 'feta', 'mozzarella',
+      'grilled cheese', 'mac and cheese', 'mac ’n’ cheese', 'mac n cheese'),
+  };
+  // A line like "chicken stock" or "fish sauce" doesn't make the dish a chicken or fish dish.
+  const MINOR = /stock|broth|buljong|kraft\b|bouillon|\bfond\b|sauce|saus\b|\bfat\b|dripping|gelatin|paste\b|powder|pulver/i;
+
+  const CUISINE_WORDS = [
+    ['korean', words('korean', 'korea', 'gochujang', 'gochugaru', 'kimchi', 'bulgogi', 'bibimbap', 'doenjang', 'japchae', 'tteok')],
+    ['vietnamese', words('vietnam', 'pho\\b', 'phở', 'banh', 'bánh', 'rice paper', 'rispapir', 'nuoc', 'nước', 'bun cha', 'bún')],
+    ['thai', words('thai', 'fish sauce', 'fiskesaus', 'lemongrass', 'sitrongress', 'galangal', 'kaffir', 'makrut', 'pad thai',
+      'tom yum', 'tom kha', 'larb', 'satay', 'palm sugar', 'red curry paste', 'green curry', 'massaman', 'panang', 'thai basil')],
+    ['japanese', words('japan', 'miso', 'mirin', 'sake\\b', 'dashi', 'teriyaki', 'ramen', 'sushi', 'nori', 'panko', 'katsu',
+      'udon', 'soba', 'tempura', 'wasabi', 'furikake', 'gyoza', 'tonkatsu', 'yakitori', 'okonomiyaki', 'matcha', 'donburi', 'onigiri')],
+    ['chinese', words('chinese', 'kinesisk', 'hoisin', 'five-spice', 'five spice', 'fem krydder', 'shaoxing', 'sichuan', 'szechuan',
+      'bok choy', 'pak choi', 'oyster sauce', 'østerssaus', 'chow mein', 'fried rice', 'kung pao', 'sweet and sour', 'sur-søt',
+      'sursøt', 'char siu', 'star anise', 'stjerneanis', 'black bean sauce', 'lo mein', 'mapo', 'wonton', 'dim sum', 'wok', 'soy sauce', 'soyasaus')],
+    ['indian', words('india', 'garam masala', 'masala', 'curry', 'karri', 'turmeric', 'gurkemeie', 'paneer', 'naan', 'dal\\b', 'dhal', 'daal',
+      'tikka', 'korma', 'vindaloo', 'biryani', 'tandoori', 'ghee', 'fenugreek', 'bukkehornkløver', 'mustard seed', 'sennepsfrø', 'curry leaves',
+      'chapati', 'samosa', 'raita', 'chana', 'aloo', 'saag', 'palak', 'asafoetida', 'basmati', 'jalfrezi', 'rogan josh', 'bhaji', 'pakora')],
+    ['middle-eastern', words('middle east', 'midtøst', 'tahini', 'za\'?atar', 'sumac', 'sumak', 'hummus', 'falafel', 'harissa', 'shawarma',
+      'shakshuka', 'baba ganoush', 'tabbouleh', 'pomegranate molasses', 'ras el hanout', 'tagine', 'couscous', 'preserved lemon',
+      'labneh', 'freekeh', 'bulgur', 'kofta', 'kofte', 'baharat', 'dukkah', 'moroccan', 'marokkansk', 'turkish', 'tyrkisk',
+      'lebanese', 'libanesisk', 'persian', 'persisk', 'israeli', 'kebab', 'pita')],
+    ['greek', words('greek', 'gresk', 'feta', 'tzatziki', 'souvlaki', 'gyro', 'moussaka', 'kalamata', 'spanakopita', 'halloumi', 'orzo', 'mediterranean', 'middelhav')],
+    ['spanish', words('spanish', 'spansk', 'chorizo', 'paella', 'smoked paprika', 'røkt paprika', 'pimentón', 'pimenton', 'tapas',
+      'gazpacho', 'manchego', 'serrano', 'patatas bravas', 'sofrito', 'romesco', 'churros', 'saffron', 'safran')],
+    ['french', words('french', 'fransk', 'gruy', 'béchamel', 'bechamel', 'coq au vin', 'ratatouille', 'bourguignon', 'quiche', 'crêpe',
+      'crepe', 'croissant', 'dijon', 'tarragon', 'estragon', 'provençal', 'provencal', 'cassoulet', 'gratin', 'confit', 'beurre',
+      'soufflé', 'souffle', 'niçoise', 'nicoise', 'brûlée', 'brulee', 'herbes de provence', 'brie\\b', 'camembert', 'baguette', 'tarte', 'madeleine')],
+    ['italian', words('italian', 'italiensk', 'tuscan', 'toscansk', 'sun-dried', 'soltørk', 'pasta', 'risotto', 'lasagn', 'carbonara', 'bolognese', 'pesto', 'gnocchi', 'parmigiano',
+      'parmesan', 'mozzarella', 'ricotta', 'prosciutto', 'pancetta', 'guanciale', 'basil', 'basilikum', 'balsamic', 'balsamico', 'focaccia',
+      'pizza', 'tiramisu', 'spaghetti', 'penne', 'tagliatelle', 'linguine', 'fettuccine', 'ravioli', 'polenta', 'arborio', 'marinara',
+      'caprese', 'bruschetta', 'panna cotta', 'osso buco', 'minestrone', 'cacio', 'aglio', 'calzone', 'arancini', 'orecchiette', 'rigatoni')],
+    ['mexican', words('mexican', 'meksikansk', 'tortilla', 'taco', 'burrito', 'enchilada', 'quesadilla', 'salsa', 'guacamole', 'jalape',
+      'chipotle', 'fajita', 'nacho', 'pico de gallo', 'mole\\b', 'queso', 'ancho', 'poblano', 'tex-mex', 'refried', 'black beans',
+      'svarte bønner', 'tomatillo', 'carnitas', 'chilaquiles', 'elote', 'cotija')],
+    ['american', words('american', 'amerikansk', 'burger', 'bbq', 'barbecue', 'mac and cheese', 'mac ’n’ cheese', 'mac n cheese', 'cornbread',
+      'pulled pork', 'buffalo', 'ranch\\b', 'brownie', 'cheesecake', 'meatloaf', 'sloppy joe', 'coleslaw', 'jambalaya', 'gumbo', 'cajun',
+      's\'mores', 'chocolate chip', 'maple syrup', 'lønnesirup', 'grits', 'hot dog', 'chili con carne', 'pancake', 'biscuits and gravy',
+      'cobbler', 'pecan pie', 'pumpkin pie', 'thanksgiving', 'ranch dressing', 'tater tot', 'clam chowder')],
+    ['british', words('british', 'britisk', 'english', 'engelsk', 'shepherd', 'cottage pie', 'yorkshire', 'scone', 'crumble', 'bangers',
+      'toad in the hole', 'fish and chips', 'trifle', 'sticky toffee', 'worcestershire', 'sunday roast', 'pasty', 'kedgeree',
+      'mushy peas', 'sausage roll', 'bubble and squeak', 'flapjack', 'scotch egg', 'crumpet', 'victoria sponge', 'eton mess')],
+    ['nordic', words('norwegian', 'norsk', 'scandinavian', 'skandinavisk', 'nordic', 'nordisk', 'swedish', 'svensk', 'danish', 'dansk',
+      'fårikål', 'lapskaus', 'kjøttkake', 'brunost', 'geitost', 'gjetost', 'lefse', 'rømme', 'lutefisk', 'pinnekjøtt', 'raspebal',
+      'komle', 'kumle', 'fiskekake', 'fiskebolle', 'fiskegrateng', 'kanelbolle', 'skillingsbolle', 'boller\\b', 'vafler', 'vaffel', 'rømmegrøt',
+      'risengrynsgrøt', 'riskrem', 'krumkake', 'kransekake', 'sodd\\b', 'smørbrød', 'gravlaks', 'gravlax', 'lingonberr', 'tyttebær',
+      'multe', 'kardemomme', 'cardamom bun', 'reinsdyr', 'finnbiff', 'bidos', 'kålrabi', 'tilslørte', 'svele', 'lompe', 'skolebolle',
+      'julekake', 'pepperkake', 'karbonade', 'medisterkake', 'ribbe\\b', 'sursild', 'flatbrød', 'knekkebrød', 'kumla', 'smørrebrød',
+      'köttbullar', 'kanelbulle', 'fiskesuppe', 'bergensk', 'brun saus', 'kålrot', 'kjøttkaker', 'sei\\b', 'skrei', 'klippfisk', 'bacalao', 'plukkfisk', 'kjøttsuppe', 'betasuppe', 'rakfisk', 'pølse')],
+  ];
+  // What recipe sites call their cuisine → our ids.
+  const CUISINE_NAMES = [
+    ['nordic', /norw|norsk|scandi|nordic|nordisk|swed|svensk|danish|dansk|finnish|finsk|iceland/i],
+    ['italian', /ital/i], ['mexican', /mexic|meksik|tex-?mex|latin/i], ['american', /americ|amerik|southern|cajun|creole|usa/i],
+    ['british', /brit|english|engelsk|scot|irish|welsh|uk\b/i], ['french', /fren|fransk|france/i],
+    ['spanish', /spani|spansk|spain|portug/i], ['greek', /greek|gresk|mediterr|middelhav|cypri/i],
+    ['middle-eastern', /middle|midt|moroc|marok|turk|tyrk|leban|liban|persia|israel|arab|north african/i],
+    ['indian', /india|pakist|sri lank|bangla|nepal/i], ['chinese', /chin|kines|cantones|sichuan|taiwan/i],
+    ['japanese', /japan/i], ['korean', /korea/i], ['thai', /thai/i], ['vietnamese', /vietnam/i],
+  ];
+
+  const MEAL_WORDS = [
+    ['drink', words('drink', 'drikke', 'cocktail', 'mocktail', 'smoothie\\b', 'smoothien', 'juice', 'lemonade', 'saft\\b', 'coffee', 'kaffe',
+      'latte', 'punch\\b', 'gløgg', 'glogg', 'sangria', 'milkshake', 'kakao', 'hot chocolate', 'iced tea', 'iste', 'beverage')],
+    ['breakfast', words('breakfast', 'frokost', 'brunch', 'pancake', 'pannekake', 'waffle', 'vaffel', 'vafler', 'porridge', 'grøt',
+      'oatmeal', 'overnight oats', 'granola', 'muesli', 'omelet', 'scrambled', 'eggerøre', 'french toast', 'arme riddere', 'eggs benedict', 'smoothie bowl')],
+    ['dessert', words('dessert', 'cake', 'kake', 'cookie', 'kjeks', 'småkake', 'brownie', 'pudding', 'ice cream', 'iskrem', 'mousse',
+      'cheesecake', 'tiramisu', 'crumble', 'sorbet', 'panna cotta', 'fudge', 'trifle', 'pavlova', 'cupcake', 'tart\\b', 'tarte', 'pie\\b',
+      'riskrem', 'karamell', 'caramel', 'sweet', 'søt', 'sjokolade', 'chocolate', 'cobbler', 'parfait', 'semifreddo', 'blondie', 'fruit salad', 'fruktsalat')],
+    ['baking', words('bread', 'brød', 'loaf', 'bun\\b', 'buns\\b', 'bolle', 'roll\\b', 'rolls\\b', 'rundstykke', 'baguette', 'focaccia',
+      'sourdough', 'surdeig', 'scone', 'muffin', 'croissant', 'bagel', 'pizza dough', 'pizzadeig', 'baking', 'bakst', 'flatbread', 'naan', 'lefse')],
+    ['soup', words('soup', 'suppe', 'chowder', 'bisque', 'ramen', 'pho\\b', 'gazpacho', 'minestrone', 'broth', 'laksa', 'tom yum', 'tom kha')],
+    ['salad', words('salad', 'salat', 'slaw', 'poke bowl', 'buddha bowl', 'grain bowl')],
+    ['side', words('side', 'tilbehør', 'mash', 'potetmos', 'fries', 'pommes', 'roasted potato', 'ovnsbakte poteter', 'garlic bread',
+      'hvitløksbrød', 'coleslaw', 'rice pilaf', 'gratin', 'stuffing', 'dressing', 'pickle')],
+    ['snack', words('snack', 'dip\\b', 'dipp', 'nacho', 'appetizer', 'appetiser', 'starter', 'forrett', 'tapas', 'bites', 'chips\\b',
+      'popcorn', 'energy ball', 'bruschetta', 'spring roll', 'vårrull', 'canapé', 'finger food', 'snacks', 'småretter')],
+    ['lunch', words('lunch', 'lunsj', 'sandwich', 'smørbrød', 'wrap\\b', 'wraps\\b', 'toastie', 'panini', 'quesadilla', 'baguette sandwich', 'matpakke')],
+    ['dinner', words('dinner', 'middag', 'main course', 'main dish', 'hovedrett', 'supper', 'entrée', 'entree', 'stew', 'gryte', 'casserole',
+      'curry', 'roast', 'stek\\b', 'traybake', 'langpanne')],
+  ];
+
+  const MEAL_ENDINGS = [
+    ['soup', /suppe\b/i], ['salad', /salat\b/i], ['lunch', /smørbrød\b/i], ['breakfast', /grøt\b/i],
+    ['baking', /brød\b|boller?\b|rundstykker?\b|muffins?\b/i],
+    // "-kake" is cake, except fiskekaker, kjøttkaker, potetkaker…
+    ['dessert', /^(?!.*(?:fiske|fisk|kjøtt|potet|lom|rå)kake).*kake(?:r|n)?\b|is\b|krem\b|pudding\b/i],
+  ];
+
+  const TAG_WORDS = {
+    'One-pot': words('one-pot', 'one pot', 'one-pan', 'one pan', 'sheet pan', 'sheet-pan', 'traybake', 'tray bake', 'langpanne', 'alt i en'),
+    'Slow cooker': words('slow cooker', 'slow-cooker', 'crockpot', 'crock-pot', 'crock pot', 'saktekoker', 'slowcooker'),
+    'Air fryer': words('air fryer', 'air-fryer', 'airfryer'),
+    'Grill': words('grill', 'bbq', 'barbecue', 'braai'),
+    'Make ahead': words('make ahead', 'make-ahead', 'overnight', 'over natten', 'dagen før', 'the night before', 'day before'),
+    'Freezes well': words('freeze', 'freezer', 'fryse', 'frys\\b'),
+    'Christmas': words('christmas', 'jul\\b', 'jule', 'xmas', 'pinnekjøtt', 'pepperkake', 'ribbe\\b'),
+  };
+
+  const DAIRY_EGG = words('milk', 'melk', 'butter\\b', 'smør\\b', 'smøre', 'cream', 'fløte', 'krem', 'cheese', 'ost\\b', 'oste', 'yogurt',
+    'yoghurt', 'rømme', 'crème', 'creme', 'ghee', 'eggs?\\b', 'egg(?:e|ene)?\\b', 'honey', 'honning', 'mayo', 'majones', 'parmesan',
+    'mozzarella', 'feta', 'ricotta', 'buttermilk', 'kefir', 'kesam', 'cottage', 'mascarpone', 'halloumi', 'paneer', 'gelatin', 'gelatin');
+  const VEGAN_OK = /vegan|plant|oat milk|havremelk|soy milk|soyamelk|almond milk|mandelmelk|coconut|kokos|dairy-free|laktosefri vegan|nut butter|peanut butter|peanøttsmør/i;
+
+  // Count how many of the lines match a pattern.
+  const countLines = (lines, re) => lines.filter(l => re.test(l)).length;
+
+  /* ───────── the guessing ───────── */
+  function guess(r) {
+    const title = r.title || '';
+    const meta = [...(r.keywords || []), ...(r.category || []), ...(r.cuisineNames || [])].join(' · ');
+    const ings = (r.ingredients || []).filter(l => !isHeading(l));
+    const steps = (r.steps || []).filter(l => !isHeading(l));
+    const body = ings.join('\n') + '\n' + steps.join('\n') + '\n' + (r.notes || '');
+    const all = title + '\n' + meta + '\n' + body;
+    const out = {};
+
+    // MEAL: what the recipe site says, then the title, then the keywords.
+    out.meal = pickMeal(title, meta) || '';
+
+    // PROTEIN: the title counts most, then each ingredient (stock and sauces barely count).
+    const score = {};
+    const add = (k, n) => { score[k] = (score[k] || 0) + n; };
+    for (const [k, re] of Object.entries(MEAT)) {
+      if (re.test(title)) add(k, 6);
+      ings.forEach(l => { if (re.test(l)) add(k, MINOR.test(l) ? 0.2 : 1); });
+    }
+    let protein = best(score, 0.9);
+    const meaty = !!protein;
+    if (!protein) {
+      const s2 = {};
+      for (const [k, re] of Object.entries(OTHER_PROTEIN)) {
+        if (re.test(title)) s2[k] = 6;
+        ings.forEach(l => { if (re.test(l) && !MINOR.test(l)) s2[k] = (s2[k] || 0) + (k === 'eggs' ? eggWeight(l) : k === 'cheese' ? 0.5 : 1); });
+      }
+      protein = best(s2, 1.5);
+    }
+    const sweet = /sugar|sukker|honey|honning|syrup|sirup|chocolate|sjokolade/i.test(body) && /flour|hvetemel|\bmel\b|oats|havre|cocoa|kakao/i.test(body);
+    if (!out.meal && !meaty && sweet) out.meal = 'baking';
+    if (!out.meal) out.meal = 'dinner';
+    if (['dessert', 'baking', 'drink'].includes(out.meal) && !meaty) protein = 'none';
+    out.protein = protein || 'veg';
+
+    // CUISINE: what the recipe site says first, otherwise count give-away words.
+    out.cuisine = pickCuisineName(r.cuisineNames || []) || pickCuisine(title, meta, body);
+
+    // TIME: the site's total, or prep + cook, or add up the minutes mentioned in the steps.
+    let total = r.totalMin || ((r.prepMin || 0) + (r.cookMin || 0)) || 0;
+    out.timeGuessed = false;
+    if (!total) {
+      const mentioned = steps.reduce((sum, s) => sum + durationsIn(s), 0);
+      total = Math.round(Math.min(mentioned, 600) + 10 + Math.min(ings.length, 15) * 1.5);
+      if (!mentioned) total = 15 + steps.length * 6 + ings.length;
+      total = Math.round(total / 5) * 5;
+      out.timeGuessed = true;
+    }
+    out.totalMin = total;
+
+    // DIFFICULTY: more ingredients, more steps, longer time and tricky techniques = harder.
+    if (r.difficultyWord) out.difficulty = r.difficultyWord;
+    else {
+      const tricky = countLines(steps, words('knead', 'elt', 'prove', 'proof', 'let rise', 'la heve', 'heve', 'laminat', 'temper',
+        'sous vide', 'deep-fry', 'deep fry', 'frityr', 'candy thermometer', 'termometer', 'water bath', 'vannbad', 'flambé', 'flambe',
+        'pipe\\b', 'piping', 'spritpose', 'roll out', 'kjevle', 'fold in the butter', 'caramel', 'karamell', 'emulsi', 'from scratch',
+        'butterfly', 'debone', 'fillet the', 'filetere', 'blind bake', 'blindbake', 'souffl', 'puff pastry from', 'choux'));
+      const points = ings.length + steps.length * 1.5 + tricky * 4 + (total > 120 ? 8 : total > 60 ? 4 : total > 40 ? 2 : 0);
+      out.difficulty = points < 19 ? 'easy' : points < 33 ? 'medium' : 'hard';
+    }
+
+    // COST: pricey ingredients push it up, cheap staples pull it down.
+    let cost = ings.length * 0.25;
+    ings.forEach(l => {
+      for (const [re, n] of PRICES) if (re.test(l)) { cost += MINOR.test(l) ? Math.min(n, 0.3) : n; break; }
+    });
+    out.cost = cost < 3 ? 'cheap' : cost < 7.5 ? 'mid' : 'pricey';
+
+    // TAGS: vegetarian/vegan from the ingredients, plus give-away words (slow cooker, grill…).
+    const tags = new Set();
+    const anyMeat = Object.values(MEAT).some(re => re.test(all.replace(/vegetarian|vegan|vegetar/gi, '')))
+      || /gelatin|anchov|ansjos|fish sauce|fiskesaus|lard\b|smult/i.test(body);
+    if (!anyMeat && ings.length) {
+      tags.add('Vegetarian');
+      const veganTitle = /\bvegan/i.test(title + ' ' + meta);
+      if (veganTitle || !ings.some(l => DAIRY_EGG.test(l) && !VEGAN_OK.test(l))) tags.add('Vegan');
+    }
+    for (const [tag, re] of Object.entries(TAG_WORDS)) if (re.test(title + '\n' + meta) || (tag !== 'Grill' && tag !== 'Christmas' && re.test(body))) tags.add(tag);
+    if (out.totalMin <= 35 && out.difficulty === 'easy' && ['dinner', 'soup', 'salad'].includes(out.meal)) tags.add('Weeknight');
+    (r.diet || []).forEach(d => { if (/vegan/i.test(d)) { tags.add('Vegan'); tags.add('Vegetarian'); } else if (/vegetarian/i.test(d)) tags.add('Vegetarian'); });
+    out.tags = [...tags];
+    return out;
+  }
+
+  // Price weights, checked in order (the first that matches a line counts).
+  const PRICES = [
+    [words('tenderloin', 'fillet steak', 'filet mignon', 'indrefilet', 'ytrefilet', 'entrecote', 'ribeye', 'rib-eye', 'wagyu', 'truffle', 'trøffel', 'lobster', 'hummer', 'kamskjell', 'scallop', 'caviar', 'kaviar\\b', 'løyrom'), 5],
+    [words('sirloin', 'steak', 'biff\\b', 'lamb', 'lamme', 'reinsdyr', 'reindeer', 'finnbiff', 'elg', 'venison', 'hjort', 'duck', 'and(?:e)?bryst', 'kveite', 'halibut', 'crab', 'krabbe', 'saffron', 'safran', 'pinnekjøtt', 'veal', 'kalv', 'short rib', 'prawn', 'scampi', 'king prawn', 'monkfish', 'breiflabb'), 3],
+    [words('salmon', 'laks', 'shrimp', 'reke', 'cod\\b', 'torsk', 'skrei', 'pine nut', 'pinjekjerne', 'prosciutto', 'parma', 'serrano', 'brisket', 'beef', 'storfe', 'okse', 'wine', 'vin\\b', 'port\\b', 'cognac', 'brandy', 'vanilla bean', 'vaniljestang', 'burrata', 'pistach', 'macadamia', 'pecan', 'mussel', 'blåskjell', 'gruy', 'parmigiano', 'manchego', 'chorizo', 'tuna steak'), 2],
+    [words('chicken', 'kylling', 'pork', 'svin', 'bacon', 'kjøttdeig', 'mince', 'karbonade', 'sausage', 'pølse', 'parmesan', 'cheese', 'ost\\b', 'mozzarella', 'feta', 'halloumi', 'cashew', 'cashew', 'avocado', 'mango', 'cream', 'fløte', 'rømme', 'turkey', 'kalkun', 'fish', 'fisk', 'tofu', 'nuts', 'nøtter', 'mandler', 'almond'), 1],
+    [words('beans?\\b', 'bønne', 'lentil', 'linse', 'chickpea', 'kikert', 'rice\\b', 'ris\\b', 'pasta', 'spaghetti', 'noodle', 'nudler', 'potato', 'potet', 'oats', 'havre', 'flour', 'mel\\b', 'hvetemel', 'cabbage', 'kål', 'carrot', 'gulrot', 'onion', 'løk', 'eggs?\\b', 'egg\\b', 'canned tomato', 'hermetiske tomater', 'tomatoes, canned', 'chopped tomatoes', 'hakkede tomater', 'bread', 'brød', 'lapskaus', 'kålrot'), -0.6],
+  ];
+
+  // "4 eggs" in an omelette counts; "1 egg" to brush on pastry hardly does.
+  function eggWeight(line) {
+    const n = parseFloat(line);
+    return n >= 4 ? 2 : n >= 3 ? 1.2 : 0.3;
+  }
+  function best(score, min) {
+    let top = '', val = min;
+    for (const [k, v] of Object.entries(score)) if (v >= val && v > (score[top] || 0)) { top = k; val = v; }
+    return top;
+  }
+  function pickMeal(title, meta) {
+    const named = (meta || '').toLowerCase();
+    for (const [id, re] of MEAL_WORDS) if (re.test(title)) return id;
+    // Norwegian puts the kind of dish at the END of a word: fiskesuppe, potetsalat, sjokoladekake.
+    for (const [id, re] of MEAL_ENDINGS) if (re.test(title)) return id;
+    if (named) for (const [id, re] of MEAL_WORDS) if (re.test(named)) return id;
+    return '';
+  }
+  function pickCuisineName(names) {
+    for (const n of names) for (const [id, re] of CUISINE_NAMES) if (re.test(n)) return id;
+    return '';
+  }
+  function pickCuisine(title, meta, body) {
+    let top = 'other', topScore = 1.9;
+    for (const [id, re] of CUISINE_WORDS) {
+      const g = new RegExp(re.source, 'gi');
+      const hits = s => new Set((s.match(g) || []).map(m => m.trim().toLowerCase())).size;
+      const s = hits(title) * 4 + hits(meta) * 2 + hits(body);
+      if (s > topScore) { top = id; topScore = s; }
+    }
+    return top;
+  }
+
+  /* ───────── times written in words ─────────
+     "1 hr 15 mins" → 75,  "1 time 30 min" → 90 (Norwegian "time" = hour),  "20-25 minutes" → 25 */
+  const DURATION = /(\d+(?:[.,]\d+)?|[½¼¾])(?:\s*(?:-|–|to|til)\s*(\d+(?:[.,]\d+)?))?\s*(hours?|hrs?|h\b|timer|time\b|t\b|minutes?|minutter|minutt|mins?|m\b)/gi;
+  const num = s => s === '½' ? 0.5 : s === '¼' ? 0.25 : s === '¾' ? 0.75 : parseFloat(String(s).replace(',', '.'));
+  function parseDuration(text) {
+    let min = 0;
+    for (const m of String(text || '').matchAll(DURATION)) {
+      const n = num(m[2] || m[1]);
+      min += /^(h|t)/i.test(m[3]) ? n * 60 : n;
+    }
+    // "1½ hours"
+    if (/1½\s*(hours?|timer|time)/i.test(text)) min += 30;
+    return Math.round(min) || null;
+  }
+  // Minutes mentioned in one step, e.g. "Bake for 25-30 minutes" → 30. Marinating overnight isn't counted.
+  function durationsIn(step) {
+    if (/overnight|over natten|day before|dagen før/i.test(step)) return 0;
+    const n = parseDuration(step) || 0;
+    return n > 600 ? 0 : n;
+  }
+
+  /* ───────── reading pasted text ───────── */
+  const H_INGREDIENTS = /^(?:ingredients?|ingredienser|ingrediensar|you(?:'|’)?ll need|you will need|what you need|du trenger|det(?: du)? trenger|handleliste|shopping list)\b/i;
+  const H_STEPS = /^(?:instructions?|method|directions?|steps?|preparation|how to make(?: it)?|how to cook|to make|fremgangsmåte|framgangsmåte|slik gjør du|sånn gjør du|tilberedning|oppskrift|gjør slik|instruksjoner|metode)\b/i;
+  const H_NOTES = /^(?:notes?|tips?|cook'?s notes?|recipe notes?|tips og triks|merknad|nutrition|næringsinnhold|storage|oppbevaring)\b/i;
+  const BULLET = /^[\s•·●○◦▪▫‣⁃∙\-–—*▢□☐✓✔➤>]+/;
+  const STEP_NUMBER = /^(?:(?:step|steg|trinn)\s*\d+\s*[:.)-]?|\d+\s*[.):]|\d+\s+(?=[A-ZÆØÅ]))\s*/i;
+
+  // "For the sauce:" style lines split a list into parts.
+  function isHeading(line) {
+    return /:$/.test(line) && line.length < 60 && !/\d+\s*(g|ml|dl|cups?|tbsp|tsp|ss|ts)\b/i.test(line);
+  }
+  const looksLikeHeading = (line, re) => line.length < 50 && re.test(line.replace(/^[#*\s]+|[:*\s]+$/g, ''));
+
+  // Pasted text → a recipe (title, ingredients, steps, notes, servings and times when written down).
+  function parseText(text) {
+    text = String(text || '').replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(/ /g, ' ');
+    const lines = text.split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const r = { title: '', description: '', ingredients: [], steps: [], notes: '', servings: '',
+      prepMin: null, cookMin: null, totalMin: null, image: '', source: '' };
+
+    // A link anywhere in the text becomes the source.
+    const link = text.match(/https?:\/\/[^\s<>"')]+/i);
+    if (link) r.source = link[0];
+
+    // Labelled facts ("Serves 4", "Prep time: 15 min", "Tid: 30 min", "Vanskelighetsgrad: Enkel").
+    const facts = [];
+    lines.forEach((l, i) => {
+      if (l.length > 70) return;
+      let m;
+      if ((m = l.match(/(?:serves|servings|portions?|yield|makes|porsjoner|personer|antall)\s*:?\s*(\d+(?:\s*[-–]\s*\d+)?[^,;|]*)/i))
+        || (m = l.match(/^(\d+(?:\s*[-–]\s*\d+)?\s*(?:servings|portions|porsjoner|personer|pers\.?|people)\b)/i))) {
+        if (!r.servings) r.servings = m[1].trim().slice(0, 40); facts.push(i);
+      }
+      if ((m = l.match(/(?:prep(?:aration)?(?:\s*time)?|forberedelse(?:stid)?|forb\.?\s*tid)\s*:\s*([^|·;,]+)/i))) { r.prepMin = parseDuration(m[1]); facts.push(i); }
+      if ((m = l.match(/(?:cook(?:ing)?\s*time|bake\s*time|baking\s*time|steketid|koketid|cook|bake)\s*:\s*([^|·;,]+)/i))) { r.cookMin = parseDuration(m[1]); facts.push(i); }
+      if ((m = l.match(/(?:^|[|·,;]\s*)(?:total(?:\s*time)?|total tid|tid|tidsbruk|ready in|klar på|time)\s*:\s*([^|·;,]+)/i)) && parseDuration(m[1])) { r.totalMin = parseDuration(m[1]); facts.push(i); }
+      if ((m = l.match(/(?:difficulty|vanskelighetsgrad|nivå|level)\s*:?\s*(\w+)/i))) {
+        const w = m[1].toLowerCase();
+        r.difficultyWord = /easy|enkel|lett|simple/.test(w) ? 'easy' : /medium|middels|moderate|intermediate/.test(w) ? 'medium'
+          : /hard|avansert|krevende|difficult|advanced|vanskelig/.test(w) ? 'hard' : undefined;
+        facts.push(i);
+      }
+    });
+
+    // Find the section headings.
+    let iIng = -1, iSteps = -1, iNotes = -1;
+    lines.forEach((l, i) => {
+      if (iIng < 0 && looksLikeHeading(l, H_INGREDIENTS)) iIng = i;
+      else if (iSteps < 0 && looksLikeHeading(l, H_STEPS)) iSteps = i;
+      else if (iNotes < 0 && i > Math.max(iIng, iSteps) && Math.max(iIng, iSteps) >= 0 && looksLikeHeading(l, H_NOTES)) iNotes = i;
+    });
+    const firstSection = [iIng, iSteps].filter(i => i >= 0).sort((a, b) => a - b)[0] ?? lines.length;
+
+    // The title: the first short line before the sections that isn't a link or a fact.
+    const intro = [];
+    for (let i = 0; i < firstSection; i++) {
+      const l = lines[i];
+      if (facts.includes(i) || /^https?:\/\//i.test(l)) continue;
+      if (!r.title && l.length <= 120 && !/^(recipe|oppskrift)$/i.test(l)) { r.title = l.replace(/^#+\s*/, ''); continue; }
+      intro.push(l);
+    }
+
+    const section = (start, ...ends) => {
+      if (start < 0) return [];
+      const end = Math.min(...ends.filter(e => e > start), lines.length);
+      return lines.slice(start + 1, end).filter((_, k) => !facts.includes(start + 1 + k));
+    };
+
+    if (iIng >= 0 || iSteps >= 0) {
+      r.ingredients = section(iIng, iSteps, iNotes);
+      r.steps = section(iSteps, iIng, iNotes);
+      if (iNotes >= 0) r.notes = section(iNotes, iIng > iNotes ? iIng : -1, iSteps > iNotes ? iSteps : -1).join('\n');
+      // Short intro lines that look like ingredients but come before the headings stay as the description.
+      r.description = intro.filter(l => l.length > 30).slice(0, 3).join(' ');
+    } else {
+      // No headings: short lines starting with an amount are ingredients, sentences are steps.
+      intro.forEach(l => {
+        const amountFirst = /^[\d¼½¾⅓⅔⅛]|^[•\-*]/.test(l) && !/^\d+\s*[.)]\s+\S/.test(l);
+        if (amountFirst && l.length < 90) r.ingredients.push(l);
+        else if (l.length > 40 || /^\d+\s*[.)]/.test(l) || /^(step|steg)\s*\d/i.test(l)) r.steps.push(l);
+        else if (!r.steps.length && !r.ingredients.length) r.description += (r.description ? ' ' : '') + l;
+        else r.ingredients.push(l);
+      });
+    }
+
+    r.ingredients = tidyIngredients(r.ingredients);
+    r.steps = tidySteps(r.steps);
+    if (!r.title) r.title = 'Untitled recipe';
+    return r;
+  }
+
+  // Bullets off, and an amount on its own line ("200 g" / "flour") joined to the next line.
+  function tidyIngredients(list) {
+    const out = [];
+    for (let i = 0; i < list.length; i++) {
+      let l = list[i].replace(BULLET, '').trim();
+      if (!l) continue;
+      if (/^[\d¼½¾⅓⅔⅛.,/\s-]+(?:(?:g|kg|ml|cl|dl|l|ss|ts|tbsp|tsp|cups?|stk|oz|lb|pk|boks)\.?)?$/i.test(l) && l.length <= 10 && list[i + 1]) {
+        l = l + ' ' + list[++i].replace(BULLET, '').trim();
+      }
+      if (/^(?:ingredients?|ingredienser)$/i.test(l)) continue;
+      out.push(l);
+    }
+    return out.slice(0, 120);
+  }
+  // Bullets and "Step 1" / "1." off; a line starting in lowercase carries on the step before it.
+  function tidySteps(list) {
+    const out = [];
+    for (const raw of list) {
+      const l = raw.replace(BULLET, '').replace(STEP_NUMBER, '').trim();
+      if (!l || /^\d+$/.test(l)) continue;
+      if (out.length && /^[a-zæøå(]/.test(l) && !/[.!:]$/.test(out[out.length - 1])) out[out.length - 1] += ' ' + l;
+      else out.push(l);
+    }
+    return out.slice(0, 80);
+  }
+
+  /* ───────── a recipe read from a web page ───────── */
+  function fromSchema(s) {
+    return {
+      title: s.title || 'Untitled recipe',
+      description: s.description || '',
+      image: s.image || '',
+      servings: s.servings || '',
+      prepMin: s.prepMin || null,
+      cookMin: s.cookMin || null,
+      totalMin: s.totalMin || null,
+      ingredients: tidyIngredients(s.ingredients || []),
+      steps: tidySteps(s.steps || []),
+      notes: '',
+      cuisineNames: s.cuisine || [],
+      category: s.category || [],
+      keywords: s.keywords || [],
+      diet: s.diet || [],
+      author: s.author || '',
+    };
+  }
+
+  /* ───────── changing the servings ─────────
+     Only the amount at the start of a line changes: "1 ½ cups milk" × 2 → "3 cups milk". */
+  const FRACTIONS = { '¼': 0.25, '½': 0.5, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3, '⅛': 0.125 };
+  const AMOUNT = /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+\s*[¼½¾⅓⅔⅛]|[¼½¾⅓⅔⅛]|\d+(?:[.,]\d+)?)(\s*[-–]\s*(\d+(?:[.,]\d+)?))?/;
+  function readAmount(s) {
+    s = s.trim();
+    let m;
+    if ((m = s.match(/^(\d+)\s+(\d+)\/(\d+)$/))) return +m[1] + m[2] / m[3];
+    if ((m = s.match(/^(\d+)\/(\d+)$/))) return m[1] / m[2];
+    if ((m = s.match(/^(\d*)\s*([¼½¾⅓⅔⅛])$/))) return (+m[1] || 0) + FRACTIONS[m[2]];
+    return parseFloat(s.replace(',', '.'));
+  }
+  function showAmount(n) {
+    if (n >= 10) return String(Math.round(n));
+    const whole = Math.floor(n), rest = n - whole;
+    for (const [ch, v] of Object.entries(FRACTIONS)) if (Math.abs(rest - v) < 0.04) return (whole || '') + ch;
+    if (rest < 0.04) return String(whole);
+    if (rest > 0.96) return String(whole + 1);
+    return String(Math.round(n * 10) / 10);
+  }
+  function scale(line, factor) {
+    if (!factor || factor === 1) return line;
+    const m = line.match(AMOUNT);
+    if (!m) return line;
+    const a = readAmount(m[1]);
+    if (!isFinite(a)) return line;
+    let txt = showAmount(a * factor);
+    if (m[3]) txt += '–' + showAmount(readAmount(m[3]) * factor);
+    return txt + line.slice(m[0].length);
+  }
+  // "4 servings" → 4,  "6-8 personer" → 6
+  const servingsNumber = s => { const m = String(s || '').match(/\d+/); return m ? +m[0] : 0; };
+
+  window.Cook = { CATS, TAGS, find, timeBucket, parseText, fromSchema, guess, scale, isHeading, servingsNumber, parseDuration };
+})();
