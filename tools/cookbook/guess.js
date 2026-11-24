@@ -256,7 +256,9 @@
         'sous vide', 'deep-fry', 'deep fry', 'frityr', 'candy thermometer', 'termometer', 'water bath', 'vannbad', 'flambé', 'flambe',
         'pipe\\b', 'piping', 'spritpose', 'roll out', 'kjevle', 'fold in the butter', 'caramel', 'karamell', 'emulsi', 'from scratch',
         'butterfly', 'debone', 'fillet the', 'filetere', 'blind bake', 'blindbake', 'souffl', 'puff pastry from', 'choux'));
-      const points = ings.length + steps.length * 1.5 + tricky * 4 + (total > 120 ? 8 : total > 60 ? 4 : total > 40 ? 2 : 0);
+      // Spices, salt and oil measured with a spoon hardly add to the difficulty.
+      const real = ings.filter(l => !/\b(tsp|tbsp|teaspoons?|tablespoons?|ts|ss|krm|pinch|klype)\b|^(salt|pepper|black pepper|oil|olive oil)\b/i.test(l)).length;
+      const points = real + (ings.length - real) * 0.3 + steps.length * 1.5 + tricky * 4 + (total > 120 ? 8 : total > 60 ? 4 : total > 40 ? 2 : 0);
       out.difficulty = points < 19 ? 'easy' : points < 33 ? 'medium' : 'hard';
     }
 
@@ -391,8 +393,8 @@
     return out;
   }
   // A little picture for a part, from its name.
-  const PART_EMOJI = [[/chicken|kylling/i, '🍗'], [/meat|kjøtt|beef|biff|steak|pork|svin|lamb|lam\b|mince|kjøttdeig|bolle|ball/i, '🥩'],
-    [/fish|fisk|salmon|laks|torsk|cod|prawn|shrimp|reke/i, '🐟'], [/sauce|saus|gravy|jus|curry/i, '🥫'], [/rice|ris\b/i, '🍚'],
+  const PART_EMOJI = [[/chicken|kylling/i, '🍗'], [/meat|kjøtt|beef|biff|steak|pork|svin|lamb|lam\b|mince|kjøttdeig|bolle|ball|patt|burger|k[öo]fte|kebab/i, '🥩'],
+    [/fish|fisk|salmon|laks|torsk|cod|prawn|shrimp|reke/i, '🐟'], [/sauce|saus|gravy|jus|curry/i, '🥫'], [/rice|ris\b|couscous|bulgur|quinoa/i, '🍚'],
     [/noodle|nudler|pasta|spaghetti/i, '🍝'], [/potato|potet|mash|mos\b/i, '🥔'], [/marinade|mariner|rub\b|krydder/i, '🧂'],
     [/dressing|salad|salat|slaw/i, '🥗'], [/dough|deig|bread|brød|crust|bunn|pastry|base/i, '🥖'], [/topping|garnish|pynt|serve|servering/i, '🌿'],
     [/filling|fyll/i, '🥟'], [/frosting|icing|glaze|glasur|syrup|sirup|cream|krem/i, '🍯'], [/veg|grønnsak/i, '🥦'],
@@ -419,6 +421,11 @@
       if ((m = l.match(/(?:serves|servings|portions?|yield|makes|porsjoner|personer|antall)\s*:?\s*(\d+(?:\s*[-–]\s*\d+)?[^,;|]*)/i))
         || (m = l.match(/^(\d+(?:\s*[-–]\s*\d+)?\s*(?:servings|portions|porsjoner|personer|pers\.?|people)\b)/i))) {
         if (!r.servings) r.servings = m[1].trim().slice(0, 40); facts.push(i);
+        // "Serves 2-3, about 30 minutes, 220 °C": the minutes are the recipe's own total time.
+        if (!r.totalMin && !/prep|cook|bake|forbered|steketid|koketid/i.test(l) && /min|hour|hr|time|timer/i.test(l)) {
+          const d = parseDuration(l.replace(/\d+\s*°\s*[CF]?/g, ''));
+          if (d) r.totalMin = d;
+        }
       }
       if ((m = l.match(/(?:prep(?:aration)?(?:\s*time)?|forberedelse(?:stid)?|forb\.?\s*tid)\s*:\s*([^|·;,]+)/i))) { r.prepMin = parseDuration(m[1]); facts.push(i); }
       if ((m = l.match(/(?:cook(?:ing)?\s*time|bake\s*time|baking\s*time|steketid|koketid|cook|bake)\s*:\s*([^|·;,]+)/i))) { r.cookMin = parseDuration(m[1]); facts.push(i); }
@@ -456,11 +463,21 @@
     };
 
     if (iIng >= 0 || iSteps >= 0) {
-      r.ingredients = section(iIng, iSteps, iNotes);
       r.steps = section(iSteps, iIng, iNotes);
-      if (iNotes >= 0) r.notes = section(iNotes, iIng > iNotes ? iIng : -1, iSteps > iNotes ? iSteps : -1).join('\n');
-      // Short intro lines that look like ingredients but come before the headings stay as the description.
-      r.description = intro.filter(l => l.length > 30).slice(0, 3).join(' ');
+      if (iNotes >= 0) r.notes = section(iNotes, iIng > iNotes ? iIng : -1, iSteps > iNotes ? iSteps : -1)
+        .map(l => l.replace(BULLET, '').trim()).join('\n');
+      if (iIng >= 0) {
+        r.ingredients = section(iIng, iSteps, iNotes);
+        // Short intro lines that look like ingredients but come before the headings stay as the description.
+        r.description = intro.filter(l => l.length > 30).slice(0, 3).join(' ');
+      } else {
+        // A "Steps" heading but no "Ingredients" one (it may start straight with "For the meat"):
+        // everything between the title and the steps is ingredients, after any opening sentences.
+        let k = 0;
+        while (k < intro.length && intro[k].length > 60 && /[.!?]$/.test(intro[k]) && !BULLET.test(intro[k])) k++;
+        r.description = intro.slice(0, k).join(' ');
+        r.ingredients = intro.slice(k);
+      }
     } else {
       // No headings: short lines starting with an amount are ingredients, sentences are steps.
       intro.forEach(l => {
@@ -479,9 +496,19 @@
   }
 
   // Bullets off, and an amount on its own line ("200 g" / "flour") joined to the next line.
+  // In a bulleted list, a line WITHOUT a bullet ("Couscous", "Sauce") is the name of a part.
+  function partLine(list, raw) {
+    const bullets = list.filter(l => BULLET.test(l)).length;
+    if (bullets < 3 || bullets < list.length * 0.6 || BULLET.test(raw)) return '';
+    const l = raw.trim();
+    return l.length <= 40 && !/[.!?]$/.test(l) && !/^[\d¼½¾⅓⅔⅛]/.test(l) ? l.replace(/:?$/, ':') : '';
+  }
+
   function tidyIngredients(list) {
     const out = [];
     for (let i = 0; i < list.length; i++) {
+      const part = partLine(list, list[i]);
+      if (part) { out.push(part); continue; }
       let l = list[i].replace(BULLET, '').trim();
       if (!l) continue;
       if (/^[\d¼½¾⅓⅔⅛.,/\s-]+(?:(?:g|kg|ml|cl|dl|l|ss|ts|tbsp|tsp|cups?|stk|oz|lb|pk|boks)\.?)?$/i.test(l) && l.length <= 10 && list[i + 1]) {
@@ -496,6 +523,8 @@
   function tidySteps(list) {
     const out = [];
     for (const raw of list) {
+      const part = partLine(list, raw);
+      if (part) { out.push(part); continue; }
       const l = raw.replace(BULLET, '').replace(STEP_NUMBER, '').trim();
       if (!l || /^\d+$/.test(l)) continue;
       if (isHeading(l)) { out.push(/:$/.test(l) ? l : l + ':'); continue; }

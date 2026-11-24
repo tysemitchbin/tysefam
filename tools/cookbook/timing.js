@@ -95,8 +95,10 @@
   function prepFor(line, why) {
     const l = line.toLowerCase();
     if (TO_SERVE.test(l) && !KNIFE.test(l)) return 0.3;
-    let t = PANTRY.test(l) && !KNIFE.test(l) ? 0.5 : 1;          // get it out and measure it
     const ready = READY.test(l), spoon = SPOONS.test(l);
+    // Get it out and measure it: a spoonful of a spice or a splash of oil is quick.
+    if (/from the (pan|tray|pot|sheet|oven)|from above|reserved|fra (pannen|langpannen|over)/.test(l)) return 0;   // already made
+    let t = (PANTRY.test(l) || spoon) && !KNIFE.test(l) ? 0.3 : 0.6;
     if (ready) t += 0.5;                                          // open the tin / bag
     const item = PER_ITEM.find(([re]) => re.test(l));
     const knife = !ready && !spoon && (KNIFE.test(l) || item);
@@ -126,8 +128,8 @@
   }
 
   /* ───────── the steps ───────── */
-  const PASSIVE = words('simmer', 'småkok', 'bake', 'bak\\b', 'roast', 'stek i ovn', 'i ovnen', 'in the oven', 'oven', 'ovn', 'boil', 'kok\\b',
-    'koke', 'rest', 'hvile', 'marinate', 'mariner', 'chill', 'kjøl', 'refrigerat', 'cool', 'avkjøl', 'rise', 'prove', 'proof', 'heve', 'steam',
+  const PASSIVE = words('simmer', 'småkok', 'bake\\b', 'bak\\b', 'roast\\b', 'stek i ovn', 'i ovnen', 'in the oven', 'oven', 'ovn', 'boil', 'kok\\b',
+    'koke', 'rest\\b(?! of)', 'hvile', 'marinate', 'mariner', 'chill', 'kjøl', 'refrigerat', 'cool', 'avkjøl', 'rise', 'prove', 'proof', 'heve', 'steam',
     'damp', 'braise', 'slow cook', 'saktekok', 'pressure', 'trykk', 'set aside', 'leave', 'la stå', 'la det stå', 'trekke', 'soak', 'bløtlegg',
     'stand', 'release', 'cover and cook', 'lokk på', 'in the fridge', 'kjøleskap');
   // A number of minutes that ISN'T time spent: "stir every 5 minutes", "check after 20 minutes".
@@ -157,7 +159,11 @@
     }
     let stated = statedMinutes(l);
     const isPassive = PASSIVE.test(l);
-    if (/preheat|pre-heat|forvarm|heat the oven|varm opp ovnen/.test(l)) flags.oven = true;
+    if (/preheat|pre-heat|forvarm|heat the oven|varm opp ovnen/.test(l)) {
+      flags.oven = true;
+      // "Heat the oven to 220 °C." is just turning a knob (but "Let rise 30 min. Preheat…" is more).
+      if (l.length < 60 && !statedMinutes(l.replace(/\d+\s*°\s*[cf]?/g, ''))) return { active: 0.5, waiting };
+    }
     if (/oven|ovn|bake|roast/.test(l)) flags.oven = true;
 
     // ── Things recipes famously underestimate ──
@@ -185,7 +191,7 @@
 
     if (stated) {
       if (isPassive && !/stir|rør|whisk|visp|flip|snu|fry|stek\b|sauté|fres/.test(l)) waiting += stated;
-      else if (isPassive) { active += stated * 0.4; waiting += stated * 0.6; }   // simmer while stirring now and then
+      else if (isPassive) { active += stated * 0.25; waiting += stated * 0.75; }   // simmer while stirring now and then
       else active += stated;
       return { active, waiting };
     }
@@ -196,14 +202,14 @@
     else if (/cool completely|avkjøl helt/.test(l)) waiting += 45;
     else if (/cool|avkjøl/.test(l)) waiting += 15;
     else if (/marinat|mariner/.test(l)) waiting += 30;
-    else if (/rest|hvile|stand|la stå/.test(l)) waiting += 10;
+    else if (/\brest\b(?! of)|hvile|let (it )?stand|la (det )?stå/.test(l)) waiting += 10;
     else if (/(cook|boil|kok).{0,30}(rice|ris)\b|\b(rice|ris)\b.{0,30}(cook|boil|kok)/.test(l)) waiting += 20;
     else if (/(cook|boil|kok).{0,30}(pasta|spaghetti|noodle|nudler)|\b(pasta|spaghetti|noodles?)\b.{0,30}(cook|boil|kok)/.test(l)) waiting += 10;
     else if (/(boil|kok).{0,30}(potato|potet)|(potato|potet).{0,30}(boil|kok)/.test(l)) waiting += 20;
-    else if (/bake|roast|stek i ovn|i ovnen|in the oven|gratiner/.test(l)) waiting += 25;
+    else if (/\b(bake|roast)\b|stek i ovn|i ovnen|in the oven|gratiner/.test(l)) waiting += 25;   // not "roasted pepper"
     else if (/simmer|småkok|braise|stew|gryte/.test(l)) { active += 4; waiting += 15; }
     else if (/knead|elt/.test(l)) active += 10;
-    else if (/roll out|kjevle|shape|form\b|forme/.test(l)) active += 8;
+    else if (/roll out|kjevle|shape|form\b|forme/.test(l)) active += 6;
     else if (/fry|sauté|saute|stir-fry|wok|stek|fres|brown|brun|sear|cook/.test(l)) active += 6;
     else if (/blend|purée|puree|mix|whisk|stir|combine|bland|visp|rør|toss|vend/.test(l)) active += 2;
     else active += 2;
@@ -245,7 +251,7 @@
     if (flags.pressure) why.push('An Instant Pot takes ~12 min to come up to pressure before the timer starts');
 
     // While things simmer or bake you can get on with some of the prep (but rarely all of it).
-    const overlap = Math.min(waiting, prep) * 0.4;
+    const overlap = Math.min(waiting, prep) * 0.45;
     const total = prep + active + waiting - overlap;
     return {
       total: Math.max(5, Math.round(total / 5) * 5),

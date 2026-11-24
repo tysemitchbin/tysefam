@@ -690,7 +690,7 @@ function showRecipe(id) {
   const ps = Cook.parts(r);
   const multi = ps.length > 1;
   const pick = multi && partNow[id] < ps.length ? partNow[id] ?? -1 : -1;   // -1 = all parts
-  const nameOf = p => p.name || (p.ings.length ? 'The rest' : 'Putting it together');
+  const nameOf = p => p.name || (p.ings.length ? 'The rest' : ps.some(q => q !== p && q.steps.length) ? 'Putting it together' : 'All the steps');
   const shown = pick >= 0 ? [ps[pick]] : ps;
   const head = p => multi && pick < 0 ? `<div class="sub">${Cook.partEmoji(nameOf(p))} ${esc(nameOf(p))}</div>` : '';
   const ingRow = it => `<div class="ing${tk['i' + it.i] ? ' done' : ''}" data-tick="i${it.i}"><div class="check${tk['i' + it.i] ? ' done' : ''}"></div><span class="t">${esc(Cook.scale(it.line, factor))}</span></div>`;
@@ -1016,8 +1016,11 @@ function openEditor(r, id, note, bad) {
   for (const k of ['prepMin', 'cookMin', 'totalMin']) form[k].value = r[k] || '';
   form.priceNok.value = r.priceNok || '';
   // One box per part. A part without a name can only come first, so later ones get a name.
-  edParts = Cook.parts(r).map((p, k) => ({
-    name: p.name || (k === 0 ? '' : p.ings.length ? 'The rest' : 'Putting it together'),
+  const all = Cook.parts(r);
+  // An unnamed part that only has steps can stay unnamed if it holds all the steps.
+  const stepsOnly = p => !p.ings.length && !all.some(q => q !== p && q.steps.length);
+  edParts = all.map((p, k) => ({
+    name: p.name || (k === 0 || stepsOnly(p) ? '' : p.ings.length ? 'The rest' : 'Putting it together'),
     ings: p.ings.map(x => x.line), steps: p.steps.map(x => x.line),
     order: p.steps.length ? p.steps[0].i : 1e9 }));   // where this part's steps come in the cooking order
   if (!edParts.length) edParts = [{ name: '', ings: [], steps: [], order: 0 }];
@@ -1087,7 +1090,10 @@ function flattenParts(list) {
   const ingredients = [], steps = [];
   list = list.filter(p => p.name || p.ings.length || p.steps.length);
   // Only the first part may go without a name (its lines come before any heading).
-  list.forEach((p, k) => { p.name = p.name || (k === 0 ? '' : `Part ${k + 1}`); });
+  list.forEach((p, k) => {
+    const stepsOnly = !p.ings.length && !list.some(q => q !== p && q.steps.length);
+    p.name = p.name || (k === 0 || stepsOnly ? '' : `Part ${k + 1}`);
+  });
   list.forEach(p => {
     if (p.name && p.ings.length) ingredients.push(p.name + ':');
     ingredients.push(...p.ings);
