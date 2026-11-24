@@ -303,4 +303,5 @@
   }
 
   window.Cook.price = price;
+  window.Cook.amountOf = amountOf;   // nutrition.js reads amounts the same way
 })();

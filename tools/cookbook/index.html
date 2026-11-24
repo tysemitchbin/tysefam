@@ -31,6 +31,10 @@
                    tags: ['Vegetarian', …], favs: { Mitch: true },
                    cooked: [{ by, date: '2026-11-24', ts, min }]   (every time we made it; min = how long
                    it really took, if logged), ts, by }
+     meals → dinners that aren't "we cooked a recipe" (see allDinners): { kind: 'leftovers' | 'quick' | 'out',
+             date, recipeId (leftovers), name, emoji, protein, fiber, kr (per person; quick/out), note, by, ts }
+     settings → 'targets': { protein, fiber }   our goals per dinner per person (📊 Insights)
+     A recipe can also have proteinG / fiberG (per serving) typed in; otherwise nutrition.js estimates them.
      Times: what the recipe says is kept, but what we SHOW is realistic: your own logged times for
      that recipe, or else our estimate (timing.js) adjusted by how your logged cooks compare with it.
      A line ending in ":" in ingredients or steps ("The sauce:") starts a PART of the dish; the recipe
@@ -125,6 +129,39 @@ a.fact:hover{filter:brightness(.95);}
 .timebox summary{cursor:pointer;font-weight:800;color:var(--meadow-deep);font-size:.85rem;margin-top:6px;}
 .tb-parts{display:flex;flex-direction:column;gap:3px;margin:8px 0;font-size:.88rem;}
 .tb-why{margin:4px 0 8px;padding-left:20px;font-size:.85rem;color:var(--ink);}
+.nut{display:inline-block;font-size:.8rem;font-weight:800;padding:2px 8px;border-radius:999px;margin-right:4px;white-space:nowrap;}
+.nut-great{background:#dcefd6;color:#3f7a3f;} .nut-ok{background:#fdf0c8;color:#8a6d10;} .nut-low{background:#fbdcd0;color:#a64b25;}
+.bar.nut-great{background:#7fa874;} .bar.nut-ok{background:#e0bd4d;} .bar.nut-low{background:#e8946c;}
+.tabs .btn{padding:8px 14px;}
+.kinds{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+@media(max-width:520px){.kinds{grid-template-columns:1fr 1fr;}}
+.kind{border:2px solid var(--line);background:#fff;border-radius:14px;padding:8px 4px;font-size:1.4rem;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.kind span{font-size:.78rem;font-weight:800;color:var(--forest);}
+.kind.on{border-color:var(--meadow);background:#eef6ea;}
+.pickList{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto;margin-top:6px;}
+.pick{border:2px solid var(--line);background:#fff;border-radius:12px;padding:8px 10px;text-align:left;font-weight:700;color:var(--ink);display:flex;gap:6px;align-items:center;}
+.pick .mini{margin-left:auto;}
+.pick.on{border-color:var(--meadow);background:#eef6ea;}
+.chiprow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;}
+@media(max-width:520px){.row3{grid-template-columns:1fr 1fr;}}
+.day.future{opacity:.45;}
+.day[data-day]{cursor:pointer;}
+.day[data-day]:hover{border-color:var(--meadow);}
+.cr{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.cr-name a,.cr-name span{font-weight:700;color:var(--forest);text-decoration:none;}
+.cr-chips{display:flex;gap:4px;flex-wrap:wrap;align-items:center;}
+.cr-chips .who-pill{margin-left:auto;}
+.kindbar{display:flex;height:30px;border-radius:999px;overflow:hidden;margin:4px 0 8px;font-size:.8rem;font-weight:800;}
+.kindbar div{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;color:#fff;}
+.k-cooked{background:#7fa874;} .k-leftovers{background:#d9b43f;} .k-quick{background:#e89b6f;} .k-out{background:#8ec6d4;}
+.wkchart{position:relative;display:flex;align-items:flex-end;gap:4px;height:100px;margin:6px 0 2px;border-bottom:1px solid var(--line);}
+.wk{flex:1;height:100%;display:flex;align-items:flex-end;}
+.wk .bar{width:100%;border-radius:4px 4px 0 0;}
+.goalline{position:absolute;left:0;right:0;border-top:2px dashed #b9c2b0;pointer-events:none;}
+.goalline span{position:absolute;right:0;top:-18px;font-size:.66rem;font-weight:800;color:var(--ink-soft);background:var(--paper);padding:0 4px;}
+.goalrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-weight:800;color:var(--forest);}
+.goalrow input{width:70px;border:2px solid var(--line);border-radius:10px;padding:6px 8px;}
 .tb-note{font-size:.8rem;color:var(--ink-soft);font-weight:600;flex-basis:100%;}
 .who-line{font-size:.82rem;color:var(--ink-soft);font-weight:700;}
 .logrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;padding:10px;background:#eef6ea;border-radius:12px;font-weight:700;}
@@ -219,7 +256,10 @@ dialog .field{width:100%;}
   </div>
   <nav class="tabs">
     <a class="tab" id="tabShelf" href="#">📚 Bookshelf</a>
-    <a class="tab" id="tabCal" href="#cal">📅 What we’ve cooked</a>
+    <a class="tab" id="tabCal" href="#cal">📅 Dinner log</a>
+    <a class="tab" id="tabIns" href="#ins">📊 Insights</a>
+    <span style="flex:1"></span>
+    <button class="btn" id="logBtn">🍽️ Log dinner</button>
   </nav>
 
   <!-- ───── the bookshelf ───── -->
@@ -250,6 +290,9 @@ dialog .field{width:100%;}
 
   <!-- ───── the cooking calendar (filled in by showCalendar) ───── -->
   <section id="calView" hidden></section>
+
+  <!-- ───── insights (filled in by showInsights) ───── -->
+  <section id="insView" hidden></section>
 </main>
 
 <!-- ───── add / edit a recipe ───── -->
@@ -271,6 +314,10 @@ dialog .field{width:100%;}
     <p class="hint" id="edEst" style="margin:-4px 0 0"></p>
     <div class="cats" id="edCats"></div>
     <label>What the whole dish costs in kr (leave empty to use our estimate)<input class="field" name="priceNok" type="number" min="0" max="20000"></label>
+    <div class="row2">
+      <label>💪 Protein per serving, g (empty = our estimate)<input class="field" name="proteinG" type="number" min="0" max="300"></label>
+      <label>🌾 Fibre per serving, g (empty = our estimate)<input class="field" name="fiberG" type="number" min="0" max="150"></label>
+    </div>
     <div>
       <div style="font-weight:800;font-size:.82rem;color:var(--ink-soft);margin-bottom:6px">Labels</div>
       <div class="taglist" id="edTags"></div>
@@ -293,11 +340,49 @@ dialog .field{width:100%;}
   </form>
 </dialog>
 
+<!-- ───── log a dinner ───── -->
+<dialog id="logDlg">
+  <form id="logForm">
+    <h3>🍽️ Log a dinner</h3>
+    <label>Day<input class="field" type="date" name="date" required></label>
+    <div class="kinds">
+      <button type="button" class="kind" data-kind="cooked">🍳<span>Cooked a recipe</span></button>
+      <button type="button" class="kind" data-kind="leftovers">🥡<span>Leftovers</span></button>
+      <button type="button" class="kind" data-kind="quick">⚡<span>Something quick</span></button>
+      <button type="button" class="kind" data-kind="out">🍔<span>Ate out / takeaway</span></button>
+    </div>
+    <div id="logRecipeBox">
+      <div class="sub" id="logRecipeHint" style="margin-top:0">Which recipe?</div>
+      <input class="field" id="logSearch" placeholder="🔍 Find the recipe" autocomplete="off">
+      <div class="pickList" id="logPick"></div>
+    </div>
+    <div id="logQuickBox">
+      <label>What was it?<input class="field" name="qname" list="quickNames" maxlength="60" autocomplete="off"></label>
+      <datalist id="quickNames"></datalist>
+      <div class="chiprow" id="quickChips"></div>
+      <div class="row3">
+        <label>💪 Protein per person (g)<input class="field" type="number" name="qprotein" min="0" max="200"></label>
+        <label>🌾 Fibre per person (g)<input class="field" type="number" name="qfiber" min="0" max="100"></label>
+        <label>💰 Cost per person (kr)<input class="field" type="number" name="qkr" min="0" max="5000"></label>
+      </div>
+      <p class="hint" style="margin:0">Tap a suggestion to fill in typical numbers; change them if you know better.</p>
+    </div>
+    <label id="logMinBox">How long it took, start to table (min, optional)<input class="field" type="number" name="lmin" min="1" max="1440"></label>
+    <label>Note (optional)<input class="field" name="note" maxlength="200" placeholder="e.g. doubled the beans, kids loved it"></label>
+    <div id="logDay"></div>
+    <div class="dlg-acts">
+      <button type="button" class="btn ghost" id="logClose">Close</button>
+      <button type="submit" class="btn">Save</button>
+    </div>
+  </form>
+</dialog>
+
 <script src="../../site.js"></script>
 <script src="../../shared/family.js"></script>
 <script src="guess.js"></script>
 <script src="timing.js"></script>
 <script src="prices.js"></script>
+<script src="nutrition.js"></script>
 <script>
 const TOOL_ID = 'cookbook';
 const store = Family.store(TOOL_ID);
@@ -315,6 +400,8 @@ const SPINES = ['#a4493d', '#3f6e8c', '#4f7a4f', '#b5832f', '#7d4f86', '#3e7a74'
 let recipes = {};        // id → recipe, kept up to date live
 let loaded = false;
 let wake = null;         // the "keep screen on" lock while cooking
+let meals = {};          // dinners that aren't "we cooked this recipe": leftovers, quick dinners, eating out
+let targets = { protein: 30, fiber: 10 };   // our goals per dinner per person (saved in settings → targets)
 
 /* ───────── small helpers ───────── */
 const safeUrl = u => (/^https?:\/\/[^\s"'<>]+$/i.test(String(u || '').trim()) ? String(u).trim() : '');
@@ -328,6 +415,13 @@ const estimateOf = remember(r => Cook.estimate(r));
 const priceEstimate = remember(r => Cook.price(r));
 // What the whole dish costs: what someone typed in, otherwise our estimate from typical prices.
 const priceOf = r => r.priceNok || (priceEstimate(r) || {}).total || 0;
+// Protein and fibre per serving: what someone typed in, otherwise our estimate (nutrition.js).
+const nutritionEst = remember(r => Cook.nutrition(r));
+function perServing(r) {
+  const e = nutritionEst(r);
+  return { protein: r.proteinG ?? e?.perServing.protein ?? null, fiber: r.fiberG ?? e?.perServing.fiber ?? null,
+    est: e, own: r.proteinG != null || r.fiberG != null };
+}
 const siteTime = r => r.totalMin || ((r.prepMin || 0) + (r.cookMin || 0)) || 0;
 const loggedMins = r => (r.cooked || []).filter(c => c.min > 0)
   .sort((a, b) => cookedDay(a).localeCompare(cookedDay(b))).map(c => c.min);
@@ -449,6 +543,8 @@ function bookContents(key) {
   const me = Family.me();
   if (key === 'all') return { emoji: '📚', label: 'All recipes', list: all };
   if (key === 'fav') return { emoji: '❤️', label: `${me}’s favourites`, list: all.filter(([, r]) => (r.favs || {})[me]) };
+  if (key === 'hp') return { emoji: '💪', label: `High protein (${targets.protein} g+)`, list: all.filter(([, r]) => perServing(r).protein >= targets.protein) };
+  if (key === 'hf') return { emoji: '🌾', label: `High fibre (${targets.fiber} g+)`, list: all.filter(([, r]) => perServing(r).fiber >= targets.fiber) };
   if (key === 'recent') return { emoji: '🕘', label: 'Made lately', list: all.filter(([, r]) => (r.cooked || []).length), sort: 'recent' };
   const [cat, ...rest] = key.split(':');
   const val = rest.join(':');
@@ -487,6 +583,10 @@ function showShelf() {
   const books = [categoryBook('all', '📚', 'All recipes', all.length, true)];
   const favs = all.filter(([, r]) => (r.favs || {})[me]).length;
   if (favs) books.push(categoryBook('fav', '❤️', 'My favourites', favs, true));
+  const hp = all.filter(([, r]) => perServing(r).protein >= targets.protein).length;
+  if (hp) books.push(categoryBook('hp', '💪', 'High protein', hp, true));
+  const hf = all.filter(([, r]) => perServing(r).fiber >= targets.fiber).length;
+  if (hf) books.push(categoryBook('hf', '🌾', 'High fibre', hf, true));
   const made = all.filter(([, r]) => (r.cooked || []).length).length;
   if (made) books.push(categoryBook('recent', '🕘', 'Made lately', made, true));
 
@@ -538,9 +638,13 @@ function showBook(key) {
 }
 
 /* ───────── "when we make it" ───────── */
-function cookStats(r) {
+function cookStats(r, id) {
   const days = (r.cooked || []).map(c => ({ day: cookedDay(c), by: c.by || '?' })).sort((a, b) => a.day.localeCompare(b.day));
-  if (!days.length) return `<p class="statline">Not made yet. Tap <b>✅ We made this</b> above when you do, and this fills up.</p>`;
+  // Leftovers: how many extra dinners this recipe gives.
+  const lo = Object.values(meals).filter(m => m.kind === 'leftovers' && m.recipeId === id).length;
+  const loLine = lo ? `<p class="statline">🥡 Leftovers: <b>${lo}</b> dinner${lo === 1 ? '' : 's'} from ${days.length || '?'} cook${days.length === 1 ? '' : 's'}${days.length ? `, so about <b>${fmtPer(lo / days.length)}</b> each time we make it` : ''}.</p>`
+    : days.length ? '<p class="statline">🥡 No leftovers logged yet. Tap <b>🥡 We ate leftovers</b> when you have them.</p>' : '';
+  if (!days.length) return loLine + `<p class="statline">Not made yet. Tap <b>✅ We made this</b> above when you do, and this fills up.</p>`;
   const n = days.length, first = days[0].day, last = days[n - 1].day;
   const ago = daysBetween(last, todayKey());
   const agoText = ago <= 0 ? 'today' : ago === 1 ? 'yesterday' : ago < 60 ? `${ago} days ago` : `${Math.round(ago / 30)} months ago`;
@@ -576,6 +680,7 @@ function cookStats(r) {
       <div class="stat"><b>${esc(fmtDay(first))}</b><span>first time</span></div>
     </div>
     ${n >= 3 && wd[topWd] >= 2 ? `<p class="statline">📆 Most often on a <b>${WEEKDAYS[topWd]}</b> (${wd[topWd]} of ${n} times).</p>` : ''}
+    ${loLine}
     <p class="statline">👩‍🍳 Made by ${Object.entries(who).sort((a, b) => b[1] - a[1]).map(([p, c]) => `<b>${esc(p)}</b> ${c}×`).join(', ')}.</p>
     <div class="bars" aria-label="Times made each month, last 12 months">
       ${months.map(m => `<div class="${m.n ? '' : 'zero'}" style="height:${m.n ? Math.max(12, m.n / most * 100) : 3}%" title="${m.full}: ${m.n}×"></div>`).join('')}
@@ -603,6 +708,24 @@ setInterval(() => {
   const start = m && timers()[decodeURIComponent(m[1])];
   if (el && start) el.textContent = fmtMin(Math.max(1, Math.round((Date.now() - start) / 60000)));
 }, 20000);
+
+/* The protein & fibre box on a recipe (our two priorities, so it comes first). */
+function nutriBox(r) {
+  const n = perServing(r), e = n.est;
+  if (n.protein == null && n.fiber == null) return '';
+  const lowFibre = n.fiber != null && n.fiber < targets.fiber;
+  return `<div class="timebox">
+    <div class="tb-main">${nutChip(n.protein, 'protein')}protein ${nutChip(n.fiber, 'fiber')}fibre
+      <span class="tb-how">per serving${e && e.assumed && !n.own ? ' (if it serves 4)' : ''}${n.own ? ' · as you typed in' : ''}</span></div>
+    <div class="tb-line">Our goals: ${targets.protein} g protein and ${targets.fiber} g fibre per dinner (change them on 📊 Insights).</div>
+    ${lowFibre ? `<div class="tb-line">🌾 Fibre boost: a can of beans or lentils adds about ${Math.round(4 * 4 / (e?.serves || 4))} g per serving; a side salad or broccoli 2–3 g.</div>` : ''}
+    ${e ? `<details><summary>Where it comes from</summary>
+      <div class="tb-parts">${e.lines.filter(x => x.protein >= 0.5 || x.fiber >= 0.5).sort((a, b) => (b.protein + b.fiber * 2) - (a.protein + a.fiber * 2)).slice(0, 10).map(x =>
+        `<span>${esc(x.line)} <b>${Math.round(x.protein)} g protein · ${Math.round(x.fiber * 10) / 10} g fibre</b></span>`).join('')}</div>
+      <div class="tb-note">For the whole dish: ${e.protein} g protein and ${e.fiber} g fibre, shared by ${e.serves}. Typical values for each ingredient; type the real numbers under ✏️ Edit if you know them.</div>
+    </details>` : ''}
+  </div>`;
+}
 
 /* The cost box on a recipe: what it costs in kr, and what makes up the price. */
 function costBox(r) {
@@ -725,6 +848,7 @@ function showRecipe(id) {
         ${r.description ? `<p class="rv-desc">${esc(r.description)}</p>` : ''}
         <div class="facts">${chips}</div>
         ${timeBox(r)}
+        ${nutriBox(r)}
         ${costBox(r)}
         <div class="who-line">
           ${src ? `From <a href="${esc(src)}" target="_blank" rel="noopener noreferrer">${esc(domain(src))} ↗</a> · ` : ''}
@@ -734,6 +858,7 @@ function showRecipe(id) {
           <button class="chipbtn pink${favs.includes(me) ? ' on' : ''}" id="rvFav">❤️ ${favs.length ? esc(favs.join(' & ')) : 'Favourite'}</button>
           <button class="chipbtn${timer ? ' on' : ''}" id="rvTimer">${timer ? `⏱️ <span id="tmr">${fmtMin(elapsed)}</span>… done?` : '⏱️ Start cooking timer'}</button>
           <button class="chipbtn${logOpen ? ' on' : ''}" id="rvCooked">✅ We made this</button>
+          <button class="chipbtn" id="rvLeft">🥡 We ate leftovers</button>
           ${'wakeLock' in navigator ? `<button class="chipbtn${wake ? ' on' : ''}" id="rvWake">📱 ${wake ? 'Screen stays on' : 'Keep screen on'}</button>` : ''}
         </div>
         ${logOpen ? `<div class="logrow">Made it on
@@ -761,7 +886,7 @@ function showRecipe(id) {
       </div>
     </div>
     ${r.notes ? `<div class="card"><h3>📝 Our notes</h3><div class="notes">${esc(r.notes)}</div></div>` : ''}
-    <div class="card"><h3>📊 When we make it</h3>${cookStats(r)}</div>`;
+    <div class="card"><h3>📊 When we make it</h3>${cookStats(r, id)}</div>`;
 
   // "← Bookshelf" goes back to the book you came from, if you came from one.
   if (/^#b=/.test(cameFrom)) box.querySelector('#rvBack').href = cameFrom;
@@ -770,6 +895,7 @@ function showRecipe(id) {
   box.querySelectorAll('[data-tick]').forEach(el => el.onclick = () => { tk[el.dataset.tick] = !tk[el.dataset.tick]; showRecipe(id); });
   box.querySelector('#rvFav').onclick = () => store.update('recipes', id, { favs: Object.assign({}, r.favs, { [me]: !(r.favs || {})[me] }) });
   box.querySelector('#rvCooked').onclick = () => { logOpen = !logOpen; showRecipe(id); };
+  box.querySelector('#rvLeft').onclick = () => openLog({ kind: 'leftovers', recipeId: id });
   if (logOpen) {
     box.querySelector('#logCancel').onclick = () => { logOpen = false; showRecipe(id); };
     box.querySelector('#logSave').onclick = () => {
@@ -821,14 +947,185 @@ async function setWake(on) {
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && wake && wake.released) { wake = null; setWake(true); } });
 
-/* ───────── the cooking calendar ───────── */
-function allCooked() {
+/* ───────── the dinner diary: every dinner, recipe or not ─────────
+   Two places hold dinners:
+     • a recipe's `cooked` list: "we made this recipe" (it also teaches the time estimate)
+     • the `meals` collection: { kind, date, recipeId?, name?, emoji?, protein?, fiber?, kr?, note?, by, ts }
+         kind 'leftovers' = leftovers of a recipe (recipeId)
+              'quick'     = an easy non-recipe dinner (hot dogs, frozen pizza…)
+              'out'       = eating out / takeaway
+   allDinners() puts them together for the calendar and the insights. */
+const KINDS = {
+  cooked: { emoji: '🍳', label: 'Cooked a recipe' },
+  leftovers: { emoji: '🥡', label: 'Leftovers' },
+  quick: { emoji: '⚡', label: 'Something quick' },
+  out: { emoji: '🍔', label: 'Ate out / takeaway' },
+};
+function recipeEmoji(r) {
+  if (!r) return '🍽️';
+  const p = Cook.find('protein', r.protein);
+  return (r.protein && !['none', 'veg'].includes(r.protein) ? p?.emoji : Cook.find('meal', r.meal)?.emoji) || '🍽️';
+}
+function allDinners() {
   const out = [];
   for (const [id, r] of Object.entries(recipes)) {
-    for (const c of r.cooked || []) out.push({ id, r, day: cookedDay(c), by: c.by || '?' });
+    (r.cooked || []).forEach((c, k) => out.push({ kind: 'cooked', day: cookedDay(c), id, r, k, by: c.by || '?', min: c.min, note: c.note }));
   }
-  return out.sort((a, b) => a.day.localeCompare(b.day));
+  for (const [mid, m] of Object.entries(meals)) {
+    if (!m || !/^\d{4}-\d\d-\d\d$/.test(m.date || '')) continue;
+    out.push({ kind: m.kind, day: m.date, mid, m, id: m.recipeId, r: m.recipeId ? recipes[m.recipeId] : null, by: m.by || '?', note: m.note });
+  }
+  return out.sort((a, b) => a.day.localeCompare(b.day) || (a.kind === 'cooked' ? -1 : 1));
 }
+// What one dinner was: name, picture and (per person) protein, fibre and cost, where we know them.
+function dinnerInfo(e) {
+  if (e.kind === 'cooked' || (e.kind === 'leftovers' && e.r)) {
+    const n = perServing(e.r);
+    const serves = Cook.servingsNumber(e.r.servings) || 4;
+    const kr = priceOf(e.r);
+    return { name: e.r.title, emoji: e.kind === 'leftovers' ? '🥡' : recipeEmoji(e.r), protein: n.protein, fiber: n.fiber,
+      kr: kr ? Math.round(kr / serves) : null, link: '#r=' + encodeURIComponent(e.id) };
+  }
+  const m = e.m || {};
+  return { name: m.name || (e.kind === 'leftovers' ? 'Leftovers' : KINDS[e.kind]?.label || 'Dinner'), emoji: m.emoji || KINDS[e.kind]?.emoji || '🍽️',
+    protein: m.protein ?? null, fiber: m.fiber ?? null, kr: m.kr ?? null, link: '' };
+}
+// How a number compares with our goal: 'great' (goal reached), 'ok' (two thirds of the way), 'low'.
+const rate = (v, goal) => v == null ? '' : v >= goal ? 'great' : v >= goal * 0.66 ? 'ok' : 'low';
+const nutChip = (v, kind) => v == null ? '' :
+  `<span class="nut nut-${rate(v, targets[kind])}">${kind === 'protein' ? '💪' : '🌾'} ${v} g</span>`;
+// Remove one logged dinner (from the recipe's list, or the meals collection).
+function removeDinner(e) {
+  if (e.kind === 'cooked') store.update('recipes', e.id, { cooked: (e.r.cooked || []).filter((_, k) => k !== e.k) });
+  else store.remove('meals', e.mid);
+}
+
+/* ───────── the "Log a dinner" box ───────── */
+const logDlg = $('#logDlg'), logForm = $('#logForm');
+const logState = { kind: 'cooked', recipeId: null };
+function openLog({ date, kind, recipeId } = {}) {
+  logForm.reset();
+  logForm.date.value = date || todayKey();
+  logForm.date.max = todayKey();
+  logState.kind = kind || 'cooked';
+  logState.recipeId = recipeId || null;
+  $('#logSearch').value = '';
+  drawLog();
+  logDlg.showModal();
+}
+function drawLog() {
+  const k = logState.kind;
+  logForm.querySelectorAll('[data-kind]').forEach(b => b.classList.toggle('on', b.dataset.kind === k));
+  $('#logRecipeBox').hidden = !(k === 'cooked' || k === 'leftovers');
+  $('#logQuickBox').hidden = !(k === 'quick' || k === 'out');
+  $('#logMinBox').hidden = k !== 'cooked';
+  $('#logRecipeHint').textContent = k === 'leftovers' ? 'Leftovers of which recipe?' : 'Which recipe?';
+  drawPick();
+  if (k === 'quick' || k === 'out') drawQuickChips();
+  drawLogDay();
+}
+// The list of recipes to pick from: recently made first, filtered by the search box.
+function drawPick() {
+  const q = $('#logSearch').value.trim();
+  const list = Object.entries(recipes).filter(([, r]) => !q || searchMatch(r, q))
+    .sort((a, b) => lastCooked(b[1]).localeCompare(lastCooked(a[1])) || (a[1].title || '').localeCompare(b[1].title || ''))
+    .slice(0, 40);
+  if (logState.recipeId && !list.some(([id]) => id === logState.recipeId) && recipes[logState.recipeId]) list.unshift([logState.recipeId, recipes[logState.recipeId]]);
+  $('#logPick').innerHTML = list.length ? list.map(([id, r]) => `
+    <button type="button" class="pick${id === logState.recipeId ? ' on' : ''}" data-pick="${esc(id)}">
+      ${recipeEmoji(r)} ${esc(r.title)}${lastCooked(r) ? `<span class="mini">made ${esc(fmtDay(lastCooked(r)))}</span>` : ''}</button>`).join('')
+    : '<div class="empty">No recipes match. For a dinner without a recipe, pick ⚡ Something quick.</div>';
+  $('#logPick').querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { logState.recipeId = b.dataset.pick; drawPick(); });
+}
+// Quick dinners: the ready-made list plus anything you've logged before (most used first).
+function pastQuick(kind) {
+  const seen = {};
+  Object.values(meals).filter(m => m.kind === kind && m.name).sort((a, b) => (a.ts || 0) - (b.ts || 0)).forEach(m => {
+    const key = m.name.trim().toLowerCase();
+    seen[key] = Object.assign(seen[key] || { n: 0 }, { name: m.name.trim(), emoji: m.emoji, protein: m.protein, fiber: m.fiber, kr: m.kr });
+    seen[key].n++;
+  });
+  return Object.values(seen).sort((a, b) => b.n - a.n);
+}
+function quickChoices(kind) {
+  const mine = pastQuick(kind);
+  const presets = (kind === 'out' ? Cook.OUT : Cook.QUICK).filter(p => !mine.some(m => m.name.toLowerCase() === p.name.toLowerCase()));
+  return [...mine, ...presets];
+}
+function drawQuickChips() {
+  const kind = logState.kind;
+  const choices = quickChoices(kind);
+  $('#quickChips').innerHTML = choices.slice(0, 14).map((c, i) =>
+    `<button type="button" class="chipbtn" data-q="${i}">${c.emoji || KINDS[kind].emoji} ${esc(c.name)}</button>`).join('');
+  $('#quickChips').querySelectorAll('[data-q]').forEach(b => b.onclick = () => fillQuick(choices[+b.dataset.q], true));
+  $('#quickNames').innerHTML = choices.map(c => `<option value="${esc(c.name)}">`).join('');
+  logForm.qname.placeholder = kind === 'out' ? 'e.g. Kebab, sushi, the pizza place' : 'e.g. Hot dogs, frozen pizza';
+}
+function fillQuick(c, force) {
+  if (!c) return;
+  logForm.qname.value = c.name;
+  logForm.qname.dataset.emoji = c.emoji || '';
+  for (const [field, key] of [['qprotein', 'protein'], ['qfiber', 'fiber'], ['qkr', 'kr']]) {
+    if (force || !logForm[field].value) logForm[field].value = c[key] ?? '';
+  }
+}
+// Typing a name we know fills in its numbers.
+logForm.qname.addEventListener('change', () => {
+  const t = logForm.qname.value.trim();
+  const mine = pastQuick(logState.kind).find(m => m.name.toLowerCase() === t.toLowerCase());
+  fillQuick(mine || Cook.quickMatch(t, logState.kind === 'out'), false);
+});
+// What's already logged on the chosen day (with ✕ to take one away).
+function drawLogDay() {
+  const day = logForm.date.value;
+  const list = allDinners().filter(e => e.day === day);
+  $('#logDay').innerHTML = list.length ? `<div class="sub">Already logged for ${esc(fmtDay(day))}</div>` + list.map((e, i) => {
+    const d = dinnerInfo(e);
+    return `<div class="histrow"><span style="flex:1">${d.emoji} ${esc(d.name)} <span class="mini">${esc(KINDS[e.kind]?.label || '')}</span></span>
+      <span class="who-pill">${esc(e.by)}</span><button type="button" class="del" data-undo="${i}" title="Remove">✕</button></div>`;
+  }).join('') : '';
+  $('#logDay').querySelectorAll('[data-undo]').forEach(b => b.onclick = () => {
+    const e = list[+b.dataset.undo];
+    if (!confirm(`Remove “${dinnerInfo(e).name}” from ${fmtDay(day)}?`)) return;
+    removeDinner(e);
+    setTimeout(drawLogDay, 300);
+  });
+}
+logForm.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => { logState.kind = b.dataset.kind; drawLog(); });
+$('#logSearch').addEventListener('input', drawPick);
+logForm.date.addEventListener('change', drawLogDay);
+$('#logClose').onclick = () => logDlg.close();
+logDlg.addEventListener('close', () => route());
+logForm.addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const day = logForm.date.value, k = logState.kind, me = Family.me();
+  if (!/^\d{4}-\d\d-\d\d$/.test(day)) return;
+  const note = logForm.note.value.trim() || undefined;
+  const num = v => (v === '' || v == null || !isFinite(+v) || +v < 0) ? null : Math.round(+v);
+  if (k === 'cooked' || k === 'leftovers') {
+    const r = recipes[logState.recipeId];
+    if (!r) { alert('Pick the recipe first (or choose ⚡ Something quick).'); return; }
+    if (k === 'cooked') {
+      const entry = { by: me, date: day, ts: keyDate(day).getTime() };
+      const min = num(logForm.lmin.value);
+      if (min > 0 && min <= 1440) entry.min = min;
+      if (note) entry.note = note;
+      await store.update('recipes', logState.recipeId, { cooked: [...(r.cooked || []), entry] });
+    } else {
+      await store.add('meals', { kind: 'leftovers', date: day, recipeId: logState.recipeId, note: note || null });
+    }
+  } else {
+    const name = logForm.qname.value.trim();
+    if (!name) { logForm.qname.focus(); return; }
+    const preset = Cook.quickMatch(name, k === 'out');
+    await store.add('meals', { kind: k, date: day, name, emoji: logForm.qname.dataset.emoji || preset?.emoji || KINDS[k].emoji,
+      protein: num(logForm.qprotein.value), fiber: num(logForm.qfiber.value), kr: num(logForm.qkr.value), note: note || null });
+  }
+  logDlg.close();
+});
+$('#logBtn').onclick = () => openLog();
+
+/* ───────── the calendar ───────── */
 function showCalendar(month) {
   const box = $('#calView');
   const now = new Date();
@@ -837,15 +1134,11 @@ function showCalendar(month) {
   const prefix = `${y}-${pad(m)}`;
   const prev = m === 1 ? `${y - 1}-12` : `${y}-${pad(m - 1)}`;
   const next = m === 12 ? `${y + 1}-01` : `${y}-${pad(m + 1)}`;
-  const entries = allCooked().filter(e => e.day.startsWith(prefix));
+  const entries = allDinners().filter(e => e.day.startsWith(prefix));
   const byDay = {};
   entries.forEach(e => (byDay[e.day] = byDay[e.day] || []).push(e));
-  const emojiOf = r => {
-    const p = Cook.find('protein', r.protein);
-    return (r.protein && !['none', 'veg'].includes(r.protein) ? p?.emoji : Cook.find('meal', r.meal)?.emoji) || '🍽️';
-  };
 
-  // The month grid, Monday first.
+  // The month grid, Monday first. Tap a day to log (or fix) its dinner.
   const first = new Date(y, m - 1, 1);
   const blanks = (first.getDay() + 6) % 7;
   const daysIn = new Date(y, m, 0).getDate();
@@ -854,18 +1147,16 @@ function showCalendar(month) {
   for (let d = 1; d <= daysIn; d++) {
     const key = `${prefix}-${pad(d)}`;
     const list = byDay[key] || [];
-    cells.push(`<div class="day${list.length ? ' has' : ''}${key === todayKey() ? ' today' : ''}"><span class="d">${d}</span>
-      ${list.slice(0, 3).map(e => `<a class="ce" href="#r=${encodeURIComponent(e.id)}" title="${esc(e.r.title)} (${esc(e.by)})">${emojiOf(e.r)} <span class="t">${esc(e.r.title)}</span></a>`).join('')}
-      ${list.length > 3 ? `<span class="more">+${list.length - 3} more</span>` : ''}</div>`);
+    const future = key > todayKey();
+    cells.push(`<div class="day${list.length ? ' has' : ''}${key === todayKey() ? ' today' : ''}${future ? ' future' : ''}" ${future ? '' : `data-day="${key}"`}><span class="d">${d}</span>
+      ${list.slice(0, 3).map(e => { const di = dinnerInfo(e); return `<span class="ce" title="${esc(di.name)} (${esc(e.by)})">${di.emoji} <span class="t">${esc(di.name)}</span></span>`; }).join('')}
+      ${list.length > 3 ? `<span class="more">+${list.length - 3}</span>` : ''}</div>`);
   }
 
-  // A few numbers for the month.
-  const counts = {};
-  entries.forEach(e => { counts[e.id] = (counts[e.id] || 0) + 1; });
-  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-  const who = {};
-  entries.forEach(e => { who[e.by] = (who[e.by] || 0) + 1; });
-  const total = allCooked().length;
+  const known = entries.map(dinnerInfo);
+  const withP = known.filter(d => d.protein != null), withF = known.filter(d => d.fiber != null);
+  const avg = (list, key) => list.length ? Math.round(list.reduce((s, d) => s + d[key], 0) / list.length) : null;
+  const kinds = Object.keys(KINDS).map(k => [k, entries.filter(e => e.kind === k).length]).filter(([, n]) => n);
 
   box.innerHTML = `
     <div class="card">
@@ -878,20 +1169,152 @@ function showCalendar(month) {
         ${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div class="wd">${d}</div>`).join('')}
         ${cells.join('')}
       </div>
+      <p class="hint" style="margin:10px 0 0">Tap a day to log its dinner. ${Object.entries(KINDS).map(([, v]) => `${v.emoji} ${v.label}`).join(' · ')}</p>
     </div>
     <div class="card">
-      <h3>📊 ${MONTH_NAMES[m - 1]} in the kitchen</h3>
+      <h3>📊 ${MONTH_NAMES[m - 1]} at the dinner table</h3>
       ${entries.length ? `
         <div class="stats">
-          <div class="stat"><b>${entries.length}</b><span>meals logged</span></div>
-          <div class="stat"><b>${Object.keys(counts).length}</b><span>different recipes</span></div>
-          ${top && top[1] > 1 ? `<div class="stat"><b>${top[1]}×</b><span>${esc(recipes[top[0]]?.title || '')}</span></div>` : ''}
+          <div class="stat"><b>${entries.length}</b><span>dinners logged</span></div>
+          ${kinds.map(([k, n]) => `<div class="stat"><b>${KINDS[k].emoji} ${n}</b><span>${esc(KINDS[k].label.toLowerCase())}</span></div>`).join('')}
+          ${withP.length ? `<div class="stat"><b>${nutChip(avg(withP, 'protein'), 'protein')}</b><span>protein per dinner, on average</span></div>` : ''}
+          ${withF.length ? `<div class="stat"><b>${nutChip(avg(withF, 'fiber'), 'fiber')}</b><span>fibre per dinner, on average</span></div>` : ''}
         </div>
-        <p class="statline">👩‍🍳 ${Object.entries(who).sort((a, b) => b[1] - a[1]).map(([p, c]) => `<b>${esc(p)}</b> ${c}×`).join(', ')}</p>
-        ${entries.slice().reverse().map(e => `<div class="calrow"><span class="dt">${WEEKDAYS[keyDate(e.day).getDay()].slice(0, 3)} ${keyDate(e.day).getDate()} ${MONTHS[m - 1]}</span>
-          <a href="#r=${encodeURIComponent(e.id)}">${emojiOf(e.r)} ${esc(e.r.title)}</a><span class="who-pill">${esc(e.by)}</span></div>`).join('')}`
-        : `<div class="empty"><span class="big">🗓️</span>Nothing logged in ${MONTH_NAMES[m - 1]}.${total ? '' : ' Open a recipe and tap <b>✅ We made this</b> to start filling the calendar.'}</div>`}
+        ${entries.slice().reverse().map(e => { const di = dinnerInfo(e); return dinnerRow(di,
+          `${nutChip(di.protein, 'protein')}${nutChip(di.fiber, 'fiber')}<span class="mini">${esc(KINDS[e.kind]?.label || '')}</span><span class="who-pill">${esc(e.by)}</span>`,
+          `${WEEKDAYS[keyDate(e.day).getDay()].slice(0, 3)} ${keyDate(e.day).getDate()} ${MONTHS[m - 1]}`); }).join('')}`
+        : `<div class="empty"><span class="big">🗓️</span>Nothing logged in ${MONTH_NAMES[m - 1]} yet. Tap <b>🍽️ Log dinner</b> or a day above.</div>`}
     </div>`;
+  box.querySelectorAll('[data-day]').forEach(c => c.onclick = () => openLog({ date: c.dataset.day }));
+}
+
+/* ───────── insights: what our dinners add up to ───────── */
+const PERIODS = [['30', 'Last 30 days'], ['90', 'Last 3 months'], ['365', 'Last year'], ['all', 'All time']];
+function showInsights(period) {
+  period = PERIODS.some(p => p[0] === period) ? period : '30';
+  const box = $('#insView');
+  const everything = allDinners();
+  const start = period === 'all' ? (everything[0]?.day || todayKey()) : dayKey(new Date(Date.now() - (+period - 1) * 864e5));
+  const list = everything.filter(e => e.day >= start && e.day <= todayKey());
+  const days = daysBetween(start, todayKey()) + 1;
+  const head = `<div class="partbar">${PERIODS.map(([k, l]) => `<a class="chipbtn${k === period ? ' on' : ''}" href="#ins=${k}">${l}</a>`).join('')}</div>`;
+  const goals = `<div class="card"><h3>🎯 Our goals per dinner (per person)</h3>
+    <div class="goalrow"><label>💪 Protein <input type="number" id="goalP" min="5" max="150" value="${targets.protein}"> g</label>
+    <label>🌾 Fibre <input type="number" id="goalF" min="2" max="60" value="${targets.fiber}"> g</label>
+    <button class="btn sm" id="goalSave">Save</button></div>
+    <p class="hint" style="margin:8px 0 0">A rough guide: adults need about 25–35 g fibre a day (so 8–12 g at dinner) and protein ≈ 0.8–1.2 g per kilo of body weight a day (25–40 g at dinner).
+    Colours: <span class="nut nut-great">reached</span> <span class="nut nut-ok">nearly</span> <span class="nut nut-low">low</span></p></div>`;
+  if (!list.length) {
+    box.innerHTML = head + `<div class="card"><div class="empty"><span class="big">📊</span>No dinners logged in this time yet.
+      Tap <b>🍽️ Log dinner</b> after each dinner (recipe, leftovers or something quick) and this page fills up.</div></div>` + goals;
+    wireGoals(); return;
+  }
+  const info = list.map(e => Object.assign({ e }, dinnerInfo(e)));
+  const avg = (arr, key) => { const v = arr.filter(d => d[key] != null); return v.length ? Math.round(v.reduce((s, d) => s + d[key], 0) / v.length) : null; };
+  const share = (arr, key) => { const v = arr.filter(d => d[key] != null); return v.length ? Math.round(100 * v.filter(d => d[key] >= targets[key]).length / v.length) : null; };
+  const loggedDays = new Set(list.map(e => e.day)).size;
+  const byKind = Object.fromEntries(Object.keys(KINDS).map(k => [k, info.filter(d => d.e.kind === k)]));
+  const homeMade = [...byKind.cooked, ...byKind.leftovers];
+  const avgP = avg(info, 'protein'), avgF = avg(info, 'fiber');
+
+  // Week by week (Monday to Sunday), the last 12 weeks of the period at most.
+  const weeks = [];
+  const monday = d => { const x = keyDate(d); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return dayKey(x); };
+  for (let w = monday(todayKey()); w >= monday(start) && weeks.length < 12; w = dayKey(new Date(keyDate(w).getTime() - 7 * 864e5))) {
+    const end = dayKey(new Date(keyDate(w).getTime() + 6 * 864e5));
+    const inWeek = info.filter(d => d.e.day >= w && d.e.day <= end);
+    weeks.unshift({ w, n: inWeek.length, protein: avg(inWeek, 'protein'), fiber: avg(inWeek, 'fiber') });
+  }
+  const weekBars = key => {
+    const max = Math.max(targets[key] * 1.5, ...weeks.map(x => x[key] || 0));
+    return `<div class="wkchart"><div class="goalline" style="bottom:${targets[key] / max * 100}%"><span>goal ${targets[key]} g</span></div>
+      ${weeks.map(x => `<div class="wk" title="Week of ${fmtDay(x.w)}: ${x[key] ?? '–'} g (${x.n} dinners)">
+        <div class="bar nut-${rate(x[key], targets[key])}" style="height:${x[key] ? Math.max(4, x[key] / max * 100) : 0}%"></div></div>`).join('')}</div>
+      <div class="barlbl">${weeks.map(x => `<span>${keyDate(x.w).getDate()}/${keyDate(x.w).getMonth() + 1}</span>`).join('')}</div>`;
+  };
+
+  // Best dinners for protein and fibre (each dish once).
+  const unique = arr => { const seen = new Set(); return arr.filter(d => !seen.has(d.name) && seen.add(d.name)); };
+  const best = key => unique(info.filter(d => d[key] != null).sort((a, b) => b[key] - a[key])).slice(0, 3);
+  // Leftovers: for each recipe, leftover dinners per time it was cooked (all time, for a fair number).
+  const leftoverStats = Object.entries(recipes).map(([id, r]) => {
+    const cooks = (r.cooked || []).length;
+    const lo = Object.values(meals).filter(m => m.kind === 'leftovers' && m.recipeId === id).length;
+    return { id, r, cooks, lo, per: cooks ? lo / cooks : 0 };
+  }).filter(x => x.cooks && x.lo).sort((a, b) => b.per - a.per || b.lo - a.lo);
+  // Most eaten in the period, and favourites we haven't had for a while.
+  const counts = {};
+  info.forEach(d => { counts[d.name] = counts[d.name] || { d, n: 0 }; counts[d.name].n++; });
+  const most = Object.values(counts).sort((a, b) => b.n - a.n).slice(0, 5);
+  const missed = Object.entries(recipes).filter(([, r]) => (r.cooked || []).length >= 2 && daysBetween(lastCooked(r), todayKey()) > 42)
+    .sort((a, b) => b[1].cooked.length - a[1].cooked.length).slice(0, 4);
+  const costed = info.filter(d => d.kr != null);
+
+  // A few things worth saying, in plain words.
+  const tips = [];
+  if (avgF != null && avgF < targets.fiber) {
+    const fibreStar = best('fiber')[0];
+    tips.push(`🌾 Fibre is the weak spot: ${share(info, 'fiber')}% of dinners reach ${targets.fiber} g.${fibreStar && fibreStar.fiber >= targets.fiber ? ` ${esc(fibreStar.name)} (${fibreStar.fiber} g) shows how: beans, lentils, whole grains and lots of veg.` : ' A can of beans or lentils adds about 4 g per person; whole-grain pasta or rice about 3 g.'}`);
+  }
+  if (avgP != null && avgP < targets.protein) tips.push(`💪 Protein averages ${avgP} g, under the ${targets.protein} g goal. Bigger portions of meat, fish, eggs, beans or a side of cottage cheese/skyr close the gap.`);
+  const qp = avg(byKind.quick, 'protein'), hp = avg(homeMade, 'protein'), qf = avg(byKind.quick, 'fiber'), hf = avg(homeMade, 'fiber');
+  if (byKind.quick.length >= 2 && qp != null && hp != null) tips.push(`⚡ Quick dinners average ${qp} g protein and ${qf ?? '?'} g fibre, against ${hp} g and ${hf ?? '?'} g for home-cooked ones.`);
+  if (byKind.leftovers.length) tips.push(`🥡 Leftovers covered ${byKind.leftovers.length} dinner${byKind.leftovers.length === 1 ? '' : 's'}: that's ${byKind.leftovers.length} night${byKind.leftovers.length === 1 ? '' : 's'} off cooking.`);
+  if (days >= 7 && loggedDays < days * 0.7) tips.push(`📝 ${loggedDays} of ${days} days have a dinner logged. The more you log, the truer these numbers get.`);
+  if (missed.length) tips.push(`🕰️ Not had for a while: ${missed.map(([id, r]) => `<a href="#r=${encodeURIComponent(id)}">${esc(r.title)}</a>`).join(', ')}.`);
+  if (avgP != null && avgF != null && avgP >= targets.protein && avgF >= targets.fiber) tips.unshift('🎉 On average you reach both goals. Nice work!');
+
+  const row = d => dinnerRow(d, `${nutChip(d.protein, 'protein')}${nutChip(d.fiber, 'fiber')}`);
+  box.innerHTML = head + `
+    <div class="card">
+      <h3>🍽️ ${list.length} dinner${list.length === 1 ? '' : 's'} logged</h3>
+      <div class="kindbar">${Object.keys(KINDS).filter(k => byKind[k].length).map(k =>
+        `<div class="k-${k}" style="flex:${byKind[k].length}" title="${KINDS[k].label}: ${byKind[k].length}">${KINDS[k].emoji} ${byKind[k].length}</div>`).join('')}</div>
+      <p class="statline">${Object.keys(KINDS).filter(k => byKind[k].length).map(k => `${KINDS[k].emoji} ${KINDS[k].label}: <b>${byKind[k].length}</b>`).join(' · ')}</p>
+      <p class="statline">📝 ${loggedDays} of ${days} days logged${costed.length ? ` · 💰 about ${Math.round(costed.reduce((s, d) => s + d.kr, 0) / costed.length)} kr per person per dinner` : ''}</p>
+    </div>
+    ${tips.length ? `<div class="card"><h3>💡 What stands out</h3>${tips.map(t => `<p class="statline">${t}</p>`).join('')}</div>` : ''}
+    <div class="card">
+      <h3>💪 Protein &amp; 🌾 fibre per dinner</h3>
+      <div class="stats">
+        <div class="stat"><b>${nutChip(avgP, 'protein') || '–'}</b><span>protein on average${share(info, 'protein') != null ? ` · ${share(info, 'protein')}% reach ${targets.protein} g` : ''}</span></div>
+        <div class="stat"><b>${nutChip(avgF, 'fiber') || '–'}</b><span>fibre on average${share(info, 'fiber') != null ? ` · ${share(info, 'fiber')}% reach ${targets.fiber} g` : ''}</span></div>
+      </div>
+      ${weeks.length > 1 ? `<div class="sub">💪 Protein, week by week</div>${weekBars('protein')}<div class="sub">🌾 Fibre, week by week</div>${weekBars('fiber')}` : ''}
+      <div class="row2" style="margin-top:12px">
+        <div><div class="sub">Best for protein</div>${best('protein').map(row).join('') || '<p class="hint">–</p>'}</div>
+        <div><div class="sub">Best for fibre</div>${best('fiber').map(row).join('') || '<p class="hint">–</p>'}</div>
+      </div>
+      ${byKind.quick.length || byKind.out.length ? `<div class="sub">By kind of dinner</div>
+        ${Object.keys(KINDS).filter(k => byKind[k].length).map(k => dinnerRow({ emoji: KINDS[k].emoji, name: KINDS[k].label },
+          `${nutChip(avg(byKind[k], 'protein'), 'protein')}${nutChip(avg(byKind[k], 'fiber'), 'fiber')}<span class="mini">${byKind[k].length} dinners</span>`)).join('')}` : ''}
+    </div>
+    <div class="card">
+      <h3>🥡 Leftovers</h3>
+      ${leftoverStats.length ? `<p class="statline">Leftover dinners per time a recipe is cooked (all time):</p>
+        ${leftoverStats.slice(0, 6).map(x => dinnerRow({ emoji: recipeEmoji(x.r), name: x.r.title, link: '#r=' + encodeURIComponent(x.id) },
+          `<b>${fmtPer(x.per)}</b><span class="mini">${x.lo} leftover dinner${x.lo === 1 ? '' : 's'} from ${x.cooks} cook${x.cooks === 1 ? '' : 's'}</span>`)).join('')}`
+        : '<p class="hint" style="margin:0">Log 🥡 Leftovers when you eat them, and you’ll see which recipes keep giving.</p>'}
+    </div>
+    <div class="card">
+      <h3>⭐ Most eaten</h3>
+      ${most.map(({ d, n }) => dinnerRow(d, `<b>${n}×</b>`)).join('')}
+    </div>` + goals;
+  wireGoals();
+}
+// One row in a list of dinners: the name on top, the little badges underneath (fits a phone).
+const dinnerRow = (d, chips, dt) => `<div class="calrow">${dt ? `<span class="dt">${dt}</span>` : ''}<div class="cr">
+  <div class="cr-name">${d.link ? `<a href="${d.link}">${d.emoji} ${esc(d.name)}</a>` : `<span>${d.emoji} ${esc(d.name)}</span>`}</div>
+  ${chips ? `<div class="cr-chips">${chips}</div>` : ''}</div></div>`;
+const fmtPer = x => `+${Math.round(x * 10) / 10} dinner${x >= 1.05 || x < 0.95 ? 's' : ''}`;
+function wireGoals() {
+  const b = $('#goalSave');
+  if (!b) return;
+  b.onclick = () => {
+    const p = Math.round(+$('#goalP').value), f = Math.round(+$('#goalF').value);
+    if (!(p > 0 && f > 0)) return;
+    store.set('settings', 'targets', { protein: p, fiber: f });
+  };
 }
 
 /* ───────── which page is showing ───────── */
@@ -899,17 +1322,20 @@ let cameFrom = '';       // the page before this one (so a recipe can go back to
 let lastHash = location.hash;
 function route() {
   const h = location.hash;
-  const r = h.match(/^#r=(.+)$/), b = h.match(/^#b=(.+)$/), cal = h.match(/^#cal(?:=(\d{4}-\d\d))?$/);
-  $('#shelfView').hidden = !!(r || b || cal);
+  const r = h.match(/^#r=(.+)$/), b = h.match(/^#b=(.+)$/), cal = h.match(/^#cal(?:=(\d{4}-\d\d))?$/), ins = h.match(/^#ins(?:=(\w+))?$/);
+  $('#shelfView').hidden = !!(r || b || cal || ins);
   $('#bookView').hidden = !b;
   $('#recipeView').hidden = !r;
   $('#calView').hidden = !cal;
-  $('#tabShelf').classList.toggle('on', !cal);
+  $('#insView').hidden = !ins;
+  $('#tabShelf').classList.toggle('on', !cal && !ins);
   $('#tabCal').classList.toggle('on', !!cal);
+  $('#tabIns').classList.toggle('on', !!ins);
   if (!r && wake) setWake(false);
   if (r) showRecipe(decodeURIComponent(r[1]));
   else if (b) showBook(decodeURIComponent(b[1]));
   else if (cal) showCalendar(cal[1]);
+  else if (ins) showInsights(ins[1]);
   else showShelf();
 }
 window.addEventListener('hashchange', () => {
@@ -1023,6 +1449,8 @@ function openEditor(r, id, note, bad) {
   for (const k of ['title', 'source', 'image', 'servings', 'description', 'notes']) form[k].value = r[k] || '';
   for (const k of ['prepMin', 'cookMin', 'totalMin']) form[k].value = r[k] || '';
   form.priceNok.value = r.priceNok || '';
+  form.proteinG.value = r.proteinG ?? '';
+  form.fiberG.value = r.fiberG ?? '';
   // One box per part. A part without a name can only come first, so later ones get a name.
   const all = Cook.parts(r, { noGuess: true });   // the recipe as written, not our guesses
   // An unnamed part that only has steps can stay unnamed if it holds all the steps.
@@ -1047,6 +1475,9 @@ function showEstimate() {
   const r = readForm();
   const p = Cook.price(r);
   form.priceNok.placeholder = p ? `About ${p.total} kr by our estimate` : '';
+  const n = Cook.nutrition(r);
+  form.proteinG.placeholder = n ? `About ${n.perServing.protein} g` : '';
+  form.fiberG.placeholder = n ? `About ${n.perServing.fiber} g` : '';
   const e = Cook.estimate(r);
   $('#edEst').textContent = e ? `⏱️ Our own estimate: about ${fmtMin(round5(e.total * kitchenSpeed().factor))}${e.overnight ? ' plus overnight' : ''}. Recipe sites tend to say less; the times you log when you cook it will make this better.` : '';
 }
@@ -1130,6 +1561,8 @@ function readForm() {
     totalMin: minutesField(form.totalMin.value) || ((prepMin || 0) + (cookMin || 0)) || null,
     ...flattenParts(readParts()),
     priceNok: Math.round(+form.priceNok.value) > 0 ? Math.round(+form.priceNok.value) : null,
+    proteinG: form.proteinG.value === '' ? null : Math.max(0, Math.round(+form.proteinG.value)),
+    fiberG: form.fiberG.value === '' ? null : Math.max(0, Math.round(+form.fiberG.value)),
     description: form.description.value.trim(),
     notes: form.notes.value.trim(),
     meal: form.meal.value, protein: form.protein.value, cuisine: form.cuisine.value,
@@ -1182,6 +1615,11 @@ store.ready.then(() => {
   const cloud = store.mode === 'cloud';
   $('#sync').className = 'badge ' + (cloud ? 'ok' : 'local');
   $('#sync').textContent = cloud ? '☁️ Synced' : '📴 This device only';
+});
+store.watch('meals', items => { meals = items; if (!ed.open && !logDlg.open) route(); });
+store.watch('settings', items => {
+  if (items.targets) targets = Object.assign({ protein: 30, fiber: 10 }, items.targets);
+  if (!ed.open && !logDlg.open) route();
 });
 store.watch('recipes', items => {
   recipes = items;

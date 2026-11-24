@@ -80,8 +80,12 @@ code readable and commented for a non-expert.
   out a realistic time from the ingredients and steps (knife work, batches, water boiling, oven heating,
   caramelising…); the page shows the family's own logged times first, else that estimate × a "kitchen
   speed" learned from logged cooks vs estimates; the recipe's own times are only shown for comparison.
+  `nutrition.js` (`Cook.nutrition`) estimates protein and fibre per serving (the family's priorities; goals per
+  dinner in collection `settings`, id `targets`) and holds presets for quick/takeaway dinners (`Cook.QUICK/OUT`).
   Shared in `family_items` (tool `cookbook`, collection `recipes`: also `favs` per person and
-  `cooked: [{by, date, ts, min}]`, which feeds the calendar, the stats and the time learning).
+  `cooked: [{by, date, ts, min}]`, which feeds the calendar, the stats and the time learning; collection
+  `meals`: every other dinner, `{kind: leftovers|quick|out, date, recipeId?, name, protein, fiber, kr}`).
+  The 🍽️ Log dinner box, `#cal` dinner log and `#ins` insights all read `allDinners()` (both together).
   Shelf arrangement, search, ticks and the cooking timer are per device.
   `tools/cookbook/claude-skill/cookbook-recipes/SKILL.md` is a claude.ai skill that makes Claude write
   recipes in the layout `parseText` reads best; update it if the paste format changes.
