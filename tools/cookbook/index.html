@@ -25,13 +25,16 @@
      Saved in Family.store('cookbook'):
        recipes → { title, source, image, description, servings, prepMin, cookMin, totalMin,
                    ingredients: [lines], steps: [lines], notes,
-                   meal, protein, cuisine, difficulty, cost   (ids from Cook.CATS in guess.js),
+                   meal, protein, cuisine, difficulty   (ids from Cook.CATS in guess.js),
+                   priceNok   what the whole dish costs, only if someone typed it in (otherwise
+                              prices.js works it out; its kr decides the Cost group),
                    tags: ['Vegetarian', …], favs: { Mitch: true },
                    cooked: [{ by, date: '2026-11-24', ts, min }]   (every time we made it; min = how long
                    it really took, if logged), ts, by }
      Times: what the recipe says is kept, but what we SHOW is realistic: your own logged times for
      that recipe, or else our estimate (timing.js) adjusted by how your logged cooks compare with it.
-     A line ending in ":" in ingredients or steps ("For the sauce:") is shown as a little heading.
+     A line ending in ":" in ingredients or steps ("The sauce:") starts a PART of the dish; the recipe
+     page has a button per part (the meat, the sauce, the rice) showing just its ingredients and steps.
      How the shelf is arranged, search and ticked-off ingredients stay on this device only.
 ═════════════════════════════════════════════════════════════════ -->
 
@@ -128,6 +131,10 @@ a.fact:hover{filter:brightness(.95);}
 .logrow input{border:2px solid var(--line);border-radius:10px;padding:7px 9px;}
 .rv-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:18px;align-items:start;margin-bottom:18px;}
 .rv-grid .card{margin:0;}
+.partbar{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px;}
+.part{border:2px dashed var(--line);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px;}
+.part-head{display:flex;gap:8px;align-items:center;}
+.part-head .field{flex:1;font-weight:700;}
 @media(max-width:760px){.rv-grid{grid-template-columns:1fr;}}
 .serv{display:flex;align-items:center;gap:8px;font-weight:800;color:var(--forest);margin-bottom:8px;}
 .serv button{width:32px;height:32px;border-radius:50%;border:2px solid var(--line);background:#fff;font-weight:800;color:var(--forest);}
@@ -263,6 +270,7 @@ dialog .field{width:100%;}
     </div>
     <p class="hint" id="edEst" style="margin:-4px 0 0"></p>
     <div class="cats" id="edCats"></div>
+    <label>What the whole dish costs in kr (leave empty to use our estimate)<input class="field" name="priceNok" type="number" min="0" max="20000"></label>
     <div>
       <div style="font-weight:800;font-size:.82rem;color:var(--ink-soft);margin-bottom:6px">Labels</div>
       <div class="taglist" id="edTags"></div>
@@ -271,8 +279,9 @@ dialog .field{width:100%;}
         <button type="button" class="btn ghost sm" id="edAddTag">Add</button>
       </div>
     </div>
-    <label>Ingredients, one per line<textarea class="field" name="ingredients" rows="8" placeholder="2 cups flour&#10;1 tsp salt&#10;For the sauce:&#10;…"></textarea></label>
-    <label>Steps, one per line<textarea class="field" name="steps" rows="8"></textarea></label>
+    <div style="font-weight:800;font-size:.82rem;color:var(--ink-soft)">Ingredients and steps. A dish with separate parts (the meat, the sauce, the rice) gets a box per part.</div>
+    <div id="edParts" style="display:flex;flex-direction:column;gap:10px"></div>
+    <button type="button" class="btn ghost sm" id="edAddPart" style="align-self:flex-start">➕ Add a part (e.g. the meat, the sauce, the rice)</button>
     <label>About it (optional)<textarea class="field" name="description" rows="2" maxlength="800"></textarea></label>
     <label>Our notes (optional)<textarea class="field" name="notes" rows="3" placeholder="Less chilli for the little one, doubles well…"></textarea></label>
     <div class="dlg-acts">
@@ -288,6 +297,7 @@ dialog .field{width:100%;}
 <script src="../../shared/family.js"></script>
 <script src="guess.js"></script>
 <script src="timing.js"></script>
+<script src="prices.js"></script>
 <script>
 const TOOL_ID = 'cookbook';
 const store = Family.store(TOOL_ID);
@@ -312,6 +322,12 @@ const safeUrl = u => (/^https?:\/\/[^\s"'<>]+$/i.test(String(u || '').trim()) ? 
    1. Your own logged times for this recipe (the average of the last 5), if there are any.
    2. Otherwise our estimate (timing.js) × how your kitchen compares with our estimates.
    3. Otherwise what the recipe says. */
+// Our estimates are worked out once per version of a recipe (a changed recipe is a new object).
+const remember = fn => { const m = new WeakMap(); return r => { if (!m.has(r)) m.set(r, fn(r)); return m.get(r); }; };
+const estimateOf = remember(r => Cook.estimate(r));
+const priceEstimate = remember(r => Cook.price(r));
+// What the whole dish costs: what someone typed in, otherwise our estimate from typical prices.
+const priceOf = r => r.priceNok || (priceEstimate(r) || {}).total || 0;
 const siteTime = r => r.totalMin || ((r.prepMin || 0) + (r.cookMin || 0)) || 0;
 const loggedMins = r => (r.cooked || []).filter(c => c.min > 0)
   .sort((a, b) => cookedDay(a).localeCompare(cookedDay(b))).map(c => c.min);
@@ -322,7 +338,7 @@ function kitchenSpeed() {
   if (speedCache) return speedCache;
   const ratios = [];
   for (const r of Object.values(recipes)) {
-    const e = Cook.estimate(r);
+    const e = estimateOf(r);
     if (e) loggedMins(r).forEach(m => ratios.push(m / e.total));
   }
   const n = ratios.length;
@@ -334,7 +350,7 @@ function kitchenSpeed() {
   return (speedCache = { factor, n });
 }
 function realTime(r) {
-  const est = Cook.estimate(r);
+  const est = estimateOf(r);
   const mine = loggedMins(r).slice(-5);
   if (mine.length) return { min: round5(mine.reduce((a, b) => a + b, 0) / mine.length), how: 'yours', n: mine.length, est };
   if (est) return { min: round5(est.total * kitchenSpeed().factor), how: 'estimate', est };
@@ -353,7 +369,7 @@ const domain = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } 
 // The same recipe link written slightly differently (tracking bits, trailing slash) counts as the same.
 const sameLink = u => String(u || '').toLowerCase().replace(/[?#].*$/, '').replace(/^https?:\/\/(www\.)?/, '').replace(/\/+$/, '');
 // What a recipe is, for one category: 'chicken' for protein; the time group for time.
-const valueOf = (r, cat) => cat === 'time' ? Cook.timeBucket(timeOf(r)) : r[cat] || '';
+const valueOf = (r, cat) => cat === 'time' ? Cook.timeBucket(timeOf(r)) : cat === 'cost' ? Cook.priceBand(priceOf(r)) : r[cat] || '';
 const allTags = () => {
   const set = new Set(Cook.TAGS);
   Object.values(recipes).forEach(r => (r.tags || []).forEach(t => set.add(t)));
@@ -588,6 +604,24 @@ setInterval(() => {
   if (el && start) el.textContent = fmtMin(Math.max(1, Math.round((Date.now() - start) / 60000)));
 }, 20000);
 
+/* The cost box on a recipe: what it costs in kr, and what makes up the price. */
+function costBox(r) {
+  const est = priceEstimate(r), own = r.priceNok;
+  const kr = own || (est && est.total);
+  if (!kr) return '';
+  const serves = Cook.servingsNumber(r.servings);
+  return `<div class="timebox">
+    <div class="tb-main">💰 About <b>${kr} kr</b> <span class="tb-how">${own ? 'what you said it costs' : 'our estimate from typical prices'}${serves ? ` · ${Math.round(kr / serves)} kr each for ${serves}` : ''}</span></div>
+    ${own && est ? `<div class="tb-line">we’d have guessed ${est.total} kr</div>` : ''}
+    ${est ? `<details><summary>What the price is made of</summary>
+      <div class="tb-parts">${est.lines.slice().sort((a, b) => b.kr - a.kr).map(x =>
+        `<span>${esc(x.line)} <b>${x.kr} kr</b>${x.known ? '' : ' <span class="mini">rough guess</span>'}</span>`).join('')}</div>
+      <div class="tb-note">Typical Norwegian supermarket prices for what goes into the dish (half a tub of cream counts as half),
+        so the shopping bill can be a bit more. If you know what it really costs, type it in under ✏️ Edit.</div>
+    </details>` : ''}
+  </div>`;
+}
+
 /* The time box on a recipe: our realistic time, what the recipe claims, and how we worked it out. */
 function timeBox(r) {
   const rt = realTime(r), site = siteTime(r), sp = kitchenSpeed(), e = rt.est;
@@ -623,6 +657,7 @@ function timeBox(r) {
 /* ───────── one recipe ───────── */
 const ticks = {};        // recipe id → { i3: true, s1: true }: what's been ticked off while cooking (this device only)
 const servingsNow = {};  // recipe id → servings being cooked for
+const partNow = {};      // recipe id → which part is showing (-1 = all)
 let logOpen = false;     // is the "we made this" date box showing?
 
 function showRecipe(id) {
@@ -651,12 +686,23 @@ function showRecipe(id) {
   const timer = timers()[id];
   const elapsed = timer ? Math.max(1, Math.round((Date.now() - timer) / 60000)) : 0;
 
-  const ingredients = (r.ingredients || []).map((line, i) => Cook.isHeading(line)
-    ? `<div class="sub">${esc(line.replace(/:$/, ''))}</div>`
-    : `<div class="ing${tk['i' + i] ? ' done' : ''}" data-tick="i${i}"><div class="check${tk['i' + i] ? ' done' : ''}"></div><span class="t">${esc(Cook.scale(line, factor))}</span></div>`).join('');
-  const steps = (r.steps || []).map((line, i) => Cook.isHeading(line)
-    ? `<li class="sub">${esc(line.replace(/:$/, ''))}</li>`
-    : `<li class="step${tk['s' + i] ? ' done' : ''}" data-tick="s${i}">${esc(line)}</li>`).join('');
+  // The parts of the dish (the meat, the sauce, the rice…). One part = an ordinary recipe.
+  const ps = Cook.parts(r);
+  const multi = ps.length > 1;
+  const pick = multi && partNow[id] < ps.length ? partNow[id] ?? -1 : -1;   // -1 = all parts
+  const nameOf = p => p.name || (p.ings.length ? 'The rest' : 'Putting it together');
+  const shown = pick >= 0 ? [ps[pick]] : ps;
+  const head = p => multi && pick < 0 ? `<div class="sub">${Cook.partEmoji(nameOf(p))} ${esc(nameOf(p))}</div>` : '';
+  const ingRow = it => `<div class="ing${tk['i' + it.i] ? ' done' : ''}" data-tick="i${it.i}"><div class="check${tk['i' + it.i] ? ' done' : ''}"></div><span class="t">${esc(Cook.scale(it.line, factor))}</span></div>`;
+  const stepRow = it => `<li class="step${tk['s' + it.i] ? ' done' : ''}" data-tick="s${it.i}">${esc(it.line)}</li>`;
+  const ingredients = shown.filter(p => p.ings.length).map(p => head(p) + p.ings.map(ingRow).join('')).join('');
+  // Steps in cooking order: the part whose first step comes first goes first.
+  const steps = shown.filter(p => p.steps.length).sort((a, b) => a.steps[0].i - b.steps[0].i).map(p => head(p) + `<ol class="steps">${p.steps.map(stepRow).join('')}</ol>`).join('');
+  const partBar = multi ? `<div class="partbar">
+    <button class="chipbtn${pick < 0 ? ' on' : ''}" data-part="-1">📋 All parts</button>
+    ${ps.map((p, k) => `<button class="chipbtn${pick === k ? ' on' : ''}" data-part="${k}">${Cook.partEmoji(nameOf(p))} ${esc(nameOf(p))}</button>`).join('')}
+  </div>` : '';
+  const forPart = pick >= 0 ? `: ${esc(nameOf(ps[pick]))}` : '';
 
   box.innerHTML = `
     <div class="rv-top">
@@ -671,6 +717,7 @@ function showRecipe(id) {
         ${r.description ? `<p class="rv-desc">${esc(r.description)}</p>` : ''}
         <div class="facts">${chips}</div>
         ${timeBox(r)}
+        ${costBox(r)}
         <div class="who-line">
           ${src ? `From <a href="${esc(src)}" target="_blank" rel="noopener noreferrer">${esc(domain(src))} ↗</a> · ` : ''}
           added by ${esc(r.by || '?')}${r.ts ? ', ' + esc(fmtDay(dayKey(new Date(r.ts)))) : ''}
@@ -690,18 +737,19 @@ function showRecipe(id) {
           <div class="tb-note">From starting to food on the table, if you know. That’s what teaches the estimates.</div></div>` : ''}
       </div>
     </div>
+    ${partBar}
     <div class="rv-grid">
       <div class="card">
-        <h3>🧺 Ingredients</h3>
+        <h3>🧺 Ingredients${forPart}</h3>
         ${base ? `<div class="serv"><button id="servLess" aria-label="Fewer servings">−</button>
           <span>Serves ${serves}${factor !== 1 ? ` <span class="mini">×${Math.round(factor * 100) / 100}</span>` : ''}</span>
           <button id="servMore" aria-label="More servings">+</button></div>`
           : r.servings ? `<div class="serv">Makes ${esc(r.servings)}</div>` : ''}
-        ${ingredients || '<div class="empty">No ingredients written down.</div>'}
+        ${ingredients || `<div class="empty">${pick >= 0 ? 'Nothing extra to get for this part.' : 'No ingredients written down.'}</div>`}
       </div>
       <div class="card">
-        <h3>👩‍🍳 Steps</h3>
-        ${steps ? `<ol class="steps">${steps}</ol>` : `<div class="empty">No steps written down.${src ? ` <a href="${esc(src)}" target="_blank" rel="noopener noreferrer">See the original ↗</a>` : ''}</div>`}
+        <h3>👩‍🍳 Steps${forPart}</h3>
+        ${steps || pick >= 0 && `<div class="empty">No separate steps for this part: see 📋 All parts.</div>` || `<div class="empty">No steps written down.${src ? ` <a href="${esc(src)}" target="_blank" rel="noopener noreferrer">See the original ↗</a>` : ''}</div>`}
       </div>
     </div>
     ${r.notes ? `<div class="card"><h3>📝 Our notes</h3><div class="notes">${esc(r.notes)}</div></div>` : ''}
@@ -710,6 +758,7 @@ function showRecipe(id) {
   // "← Bookshelf" goes back to the book you came from, if you came from one.
   if (/^#b=/.test(cameFrom)) box.querySelector('#rvBack').href = cameFrom;
   box.querySelector('#rvEdit').onclick = () => openEditor(r, id);
+  box.querySelectorAll('[data-part]').forEach(b => b.onclick = () => { partNow[id] = +b.dataset.part; showRecipe(id); });
   box.querySelectorAll('[data-tick]').forEach(el => el.onclick = () => { tk[el.dataset.tick] = !tk[el.dataset.tick]; showRecipe(id); });
   box.querySelector('#rvFav').onclick = () => store.update('recipes', id, { favs: Object.assign({}, r.favs, { [me]: !(r.favs || {})[me] }) });
   box.querySelector('#rvCooked').onclick = () => { logOpen = !logOpen; showRecipe(id); };
@@ -933,7 +982,7 @@ let editing = null;      // id of the recipe being edited (null = a new one)
 let edTags = [];         // labels ticked in the edit box
 
 function catSelects(r) {
-  $('#edCats').innerHTML = ['meal', 'protein', 'cuisine', 'difficulty', 'cost'].map(cat => `
+  $('#edCats').innerHTML = ['meal', 'protein', 'cuisine', 'difficulty'].map(cat => `
     <label>${esc(CATS[cat].label)}<select class="field" name="${cat}">
       <option value="">—</option>
       ${CATS[cat].items.map(([id, emoji, label]) => `<option value="${id}"${r[cat] === id ? ' selected' : ''}>${emoji} ${esc(label)}</option>`).join('')}
@@ -965,8 +1014,14 @@ function openEditor(r, id, note, bad) {
   $('#edDel').hidden = !id;
   for (const k of ['title', 'source', 'image', 'servings', 'description', 'notes']) form[k].value = r[k] || '';
   for (const k of ['prepMin', 'cookMin', 'totalMin']) form[k].value = r[k] || '';
-  form.ingredients.value = (r.ingredients || []).join('\n');
-  form.steps.value = (r.steps || []).join('\n');
+  form.priceNok.value = r.priceNok || '';
+  // One box per part. A part without a name can only come first, so later ones get a name.
+  edParts = Cook.parts(r).map((p, k) => ({
+    name: p.name || (k === 0 ? '' : p.ings.length ? 'The rest' : 'Putting it together'),
+    ings: p.ings.map(x => x.line), steps: p.steps.map(x => x.line),
+    order: p.steps.length ? p.steps[0].i : 1e9 }));   // where this part's steps come in the cooking order
+  if (!edParts.length) edParts = [{ name: '', ings: [], steps: [], order: 0 }];
+  drawParts();
   catSelects(r);
   edTags = [...(r.tags || [])];
   tagBoxes();
@@ -978,11 +1033,75 @@ function openEditor(r, id, note, bad) {
 
 // Our own time estimate, updated as the ingredients and steps are typed.
 function showEstimate() {
-  const e = Cook.estimate(readForm());
+  const r = readForm();
+  const p = Cook.price(r);
+  form.priceNok.placeholder = p ? `About ${p.total} kr by our estimate` : '';
+  const e = Cook.estimate(r);
   $('#edEst').textContent = e ? `⏱️ Our own estimate: about ${fmtMin(round5(e.total * kitchenSpeed().factor))}${e.overnight ? ' plus overnight' : ''}. Recipe sites tend to say less; the times you log when you cook it will make this better.` : '';
 }
-form.ingredients.addEventListener('input', () => showEstimate());
-form.steps.addEventListener('input', () => showEstimate());
+$('#edParts').addEventListener('input', () => showEstimate());
+
+/* ───────── the parts boxes in the edit box ───────── */
+let edParts = [];        // [{ name, ings: [lines], steps: [lines] }]
+function readParts() {
+  return [...document.querySelectorAll('#edParts .part')].map((el, k) => ({
+    order: (edParts[k] || {}).order ?? 1e9 + k,
+    name: el.querySelector('.pname').value.trim().replace(/:$/, ''),
+    ings: lines(el.querySelector('.ping').value),
+    steps: lines(el.querySelector('.pstep').value),
+  }));
+}
+function drawParts() {
+  const many = edParts.length > 1;
+  $('#edParts').innerHTML = edParts.map((p, k) => `
+    <div class="part">
+      <div class="part-head">
+        <span style="font-size:1.2rem">${many ? Cook.partEmoji(p.name || '') : '🍳'}</span>
+        <input class="field pname" maxlength="40" value="${esc(p.name)}"
+          placeholder="${many ? (k === 0 ? 'Name, e.g. The meat (or leave empty)' : 'Name, e.g. The sauce') : 'Name of this part (only needed if there are several)'}">
+        ${many ? `<button type="button" class="del" data-delpart="${k}" title="Remove this part">✕</button>` : ''}
+      </div>
+      <div class="row2">
+        <label>Ingredients, one per line<textarea class="field ping" rows="${many ? 4 : 8}" placeholder="${k === 0 ? '2 cups flour&#10;1 tsp salt' : ''}">${esc(p.ings.join('\n'))}</textarea></label>
+        <label>Steps, one per line<textarea class="field pstep" rows="${many ? 4 : 8}">${esc(p.steps.join('\n'))}</textarea></label>
+      </div>
+    </div>`).join('');
+  $('#edParts').querySelectorAll('[data-delpart]').forEach(b => b.onclick = () => {
+    const k = +b.dataset.delpart;
+    edParts = readParts();
+    const p = edParts[k];
+    if ((p.ings.length || p.steps.length) && !confirm(`Remove ${p.name ? '“' + p.name + '”' : 'this part'} and its ingredients and steps?`)) return;
+    edParts.splice(k, 1);
+    drawParts(); showEstimate();
+  });
+}
+$('#edAddPart').onclick = () => {
+  edParts = readParts();
+  edParts.push({ name: '', ings: [], steps: [], order: 1e9 + edParts.length });
+  drawParts();
+  const names = $('#edParts').querySelectorAll('.pname');
+  names[names.length - 1].focus();
+};
+// The parts boxes → the recipe's ingredient and step lists, with "The sauce:" headings between parts.
+function flattenParts(list) {
+  const ingredients = [], steps = [];
+  list = list.filter(p => p.name || p.ings.length || p.steps.length);
+  // Only the first part may go without a name (its lines come before any heading).
+  list.forEach((p, k) => { p.name = p.name || (k === 0 ? '' : `Part ${k + 1}`); });
+  list.forEach(p => {
+    if (p.name && p.ings.length) ingredients.push(p.name + ':');
+    ingredients.push(...p.ings);
+  });
+  // Steps keep their cooking order (the sauce may be made first even if the meat is listed first).
+  const unnamedFirst = (a, b) => (a.name ? 1 : 0) - (b.name ? 1 : 0) || a.order - b.order;
+  list.slice().sort(unnamedFirst).forEach(p => {
+    if (p.name && p.steps.length) steps.push(p.name + ':');
+    steps.push(...p.steps);
+  });
+  // A heading with nothing under it at the very end is just noise.
+  while (ingredients.length && Cook.isHeading(ingredients[ingredients.length - 1])) ingredients.pop();
+  return { ingredients, steps };
+}
 
 const lines = text => String(text || '').split('\n').map(s => s.trim()).filter(Boolean);
 const minutesField = v => { const n = Math.round(+v); return n > 0 ? n : null; };
@@ -995,12 +1114,12 @@ function readForm() {
     servings: form.servings.value.trim(),
     prepMin, cookMin,
     totalMin: minutesField(form.totalMin.value) || ((prepMin || 0) + (cookMin || 0)) || null,
-    ingredients: lines(form.ingredients.value),
-    steps: lines(form.steps.value),
+    ...flattenParts(readParts()),
+    priceNok: Math.round(+form.priceNok.value) > 0 ? Math.round(+form.priceNok.value) : null,
     description: form.description.value.trim(),
     notes: form.notes.value.trim(),
     meal: form.meal.value, protein: form.protein.value, cuisine: form.cuisine.value,
-    difficulty: form.difficulty.value, cost: form.cost.value,
+    difficulty: form.difficulty.value, cost: null,   // cost now comes from the kr price
     tags: edTags,
   };
 }

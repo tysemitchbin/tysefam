@@ -68,7 +68,13 @@ code readable and commented for a non-expert.
   Machine (many sites block cloud servers), reads schema.org Recipe JSON-LD, or sends back the page text.
   `guess.js` (`window.Cook`) reads pasted text and guesses meal, main protein, cuisine, time, difficulty,
   cost and labels by keyword spotting (English + Norwegian); the edit box shows the guesses before saving.
-  Category ids in `Cook.CATS` are what's saved, so don't rename them. `timing.js` (`Cook.estimate`) works
+  Category ids in `Cook.CATS` are what's saved, so don't rename them. Parts of a dish (the meat, the
+  sauce, the rice) are heading lines ending in ":" inside `ingredients`/`steps`; `Cook.parts()` pairs them
+  up, the recipe page has a button per part and the edit box a box per part (steps keep cooking order);
+  the edge function reads ingredient groups from WP Recipe Maker / Tasty Recipes pages. `prices.js`
+  (`Cook.price`) costs a dish in kr from typical Norwegian prices; the Cost group is the kr band (under 100,
+  100–200 … over 500), or `priceNok` if someone typed the real cost. **Update its PRICES table now and then.**
+  `timing.js` (`Cook.estimate`) works
   out a realistic time from the ingredients and steps (knife work, batches, water boiling, oven heating,
   caramelising…); the page shows the family's own logged times first, else that estimate × a "kitchen
   speed" learned from logged cooks vs estimates; the recipe's own times are only shown for comparison.

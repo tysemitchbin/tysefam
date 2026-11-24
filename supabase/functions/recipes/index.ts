@@ -246,6 +246,44 @@ function fromSchema(r: Record<string, unknown>) {
   };
 }
 
+/* ───────── ingredient parts ("For the sauce") ─────────
+   The tidy copy usually lists all ingredients in one list, losing "For the sauce:" and friends.
+   The two most common recipe plugins show the groups on the page, so we read them from there:
+   WP Recipe Maker (wprm-…) and Tasty Recipes (tasty-recipes-…). Returns the ingredient lines with
+   "Name:" headings between the groups, or null when the page doesn't have groups. */
+function ingredientGroups(html: string, expected: number): string[] | null {
+  const out: string[] = [];
+  let count = 0, named = 0;
+  // WP Recipe Maker: <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-group-name …">For the sauce</h4> <li class="wprm-recipe-ingredient">…
+  const starts = [...html.matchAll(/class="(?:[^"]*\s)?wprm-recipe-ingredient-group(?=[\s"])[^"]*"/g)].map(m => m.index!);
+  for (let k = 0; k < starts.length && count < expected; k++) {
+    const part = html.slice(starts[k], starts[k + 1] ?? starts[k] + 40_000);
+    const name = clean(part.match(/class="[^"]*wprm-recipe-group-name[^"]*"[^>]*>([\s\S]*?)<\/(?:h\d|div|span|p)>/)?.[1] ?? '');
+    const items = [...part.matchAll(/<li[^>]*class="[^"]*\bwprm-recipe-ingredient\b[^"]*"[^>]*>([\s\S]*?)<\/li>/g)]
+      .map(m => clean(m[1].replace(/<span[^>]*wprm-checkbox[\s\S]*?<\/span>/g, ''))).filter(Boolean);
+    if (!items.length) continue;
+    if (name) { out.push(name.replace(/:?$/, ':')); named++; }
+    out.push(...items); count += items.length;
+  }
+  if (named && count >= expected * 0.8) return out;
+
+  // Tasty Recipes: <div class="tasty-recipes-ingredients"> … <h4>For the sauce</h4><ul><li>…</li></ul> …
+  const box = html.match(/class="[^"]*tasty-recipes-ingredients[^"]*"[\s\S]*?(?=class="[^"]*tasty-recipes-instructions)/)?.[0];
+  if (box) {
+    const lines: string[] = [];
+    let n = 0, heads = 0;
+    for (const m of box.matchAll(/<(h[2-6]|p)[^>]*>([\s\S]*?)<\/\1>|<li[^>]*>([\s\S]*?)<\/li>/g)) {
+      if (m[3] != null) { const t = clean(m[3]); if (t) { lines.push(t); n++; } }
+      else {
+        const t = clean(m[2]);
+        if (t && t.length < 50 && !/\d/.test(t) && (m[1] !== 'p' || /<strong|<b>/.test(m[2]))) { lines.push(t.replace(/:?$/, ':')); heads++; }
+      }
+    }
+    if (heads && n >= expected * 0.8) return lines;
+  }
+  return null;
+}
+
 /* ───────── 2. no tidy copy: the page's title, picture and plain text ───────── */
 function meta(html: string, name: string) {
   const re = new RegExp(`<meta[^>]+(?:property|name)\\s*=\\s*["']${name}["'][^>]*>`, 'i');
@@ -286,6 +324,8 @@ Deno.serve(async (req) => {
         const recipe = fromSchema(schema);
         if (recipe.ingredients.length || recipe.steps.length) {
           if (!recipe.image) recipe.image = meta(page.html, 'og:image');
+          const groups = ingredientGroups(page.html, recipe.ingredients.length);
+          if (groups) recipe.ingredients = groups;
           return json({ found: 'schema', via: page.via, source, recipe });
         }
       }

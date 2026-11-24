@@ -11,7 +11,8 @@
      ACTIVE   each step you're busy with: frying, stirring, kneading, plus ~1½ min per step
               for reading, moving things and tasting
      WAITING  simmering, baking, resting, rising, marinating: you can do some prep meanwhile,
-              so a bit of the prep overlaps with the waiting
+              so a bit of the prep overlaps with the waiting; and when a dish has parts
+              (the meat, the sauce, the rice) their waiting mostly happens at the same time
      + 5 min to get started (pans out, hob on) and 3 min to dish up
 
    Then the page (index.html) learns from you: when you log "We made this" with how long it
@@ -220,8 +221,19 @@
     for (const line of ings) prep += prepFor(line, why);
 
     let active = 5 + 3;                                   // getting started + dishing up
-    let waiting = 0;
-    for (const s of steps) { const t = stepTime(s, why, flags); active += t.active; waiting += t.waiting; }
+    // Each part of the dish (the meat, the sauce, the rice) has its own steps. You only have one
+    // pair of hands, so busy time adds up, but parts can wait at the same time: the rice simmers
+    // while the sauce reduces. So the longest wait counts in full and the others only a little.
+    const waits = [];
+    for (const part of C.parts(r)) {
+      let w = 0;
+      for (const st of part.steps) { const t = stepTime(st.line, why, flags); active += t.active; w += t.waiting; }
+      waits.push(w);
+    }
+    waits.sort((a, b) => b - a);
+    const rest = waits.slice(1).reduce((a, b) => a + b, 0);
+    let waiting = (waits[0] || 0) + rest * 0.3;
+    if (rest >= 10) why.push('The parts can cook at the same time, so their waiting overlaps');
 
     // The oven heats while you prep: only the part that's left over counts.
     if (flags.oven) {

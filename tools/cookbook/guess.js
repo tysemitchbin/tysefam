@@ -42,8 +42,10 @@
       ['long', '🕰️', 'Over 1½ hours'] ] },
     difficulty: { label: 'Difficulty', items: [
       ['easy', '🟢', 'Easy'], ['medium', '🟡', 'Some effort'], ['hard', '🔴', 'A project'] ] },
+    // What the whole dish costs (as the recipe is written), worked out in prices.js or typed in.
     cost: { label: 'Cost', items: [
-      ['cheap', '💰', 'Cheap'], ['mid', '💰💰', 'Middling'], ['pricey', '💰💰💰', 'Pricey'] ] },
+      ['n100', '🪙', 'Under 100 kr'], ['n200', '💰', '100–200 kr'], ['n300', '💰', '200–300 kr'],
+      ['n400', '💰', '300–400 kr'], ['n500', '💰', '400–500 kr'], ['n500+', '💎', 'Over 500 kr'] ] },
   };
   // Little extra labels that can be ticked on any recipe (people can add their own too).
   const TAGS = ['Vegetarian', 'Vegan', 'Kid-friendly', 'One-pot', 'Instant Pot', 'Slow cooker', 'Air fryer',
@@ -53,6 +55,12 @@
   function find(cat, id) {
     const it = (CATS[cat]?.items || []).find(i => i[0] === id);
     return it ? { id: it[0], emoji: it[1], label: it[2] } : null;
+  }
+
+  // 180 (kr) → 'n200'  (which cost group a dish is in)
+  function priceBand(kr) {
+    if (!kr) return '';
+    return kr < 100 ? 'n100' : kr < 200 ? 'n200' : kr < 300 ? 'n300' : kr < 400 ? 'n400' : kr < 500 ? 'n500' : 'n500+';
   }
 
   function timeBucket(min) {
@@ -252,12 +260,7 @@
       out.difficulty = points < 19 ? 'easy' : points < 33 ? 'medium' : 'hard';
     }
 
-    // COST: pricey ingredients push it up, cheap staples pull it down.
-    let cost = ings.length * 0.25;
-    ings.forEach(l => {
-      for (const [re, n] of PRICES) if (re.test(l)) { cost += MINOR.test(l) ? Math.min(n, 0.3) : n; break; }
-    });
-    out.cost = cost < 3 ? 'cheap' : cost < 7.5 ? 'mid' : 'pricey';
+    // COST: worked out from real prices in prices.js (Cook.price), so nothing to guess here.
 
     // TAGS: vegetarian/vegan from the ingredients, plus give-away words (slow cooker, grill…).
     const tags = new Set();
@@ -274,15 +277,6 @@
     out.tags = [...tags];
     return out;
   }
-
-  // Price weights, checked in order (the first that matches a line counts).
-  const PRICES = [
-    [words('tenderloin', 'fillet steak', 'filet mignon', 'indrefilet', 'ytrefilet', 'entrecote', 'ribeye', 'rib-eye', 'wagyu', 'truffle', 'trøffel', 'lobster', 'hummer', 'kamskjell', 'scallop', 'caviar', 'kaviar\\b', 'løyrom'), 5],
-    [words('sirloin', 'steak', 'biff\\b', 'lamb', 'lamme', 'reinsdyr', 'reindeer', 'finnbiff', 'elg', 'venison', 'hjort', 'duck', 'and(?:e)?bryst', 'kveite', 'halibut', 'crab', 'krabbe', 'saffron', 'safran', 'pinnekjøtt', 'veal', 'kalv', 'short rib', 'prawn', 'scampi', 'king prawn', 'monkfish', 'breiflabb'), 3],
-    [words('salmon', 'laks', 'shrimp', 'reke', 'cod\\b', 'torsk', 'skrei', 'pine nut', 'pinjekjerne', 'prosciutto', 'parma', 'serrano', 'brisket', 'beef', 'storfe', 'okse', 'wine', 'vin\\b', 'port\\b', 'cognac', 'brandy', 'vanilla bean', 'vaniljestang', 'burrata', 'pistach', 'macadamia', 'pecan', 'mussel', 'blåskjell', 'gruy', 'parmigiano', 'manchego', 'chorizo', 'tuna steak'), 2],
-    [words('chicken', 'kylling', 'pork', 'svin', 'bacon', 'kjøttdeig', 'mince', 'karbonade', 'sausage', 'pølse', 'parmesan', 'cheese', 'ost\\b', 'mozzarella', 'feta', 'halloumi', 'cashew', 'cashew', 'avocado', 'mango', 'cream', 'fløte', 'rømme', 'turkey', 'kalkun', 'fish', 'fisk', 'tofu', 'nuts', 'nøtter', 'mandler', 'almond'), 1],
-    [words('beans?\\b', 'bønne', 'lentil', 'linse', 'chickpea', 'kikert', 'rice\\b', 'ris\\b', 'pasta', 'spaghetti', 'noodle', 'nudler', 'potato', 'potet', 'oats', 'havre', 'flour', 'mel\\b', 'hvetemel', 'cabbage', 'kål', 'carrot', 'gulrot', 'onion', 'løk', 'eggs?\\b', 'egg\\b', 'canned tomato', 'hermetiske tomater', 'tomatoes, canned', 'chopped tomatoes', 'hakkede tomater', 'bread', 'brød', 'lapskaus', 'kålrot'), -0.6],
-  ];
 
   // "4 eggs" in an omelette counts; "1 egg" to brush on pastry hardly does.
   function eggWeight(line) {
@@ -342,8 +336,68 @@
 
   // "For the sauce:" style lines split a list into parts.
   function isHeading(line) {
-    return /:$/.test(line) && line.length < 60 && !/\d+\s*(g|ml|dl|cups?|tbsp|tsp|ss|ts)\b/i.test(line);
+    line = String(line || '').trim();
+    if (/:$/.test(line)) return line.length < 60 && !/\d+\s*(g|ml|dl|cups?|tbsp|tsp|ss|ts)\b/i.test(line);
+    // "SAUCE", "For the sauce", "Til sausen": short, no amounts, no full stop, no colon in the middle.
+    if (line.length > 40 || /\d|:|[.!?,;]$/.test(line)) return false;
+    return /^[A-ZÆØÅ][A-ZÆØÅ &'-]{3,}$/.test(line) || /^(for|to make|til)\s+\S/i.test(line);
   }
+
+  /* ───────── parts of a dish (the meat, the sauce, the rice…) ─────────
+     A recipe keeps one list of ingredients and one of steps; a heading line ending in ":"
+     ("The sauce:") starts a part. Cook.parts(recipe) pairs each part's ingredients with its steps
+     (ingredient "For the sauce:" goes with step "Make the sauce:"). */
+  // "For the sauce:" → "The sauce"
+  const partName = h => {
+    let n = String(h).replace(/:$/, '').replace(/^(for|to make|til)\s+/i, '').trim();
+    if (n === n.toUpperCase()) n = n.toLowerCase();          // "SAUCE" → "sauce"
+    return n.replace(/^./, c => c.toUpperCase());
+  };
+  // What two headings must share to be the same part: "Make the meatballs" ≈ "The meatballs" ≈ "Meatball".
+  const partKey = name => String(name).toLowerCase().replace(/:$/, '')
+    .replace(/^(for|to make|til|make|making|prepare|preparing|cook|cooking|assemble|lag|lage|tilbered|kok|stek)\s+/, '')
+    .replace(/^(the|a|an|your|den|det|de)\s+/, '').replace(/(es|s|en|er|ene)$/, '').trim();
+  function splitGroups(lines) {
+    const groups = [{ name: '', items: [] }];
+    (lines || []).forEach((l, i) => {
+      if (isHeading(l)) groups.push({ name: partName(l), items: [] });
+      else groups[groups.length - 1].items.push({ line: l, i });
+    });
+    return groups.filter((g, k) => k > 0 || g.items.length);
+  }
+  // → [{ name: 'The sauce', ings: [{ line, i }], steps: [{ line, i }] }, …]   (i = position in the full list)
+  function parts(r) {
+    const out = splitGroups(r.ingredients).map(g => ({ name: g.name, ings: g.items, steps: [] }));
+    const named = name => {
+      const k = partKey(name);
+      return out.find(p => p.name && partKey(p.name) === k) ||
+        out.find(p => p.name && k && partKey(p.name) && (partKey(p.name).includes(k) || k.includes(partKey(p.name))));
+    };
+    for (const g of splitGroups(r.steps)) {
+      // A step that starts "Make the sauce: …" belongs to the sauce, wherever it is.
+      const own = [], loose = [];
+      g.items.forEach(it => {
+        const m = it.line.match(/^([^:.]{3,30}):\s+\S/);
+        const p = m && named(m[1]);
+        if (p) own.push([p, it]); else loose.push(it);
+      });
+      own.forEach(([p, it]) => p.steps.push(it));
+      if (!loose.length) continue;
+      const p = g.name ? named(g.name) : out.find(p => !p.name);
+      if (p) p.steps = p.steps.concat(loose);
+      else out.push({ name: g.name, ings: [], steps: loose });
+    }
+    out.forEach(p => p.steps.sort((a, b) => a.i - b.i));
+    return out;
+  }
+  // A little picture for a part, from its name.
+  const PART_EMOJI = [[/chicken|kylling/i, '🍗'], [/meat|kjøtt|beef|biff|steak|pork|svin|lamb|lam\b|mince|kjøttdeig|bolle|ball/i, '🥩'],
+    [/fish|fisk|salmon|laks|torsk|cod|prawn|shrimp|reke/i, '🐟'], [/sauce|saus|gravy|jus|curry/i, '🥫'], [/rice|ris\b/i, '🍚'],
+    [/noodle|nudler|pasta|spaghetti/i, '🍝'], [/potato|potet|mash|mos\b/i, '🥔'], [/marinade|mariner|rub\b|krydder/i, '🧂'],
+    [/dressing|salad|salat|slaw/i, '🥗'], [/dough|deig|bread|brød|crust|bunn|pastry|base/i, '🥖'], [/topping|garnish|pynt|serve|servering/i, '🌿'],
+    [/filling|fyll/i, '🥟'], [/frosting|icing|glaze|glasur|syrup|sirup|cream|krem/i, '🍯'], [/veg|grønnsak/i, '🥦'],
+    [/egg/i, '🥚'], [/together|assembl|montering|finish|sammen/i, '🍽️']];
+  const partEmoji = name => (PART_EMOJI.find(([re]) => re.test(name)) || [0, '🍳'])[1];
   const looksLikeHeading = (line, re) => line.length < 50 && re.test(line.replace(/^[#*\s]+|[:*\s]+$/g, ''));
 
   // Pasted text → a recipe (title, ingredients, steps, notes, servings and times when written down).
@@ -434,7 +488,7 @@
         l = l + ' ' + list[++i].replace(BULLET, '').trim();
       }
       if (/^(?:ingredients?|ingredienser)$/i.test(l)) continue;
-      out.push(l);
+      out.push(isHeading(l) && !/:$/.test(l) ? l + ':' : l);   // part headings always end in a colon
     }
     return out.slice(0, 120);
   }
@@ -444,6 +498,7 @@
     for (const raw of list) {
       const l = raw.replace(BULLET, '').replace(STEP_NUMBER, '').trim();
       if (!l || /^\d+$/.test(l)) continue;
+      if (isHeading(l)) { out.push(/:$/.test(l) ? l : l + ':'); continue; }
       if (out.length && /^[a-zæøå(]/.test(l) && !/[.!:]$/.test(out[out.length - 1])) out[out.length - 1] += ' ' + l;
       else out.push(l);
     }
@@ -504,5 +559,5 @@
   // "4 servings" → 4,  "6-8 personer" → 6
   const servingsNumber = s => { const m = String(s || '').match(/\d+/); return m ? +m[0] : 0; };
 
-  window.Cook = { CATS, TAGS, find, timeBucket, parseText, fromSchema, guess, scale, isHeading, servingsNumber, parseDuration };
+  window.Cook = { CATS, TAGS, find, timeBucket, priceBand, parts, partName, partEmoji, parseText, fromSchema, guess, scale, isHeading, servingsNumber, parseDuration };
 })();
