@@ -292,6 +292,10 @@
   }
   function pickMeal(title, meta) {
     const named = (meta || '').toLowerCase();
+    // "Teriyaki chicken bowls with pickled cucumber": the dish is what comes before "with".
+    const dish = title.split(/\s+(?:with|med|and|og|served with|&)\s+/i)[0];
+    if (dish !== title) for (const [id, re] of MEAL_WORDS) if (re.test(dish)) return id;
+    if (dish !== title && Object.values(MEAT).some(re => re.test(dish))) return 'dinner';
     for (const [id, re] of MEAL_WORDS) if (re.test(title)) return id;
     // Norwegian puts the kind of dish at the END of a word: fiskesuppe, potetsalat, sjokoladekake.
     for (const [id, re] of MEAL_ENDINGS) if (re.test(title)) return id;

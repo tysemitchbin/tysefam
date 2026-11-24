@@ -81,6 +81,8 @@ code readable and commented for a non-expert.
   Shared in `family_items` (tool `cookbook`, collection `recipes`: also `favs` per person and
   `cooked: [{by, date, ts, min}]`, which feeds the calendar, the stats and the time learning).
   Shelf arrangement, search, ticks and the cooking timer are per device.
+  `tools/cookbook/claude-skill/cookbook-recipes/SKILL.md` is a claude.ai skill that makes Claude write
+  recipes in the layout `parseText` reads best; update it if the paste format changes.
 - `tools/packing/`: shared packing checklists in `family_items` (tool `packing`: `lists`, `items`, `trip`).
 - `tools/energy/`: Tibber prices + usage per house, plus a Bills list. The page calls the `energy`
   edge function (`supabase/functions/energy/`), which reads Tibber/Elvia tokens from
