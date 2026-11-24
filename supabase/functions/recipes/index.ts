@@ -12,6 +12,13 @@
 //      picks out the ingredients and steps the same way it does for pasted text.
 // Sorting into cost / difficulty / protein / cuisine happens on the page (tools/cookbook/guess.js),
 // so pasted recipes and links are sorted the same way.
+//
+// Getting the page: many recipe sites refuse requests from cloud servers (where this runs),
+// even though they're happy to show the page to a phone. So we try, in order:
+//   a. the site itself, dressed up like a normal browser,
+//   b. r.jina.ai, a free public "reader" service that opens the page in a real browser for us,
+//   c. the Internet Archive's saved copy (web.archive.org), if it has one.
+// Only the recipe's web address is sent to b and c, nothing about the family.
 
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
@@ -56,22 +63,24 @@ function tidyUrl(raw: unknown) {
 }
 
 /* ───────── fetching the page ───────── */
-async function fetchPage(url: string) {
-  const res = await fetch(url, {
-    redirect: 'follow',
-    signal: AbortSignal.timeout(15_000),
-    headers: {
-      // Some sites refuse anything that doesn't look like a normal browser.
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-      Accept: 'text/html,application/xhtml+xml',
-      'Accept-Language': 'en,nb;q=0.8,no;q=0.7',
-    },
-  });
-  if (res.status === 404) throw new Error('That page doesn’t exist (the site said 404).');
-  if (res.status === 401 || res.status === 403) throw new Error('That site won’t let us read its page. Copy the recipe text and paste it in instead.');
-  if (!res.ok) throw new Error(`The site answered with an error (${res.status}).`);
+// Headers a real Chrome browser sends when you open a page. Some sites refuse anything less.
+const BROWSER = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-GB,en;q=0.9,nb;q=0.8,no;q=0.7',
+  'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'none', 'Sec-Fetch-User': '?1',
+  'Upgrade-Insecure-Requests': '1',
+};
+
+class Missing extends Error {}   // the page really doesn't exist (404): no point trying elsewhere
+
+// One try at reading a page. Throws when the answer isn't a usable web page.
+async function fetchPage(url: string, headers: Record<string, string>, seconds = 15) {
+  const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(seconds * 1000), headers });
+  if (res.status === 404 || res.status === 410) throw new Missing('That page doesn’t exist (the site said 404). Check the link?');
+  if (!res.ok) throw new Error(`answered ${res.status}`);
   const type = res.headers.get('content-type') || '';
-  if (type && !/html|xml|text/i.test(type)) throw new Error('That link isn’t a web page (maybe a picture or PDF?).');
+  if (type && !/html|xml|text/i.test(type)) throw new Missing('That link isn’t a web page (maybe a picture or PDF?).');
   // Read at most MAX_PAGE bytes.
   const reader = res.body!.getReader();
   const chunks: Uint8Array[] = [];
@@ -85,7 +94,36 @@ async function fetchPage(url: string) {
   const bytes = new Uint8Array(size);
   let at = 0;
   for (const c of chunks) { bytes.set(c.subarray(0, size - at), at); at += c.length; }
-  return { html: new TextDecoder('utf-8').decode(bytes), finalUrl: res.url || url };
+  const html = new TextDecoder('utf-8').decode(bytes);
+  // A "checking your browser" / "access denied" page instead of the recipe counts as a refusal.
+  if (html.length < 60_000 && /just a moment|attention required|access denied|cf-challenge|captcha|are you a robot|enable javascript and cookies/i.test(html)
+      && !/recipeIngredient/i.test(html)) throw new Error('showed a robot check');
+  return html;
+}
+
+// Try the site, then the reader service, then the Internet Archive. Returns the first page that
+// has the tidy recipe copy, or else the best plain page we got.
+async function getPage(url: string) {
+  const tries: [string, () => Promise<string>][] = [
+    ['site', () => fetchPage(url, BROWSER)],
+    ['reader', () => fetchPage('https://r.jina.ai/' + url, { 'X-Return-Format': 'html', Accept: 'text/html' }, 30)],
+    ['archive', () => fetchPage('https://web.archive.org/web/2id_/' + url, { 'User-Agent': BROWSER['User-Agent'] }, 20)],
+  ];
+  let plain: { html: string; via: string } | null = null;
+  const problems: string[] = [];
+  for (const [via, get] of tries) {
+    try {
+      const html = await get();
+      if (jsonLdRecipe(html)) return { html, via };
+      plain = plain || { html, via };   // no tidy copy: keep it, but see if the next one does better
+    } catch (e) {
+      if (e instanceof Missing && via === 'site') throw e;
+      problems.push(`${via} ${(e as Error).name === 'TimeoutError' ? 'took too long' : (e as Error).message}`);
+    }
+  }
+  console.log(`recipes: ${new URL(url).hostname}: ${problems.join(', ') || 'no tidy copy'}${plain ? ' → used ' + plain.via : ''}`);
+  if (plain) return plain;
+  throw new Error('That site won’t let us read its page. Open it, copy the recipe (name, ingredients and steps) and paste that in instead.');
 }
 
 /* ───────── small text helpers ───────── */
@@ -240,23 +278,20 @@ Deno.serve(async (req) => {
       const link = tidyUrl(body?.url);
       if (!link) return json({ error: 'That doesn’t look like a web link. It should start with https://' }, 400);
       let page;
-      try { page = await fetchPage(link); }
-      catch (e) {
-        const msg = (e as Error).name === 'TimeoutError' ? 'The site took too long to answer.' : (e as Error).message;
-        return json({ error: msg }, 400);
-      }
+      try { page = await getPage(link); }
+      catch (e) { return json({ error: (e as Error).message }, 400); }
       const schema = jsonLdRecipe(page.html);
-      const source = page.finalUrl;
+      const source = link;
       if (schema) {
         const recipe = fromSchema(schema);
         if (recipe.ingredients.length || recipe.steps.length) {
           if (!recipe.image) recipe.image = meta(page.html, 'og:image');
-          return json({ found: 'schema', source, recipe });
+          return json({ found: 'schema', via: page.via, source, recipe });
         }
       }
       // No tidy copy: send the page text for the Cookbook page to read.
       return json({
-        found: 'text', source,
+        found: 'text', via: page.via, source,
         recipe: {
           title: meta(page.html, 'og:title') || clean(page.html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? ''),
           description: meta(page.html, 'og:description') || meta(page.html, 'description'),

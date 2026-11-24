@@ -6,7 +6,14 @@
 <title>Cookbook</title>
 
 <!-- ════════════════════════════════════════════════════════════════
-     COOKBOOK: the family's recipe collection.
+     COOKBOOK: the family's recipe collection, shown as a bookshelf.
+
+     Pages (the part of the address after #):
+       (nothing)          the bookshelf: one book per category (pick what the shelf is arranged by)
+       #b=cuisine:italian one book opened: its recipes stand on a shelf as little books between bookends
+                          (also #b=all, #b=fav, #b=recent)
+       #r=<id>            one recipe, with "when we make it" stats
+       #cal=2026-11       the cooking calendar: what we made each day
 
      Add a recipe by pasting either
        • a link to a recipe page  → the `recipes` edge function (supabase/functions/recipes/)
@@ -19,9 +26,10 @@
        recipes → { title, source, image, description, servings, prepMin, cookMin, totalMin,
                    ingredients: [lines], steps: [lines], notes,
                    meal, protein, cuisine, difficulty, cost   (ids from Cook.CATS in guess.js),
-                   tags: ['Vegetarian', …], favs: { Mitch: true }, cooked: [{ by, ts }], ts, by }
+                   tags: ['Vegetarian', …], favs: { Mitch: true },
+                   cooked: [{ by, date: '2026-11-24', ts }]   (every time we made it), ts, by }
      A line ending in ":" in ingredients or steps ("For the sauce:") is shown as a little heading.
-     Search, filters and ticked-off ingredients stay on this device only.
+     How the shelf is arranged, search and ticked-off ingredients stay on this device only.
 ═════════════════════════════════════════════════════════════════ -->
 
 <link rel="stylesheet" href="../../shared/family.css">
@@ -30,34 +38,66 @@ textarea.field{width:100%;resize:vertical;line-height:1.4;}
 .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
 .msg{font-weight:700;font-size:.9rem;color:var(--ink-soft);}
 .msg.bad{color:var(--peach-deep);}
-
-/* filters */
-.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
-.fgrid select,.sortsel{border:2px solid var(--line);background:#fff;border-radius:12px;padding:8px 10px;font-size:.9rem;font-weight:700;color:var(--forest);width:100%;}
-.fgrid select.on{border-color:var(--meadow);background:#eef6ea;}
-.frow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
-.chipbtn{border:2px solid var(--line);background:#fff;color:var(--forest);border-radius:999px;padding:6px 12px;font-weight:800;font-size:.85rem;}
-.chipbtn.on{background:var(--blossom-deep);border-color:var(--blossom-deep);color:#fff;}
-.count{font-weight:800;color:var(--ink-soft);font-size:.85rem;margin-left:auto;}
 .linkbtn{border:none;background:none;color:var(--meadow-deep);font-weight:800;text-decoration:underline;padding:4px;}
 
-/* recipe cards */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
-@media(min-width:600px){.grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px;}}
-.rc{display:flex;flex-direction:column;background:var(--paper);border:1px solid var(--line);border-radius:var(--r);
-  overflow:hidden;box-shadow:var(--shadow);color:var(--ink);text-decoration:none;position:relative;transition:.15s;}
-.rc:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);}
-.pic{position:relative;aspect-ratio:4/3;display:grid;place-items:center;font-size:2.6rem;background:#eef6ea;overflow:hidden;}
-.pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
-.pic.noimg img{display:none;}
-.m-breakfast,.m-baking{background:#fdf3d6;} .m-dessert{background:#fbe4ea;} .m-soup,.m-side{background:#fde9dc;}
-.m-drink,.m-snack{background:#e2f1f4;}
-.rc-body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;flex:1;}
-.rc-title{font-family:'Fredoka',sans-serif;font-weight:600;font-size:1.02rem;color:var(--forest);line-height:1.2;}
-.rc-tags{display:flex;flex-wrap:wrap;gap:4px;}
-.mini{font-size:.7rem;font-weight:800;padding:2px 7px;border-radius:999px;background:#eef0e8;color:var(--ink-soft);white-space:nowrap;}
-.rc-sub{font-size:.78rem;font-weight:700;color:var(--ink-soft);margin-top:auto;}
-.heart{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.9);border-radius:999px;padding:2px 7px;font-size:.85rem;}
+/* tabs under the title */
+.tabs{display:flex;gap:6px;margin:-6px 0 16px;flex-wrap:wrap;}
+.tab{padding:8px 14px;border-radius:999px;font-weight:800;font-size:.92rem;text-decoration:none;color:var(--forest);background:#fff;border:2px solid var(--line);}
+.tab.on{background:var(--forest);border-color:var(--forest);color:#fff;}
+
+/* "arrange the shelf by" chips */
+.arrange{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin:0 0 12px;scrollbar-width:thin;}
+.arrange .lbl{font-weight:800;color:var(--ink-soft);font-size:.85rem;align-self:center;white-space:nowrap;}
+.chipbtn{border:2px solid var(--line);background:#fff;color:var(--forest);border-radius:999px;padding:6px 12px;font-weight:800;font-size:.85rem;white-space:nowrap;}
+.chipbtn.on{background:var(--meadow);border-color:var(--meadow);color:#fff;}
+.chipbtn.pink.on{background:var(--blossom-deep);border-color:var(--blossom-deep);}
+.searchrow{display:flex;gap:8px;margin-bottom:12px;}
+.searchrow input{flex:1;min-width:0;border:2px solid var(--line);background:#fff;border-radius:12px;padding:10px 12px;outline:none;}
+.searchrow input:focus{border-color:var(--meadow);}
+.sortsel{border:2px solid var(--line);background:#fff;border-radius:12px;padding:8px 10px;font-size:.9rem;font-weight:700;color:var(--forest);}
+
+/* ───── the bookcase ─────
+   Every book stands in a .slot exactly one shelf tall, so the rows of books line up
+   with the wooden boards drawn by the background. */
+.bookcase{--row:210px;--board:16px;display:flex;flex-wrap:wrap;align-items:flex-end;padding:0 10px;margin-bottom:18px;
+  border:10px solid #8a5a35;border-top-width:14px;border-radius:12px;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 calc(var(--row) - var(--board)),
+      #b07b4c calc(var(--row) - var(--board)), #94633c calc(var(--row) - 5px), #6e4528 calc(var(--row) - 5px) var(--row)),
+    linear-gradient(90deg, rgba(0,0,0,.06), transparent 6%, transparent 94%, rgba(0,0,0,.06)),
+    #f0dfc0;
+  box-shadow:inset 0 8px 16px rgba(60,35,15,.18), var(--shadow);}
+.slot{height:var(--row);display:flex;align-items:flex-end;padding-bottom:var(--board);}
+.shelf-empty{height:var(--row);padding:24px 10px var(--board);display:flex;align-items:center;justify-content:center;width:100%;
+  color:#7a5a3a;font-weight:700;text-align:center;}
+
+.book{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;
+  width:var(--w);height:var(--h);margin:0 1px;padding:8px 3px 7px;border-radius:4px 4px 2px 2px;
+  background:linear-gradient(90deg, rgba(0,0,0,.22), rgba(255,255,255,.16) 14%, rgba(255,255,255,0) 38%, rgba(0,0,0,.08) 86%, rgba(0,0,0,.28)), var(--c);
+  color:#fdf6e3;text-decoration:none;box-shadow:1px 0 2px rgba(0,0,0,.3);transition:transform .15s;}
+.book:hover,.book:focus-visible{transform:translateY(-10px);outline:none;}
+.book::before,.book::after{content:"";position:absolute;left:0;right:0;height:3px;background:rgba(255,231,160,.6);}
+.book::before{top:34px;} .book::after{bottom:30px;}
+.b-top{font-size:1.15rem;line-height:1;height:22px;}
+.b-title{writing-mode:vertical-rl;flex:1;min-height:0;overflow:hidden;font-family:'Fredoka',sans-serif;font-weight:600;
+  font-size:.86rem;line-height:1.12;text-align:center;padding:8px 0 6px;text-shadow:0 1px 1px rgba(0,0,0,.3);}
+.b-n{font-size:.68rem;font-weight:800;background:rgba(255,253,247,.92);color:var(--ink);border-radius:999px;padding:1px 6px;min-width:20px;text-align:center;}
+.book.special::before,.book.special::after{background:#e9c46a;}
+.book.rbook .b-title{font-size:.78rem;}
+.book.rbook .b-n{background:transparent;color:#fdf6e3;padding:0;font-size:.72rem;}
+/* a book leaning on the last one, just for looks */
+.slot.lean .book{transform:rotate(7deg);transform-origin:bottom left;margin-left:2px;margin-right:22px;}
+.slot.lean .book:hover{transform:rotate(7deg) translateY(-10px);}
+
+/* bookends at both ends of an opened book's shelf */
+.bookend{width:44px;height:118px;margin:0 3px;display:flex;align-items:flex-start;justify-content:center;padding-top:14px;
+  font-size:1.3rem;background:linear-gradient(180deg,#7a4f2e,#5a3820);box-shadow:inset 0 2px 0 rgba(255,255,255,.15),0 2px 4px rgba(0,0,0,.3);}
+.bookend.left{border-radius:44px 4px 0 0;}
+.bookend.right{border-radius:4px 44px 0 0;}
+
+.bookhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.bookhead h2{margin:0;color:var(--forest);font-size:1.4rem;}
+.bookhead .n{color:var(--ink-soft);font-weight:800;font-size:.9rem;}
 
 /* one recipe */
 .rv-top{display:flex;gap:8px;align-items:center;margin-bottom:12px;}
@@ -67,18 +107,21 @@ textarea.field{width:100%;resize:vertical;line-height:1.4;}
 .rv-in h1{margin:0 0 6px;font-size:1.7rem;color:var(--forest);line-height:1.15;}
 .rv-desc{color:var(--ink-soft);margin:0 0 12px;line-height:1.45;}
 .facts{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;}
-.fact{border:none;font:inherit;font-size:.82rem;font-weight:800;padding:5px 11px;border-radius:999px;background:#e3f1df;color:var(--meadow-deep);}
-button.fact:hover{filter:brightness(.95);}
+.fact{border:none;font:inherit;font-size:.82rem;font-weight:800;padding:5px 11px;border-radius:999px;background:#e3f1df;color:var(--meadow-deep);text-decoration:none;}
+a.fact:hover{filter:brightness(.95);}
 .fact.c-cost{background:#fdf3d6;color:#9a7a17;} .fact.c-difficulty{background:#fde9dc;color:#b86a3c;}
 .fact.c-cuisine{background:#e2f1f4;color:#3f7f8f;} .fact.c-tag{background:#fbe4ea;color:#b4566f;}
 .times{font-size:.85rem;color:var(--ink-soft);font-weight:700;margin:4px 0 8px;}
 .who-line{font-size:.82rem;color:var(--ink-soft);font-weight:700;}
+.logrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;padding:10px;background:#eef6ea;border-radius:12px;font-weight:700;}
+.logrow input{border:2px solid var(--line);border-radius:10px;padding:7px 9px;}
 .rv-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:18px;align-items:start;margin-bottom:18px;}
 .rv-grid .card{margin:0;}
 @media(max-width:760px){.rv-grid{grid-template-columns:1fr;}}
 .serv{display:flex;align-items:center;gap:8px;font-weight:800;color:var(--forest);margin-bottom:8px;}
 .serv button{width:32px;height:32px;border-radius:50%;border:2px solid var(--line);background:#fff;font-weight:800;color:var(--forest);}
 .serv button:hover{border-color:var(--meadow);}
+.mini{font-size:.7rem;font-weight:800;padding:2px 7px;border-radius:999px;background:#eef0e8;color:var(--ink-soft);white-space:nowrap;}
 .ing{display:flex;gap:10px;align-items:flex-start;padding:8px 2px;border-bottom:1px dashed var(--line);cursor:pointer;line-height:1.35;}
 .ing:last-child{border-bottom:none;}
 .ing.done .t{text-decoration:line-through;color:var(--ink-soft);}
@@ -91,6 +134,43 @@ ol.steps li.step.done{color:var(--ink-soft);}
 ol.steps li.step.done::before{content:"✓";background:#c9d9c3;}
 ol.steps li.step:hover{background:#f6faf3;}
 .notes{white-space:pre-wrap;line-height:1.45;}
+
+/* "when we make it" stats */
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:12px;}
+.stat{background:#f6faf3;border-radius:14px;padding:10px 12px;}
+.stat b{display:block;font-family:'Fredoka',sans-serif;font-size:1.25rem;color:var(--forest);font-weight:600;line-height:1.2;}
+.stat span{font-size:.78rem;font-weight:700;color:var(--ink-soft);}
+.bars{display:flex;align-items:flex-end;gap:4px;height:70px;margin:6px 0 2px;}
+.bars div{flex:1;background:var(--meadow);border-radius:4px 4px 0 0;min-height:2px;}
+.bars div.zero{background:#e6ece1;}
+.barlbl{display:flex;gap:4px;font-size:.66rem;font-weight:800;color:var(--ink-soft);}
+.barlbl span{flex:1;text-align:center;}
+.statline{font-weight:700;color:var(--ink);margin:4px 0;line-height:1.4;}
+details.hist{margin-top:10px;}
+details.hist summary{cursor:pointer;font-weight:800;color:var(--meadow-deep);}
+.histrow{display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px dashed var(--line);font-weight:700;font-size:.9rem;}
+
+/* the cooking calendar */
+.calhead{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.calhead h2{margin:0;flex:1;text-align:center;color:var(--forest);}
+.calhead button{width:40px;height:40px;border-radius:50%;border:2px solid var(--line);background:#fff;font-weight:800;font-size:1.1rem;color:var(--forest);}
+.calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;}
+.calgrid .wd{text-align:center;font-weight:800;font-size:.75rem;color:var(--ink-soft);padding:2px 0;}
+.day{min-height:78px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px;display:flex;flex-direction:column;gap:2px;overflow:hidden;}
+.day.blank{background:transparent;border:none;}
+.day.today{border:2px solid var(--meadow);}
+.day .d{font-weight:800;font-size:.75rem;color:var(--ink-soft);}
+.day.has{background:#f6faf3;}
+.ce{display:block;font-size:.7rem;font-weight:700;color:var(--forest);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  background:#e3f1df;border-radius:6px;padding:1px 4px;}
+.ce:hover{background:#d4ead0;}
+.more{font-size:.68rem;font-weight:800;color:var(--ink-soft);}
+/* on a phone the days are too narrow for names: just the little pictures (the list below has the names) */
+@media(max-width:520px){.day{min-height:58px;padding:3px;}.ce{font-size:.85rem;padding:0;background:none;text-align:center;}.ce .t{display:none;}}
+.calrow{display:flex;gap:10px;align-items:center;padding:8px 2px;border-bottom:1px dashed var(--line);}
+.calrow:last-child{border-bottom:none;}
+.calrow .dt{flex:0 0 92px;font-weight:800;color:var(--ink-soft);font-size:.85rem;}
+.calrow a{font-weight:700;color:var(--forest);text-decoration:none;flex:1;min-width:0;}
 
 /* the edit box */
 dialog{border:none;border-radius:20px;padding:0;max-width:680px;width:calc(100% - 16px);max-height:94vh;box-shadow:var(--shadow-lg);background:var(--paper);color:var(--ink);}
@@ -119,14 +199,16 @@ dialog .field{width:100%;}
     <span style="flex:1"></span>
     <span id="sync" class="badge local">…</span>
   </div>
+  <nav class="tabs">
+    <a class="tab" id="tabShelf" href="#">📚 Bookshelf</a>
+    <a class="tab" id="tabCal" href="#cal">📅 What we’ve cooked</a>
+  </nav>
 
-  <!-- ───── the collection ───── -->
-  <section id="listView">
-    <p class="hint">Paste a link to a recipe, or copy a whole recipe from anywhere and paste it in. It gets sorted by meal, protein, cuisine, time, difficulty and cost for you.</p>
-
+  <!-- ───── the bookshelf ───── -->
+  <section id="shelfView">
     <div class="card">
       <h3>➕ Add a recipe</h3>
-      <textarea id="paste" class="field" rows="3" placeholder="Paste a link (https://…) or the whole recipe: name, ingredients and steps"></textarea>
+      <textarea id="paste" class="field" rows="2" placeholder="Paste a link (https://…) or a whole recipe: name, ingredients and steps"></textarea>
       <div class="acts">
         <button class="btn" id="addBtn">Add to cookbook</button>
         <button class="btn ghost" id="blankBtn">✍️ Type one in</button>
@@ -134,30 +216,22 @@ dialog .field{width:100%;}
       </div>
     </div>
 
-    <div class="card">
-      <div class="addrow">
-        <input id="q" placeholder="🔍 Search recipes" title="Search names, ingredients and labels" autocomplete="off">
-        <button class="btn sky" id="surprise" title="Pick a random recipe from the ones showing">🎲 Surprise me</button>
-      </div>
-      <div class="fgrid" id="filters"></div>
-      <div class="frow">
-        <button class="chipbtn" id="favBtn">❤️ My favourites</button>
-        <select class="sortsel" id="sort" style="width:auto">
-          <option value="new">Newest first</option>
-          <option value="az">A to Z</option>
-          <option value="quick">Quickest first</option>
-          <option value="cooked">Made most often</option>
-        </select>
-        <button class="linkbtn" id="clear" hidden>Clear filters</button>
-        <span class="count" id="count"></span>
-      </div>
+    <div class="searchrow">
+      <input id="q" placeholder="🔍 Search recipes or ingredients" autocomplete="off">
+      <button class="btn sky" id="surprise" title="Pick a random recipe">🎲</button>
     </div>
-
-    <div class="grid" id="grid"></div>
+    <div class="arrange" id="arrange"></div>
+    <div id="shelf"></div>
   </section>
+
+  <!-- ───── one book opened (filled in by showBook) ───── -->
+  <section id="bookView" hidden></section>
 
   <!-- ───── one recipe (filled in by showRecipe) ───── -->
   <section id="recipeView" hidden></section>
+
+  <!-- ───── the cooking calendar (filled in by showCalendar) ───── -->
+  <section id="calView" hidden></section>
 </main>
 
 <!-- ───── add / edit a recipe ───── -->
@@ -207,8 +281,13 @@ const store = Family.store(TOOL_ID);
 const $ = s => document.querySelector(s);
 const esc = Family.esc;
 const CATS = Cook.CATS;
-const FILTERS = ['meal', 'protein', 'cuisine', 'time', 'difficulty', 'cost'];
-const SHORT = { meal: 'Meal', protein: 'Protein', cuisine: 'Cuisine', time: 'Time', difficulty: 'Difficulty', cost: 'Cost' };   // names that fit the filter boxes on a phone
+const CAT_KEYS = ['meal', 'protein', 'cuisine', 'time', 'difficulty', 'cost'];
+// The ways the shelf can be arranged (each one fills the shelf with different books).
+const ARRANGE = [['meal', '🍽️ Meal'], ['protein', '🥩 Protein'], ['cuisine', '🌍 Cuisine'], ['time', '⏱️ Time'],
+  ['difficulty', '📶 Difficulty'], ['cost', '💰 Cost'], ['tag', '🏷️ Labels']];
+// Spine colours: old cloth-bound book colours that work with cream text.
+const SPINES = ['#a4493d', '#3f6e8c', '#4f7a4f', '#b5832f', '#7d4f86', '#3e7a74', '#9a5a32', '#56609e',
+  '#8e3f57', '#5f7a35', '#b46a4c', '#35566b', '#8a6d2f', '#6a4a7a'];
 
 let recipes = {};        // id → recipe, kept up to date live
 let loaded = false;
@@ -223,7 +302,7 @@ function fmtMin(m) {
   const h = Math.floor(m / 60), rest = m % 60;
   return rest ? `${h} h ${rest} min` : `${h} h`;
 }
-const fmtDate = ts => new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+const shortMin = m => !m ? '' : m < 60 ? m + 'm' : Math.floor(m / 60) + 'h' + (m % 60 ? pad(m % 60) : '');
 const domain = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; } };
 // The same recipe link written slightly differently (tracking bits, trailing slash) counts as the same.
 const sameLink = u => String(u || '').toLowerCase().replace(/[?#].*$/, '').replace(/^https?:\/\/(www\.)?/, '').replace(/\/+$/, '');
@@ -234,128 +313,231 @@ const allTags = () => {
   Object.values(recipes).forEach(r => (r.tags || []).forEach(t => set.add(t)));
   return [...set];
 };
+// A number from some text, always the same for the same text (so each book keeps its colour and height).
+function hash(text) { let h = 7; for (const ch of String(text)) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h; }
 
-/* ───────── filters (remembered on this device) ───────── */
-const F = Object.assign({ q: '', tag: '', fav: false, sort: 'new', meal: '', protein: '', cuisine: '', time: '', difficulty: '', cost: '' },
-  (() => { try { return JSON.parse(localStorage.getItem('cookbook:filters')) || {}; } catch (e) { return {}; } })());
-const saveFilters = () => { try { localStorage.setItem('cookbook:filters', JSON.stringify(F)); } catch (e) { /* private window */ } };
+/* Dates: a day is kept as '2026-11-24' (the day it was cooked where we are). */
+const pad = n => String(n).padStart(2, '0');
+const dayKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const keyDate = k => new Date(k + 'T12:00:00');
+const todayKey = () => dayKey(new Date());
+const cookedDay = c => c.date || dayKey(new Date(c.ts));
+const fmtDay = k => keyDate(k).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: keyDate(k).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+const daysBetween = (a, b) => Math.round((keyDate(b) - keyDate(a)) / 864e5);
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const lastCooked = r => (r.cooked || []).map(cookedDay).sort().pop() || '';
 
-function matches(r) {
-  for (const k of FILTERS) if (F[k] && valueOf(r, k) !== F[k]) return false;
-  if (F.tag && !(r.tags || []).includes(F.tag)) return false;
-  if (F.fav && !(r.favs || {})[Family.me()]) return false;
-  if (F.q) {
-    const hay = [r.title, r.description, r.notes, ...(r.ingredients || []), ...(r.tags || []),
-      ...['meal', 'protein', 'cuisine'].map(k => Cook.find(k, r[k])?.label)].join(' ').toLowerCase();
-    if (!F.q.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w))) return false;
-  }
-  return true;
-}
-function shownRecipes() {
-  const list = Object.entries(recipes).filter(([, r]) => matches(r));
-  const by = {
-    new: (a, b) => (b[1].ts || 0) - (a[1].ts || 0),
-    az: (a, b) => (a[1].title || '').localeCompare(b[1].title || ''),
-    quick: (a, b) => (timeOf(a[1]) || 9999) - (timeOf(b[1]) || 9999),
-    cooked: (a, b) => (b[1].cooked || []).length - (a[1].cooked || []).length || (b[1].ts || 0) - (a[1].ts || 0),
-  };
-  return list.sort(by[F.sort] || by.new);
-}
+/* ───────── settings remembered on this device ───────── */
+const F = Object.assign({ q: '', shelf: 'meal', sort: 'new' },
+  (() => { try { return JSON.parse(localStorage.getItem('cookbook:view')) || {}; } catch (e) { return {}; } })());
+const saveView = () => { try { localStorage.setItem('cookbook:view', JSON.stringify(F)); } catch (e) { /* private window */ } };
 
-// One dropdown per category, each choice with how many recipes are in it (empty ones are left out).
-function drawFilters() {
-  const all = Object.values(recipes);
-  const box = $('#filters');
-  const selects = FILTERS.map(cat => {
-    const opts = CATS[cat].items.map(([id, emoji, label]) => {
-      const n = all.filter(r => valueOf(r, cat) === id).length;
-      return (n || F[cat] === id) ? `<option value="${id}"${F[cat] === id ? ' selected' : ''}>${emoji} ${esc(label)} (${n})</option>` : '';
-    }).join('');
-    return `<select data-cat="${cat}" class="${F[cat] ? 'on' : ''}" aria-label="${esc(CATS[cat].label)}">
-      <option value="">${SHORT[cat]}: any</option>${opts}</select>`;
-  });
-  const tags = allTags().map(t => {
-    const n = all.filter(r => (r.tags || []).includes(t)).length;
-    return (n || F.tag === t) ? `<option${F.tag === t ? ' selected' : ''}>${esc(t)}</option>` : '';
-  }).join('');
-  selects.push(`<select data-cat="tag" class="${F.tag ? 'on' : ''}" aria-label="Label"><option value="">Label: any</option>${tags}</select>`);
-  box.innerHTML = selects.join('');
-  box.querySelectorAll('select').forEach(s => s.onchange = () => { F[s.dataset.cat] = s.value; saveFilters(); drawList(); });
-  $('#favBtn').classList.toggle('on', F.fav);
-  $('#sort').value = F.sort;
-  $('#clear').hidden = !(FILTERS.some(k => F[k]) || F.tag || F.fav || F.q);
+function searchMatch(r, q) {
+  const hay = [r.title, r.description, r.notes, ...(r.ingredients || []), ...(r.tags || []),
+    ...['meal', 'protein', 'cuisine'].map(k => Cook.find(k, r[k])?.label)].join(' ').toLowerCase();
+  return q.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w));
 }
-
-/* ───────── the collection ───────── */
-function picture(r) {
-  const meal = Cook.find('meal', r.meal), prot = Cook.find('protein', r.protein);
-  const emoji = (r.protein && r.protein !== 'none' && r.protein !== 'veg' ? prot?.emoji : meal?.emoji) || '🍽️';
-  const img = safeUrl(r.image);
-  return `<div class="pic m-${esc(r.meal || '')}${img ? '' : ' noimg'}">${emoji}
-    ${img ? `<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('noimg')">` : ''}</div>`;
-}
-
-function drawList() {
-  drawFilters();
-  const grid = $('#grid');
-  const total = Object.keys(recipes).length;
-  if (!loaded) { grid.innerHTML = '<div class="empty" style="grid-column:1/-1">Loading the cookbook…</div>'; return; }
-  if (!total) {
-    grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><span class="big">🍳</span>No recipes yet. Paste a link or a recipe above to start the family cookbook.</div>`;
-    $('#count').textContent = '';
-    return;
-  }
-  const list = shownRecipes();
-  $('#count').textContent = list.length === total ? `${total} recipe${total === 1 ? '' : 's'}` : `${list.length} of ${total}`;
-  if (!list.length) {
-    grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><span class="big">🔍</span>Nothing matches all of that. <button class="linkbtn" onclick="clearFilters()">Clear filters</button></div>`;
-    return;
-  }
-  const me = Family.me();
-  grid.innerHTML = list.map(([id, r]) => {
-    const diff = Cook.find('difficulty', r.difficulty), cost = Cook.find('cost', r.cost);
-    const cui = Cook.find('cuisine', r.cuisine), prot = Cook.find('protein', r.protein);
-    const t = timeOf(r);
-    return `<a class="rc" href="#r=${encodeURIComponent(id)}">
-      ${picture(r)}
-      ${(r.favs || {})[me] ? '<span class="heart">❤️</span>' : ''}
-      <div class="rc-body">
-        <div class="rc-title">${esc(r.title)}</div>
-        <div class="rc-tags">
-          ${t ? `<span class="mini">⏱️ ${fmtMin(t)}</span>` : ''}
-          ${diff ? `<span class="mini">${diff.emoji} ${esc(diff.label)}</span>` : ''}
-          ${cost ? `<span class="mini" title="${esc(cost.label)}">${cost.emoji}</span>` : ''}
-        </div>
-        <div class="rc-sub">${[cui && cui.id !== 'other' ? cui.emoji + ' ' + cui.label : '', prot ? prot.emoji + ' ' + prot.label.replace(/ \(.*\)$/, '') : ''].filter(Boolean).map(esc).join(' · ')}</div>
-      </div>
-    </a>`;
-  }).join('');
-}
-
-function clearFilters() {
-  FILTERS.forEach(k => { F[k] = ''; });
-  F.tag = ''; F.fav = false; F.q = ''; $('#q').value = '';
-  saveFilters(); drawList();
-}
-$('#clear').onclick = clearFilters;
-$('#favBtn').onclick = () => { F.fav = !F.fav; saveFilters(); drawList(); };
-$('#sort').onchange = e => { F.sort = e.target.value; saveFilters(); drawList(); };
-$('#q').value = F.q;
-$('#q').oninput = e => { F.q = e.target.value; saveFilters(); drawList(); };
-$('#surprise').onclick = () => {
-  const list = shownRecipes();
-  if (!list.length) return;
-  location.hash = 'r=' + encodeURIComponent(list[Math.floor(Math.random() * list.length)][0]);
+const SORTS = {
+  new: (a, b) => (b[1].ts || 0) - (a[1].ts || 0),
+  az: (a, b) => (a[1].title || '').localeCompare(b[1].title || ''),
+  quick: (a, b) => (timeOf(a[1]) || 9999) - (timeOf(b[1]) || 9999),
+  cooked: (a, b) => (b[1].cooked || []).length - (a[1].cooked || []).length || SORTS.az(a, b),
+  recent: (a, b) => lastCooked(b[1]).localeCompare(lastCooked(a[1])) || SORTS.az(a, b),
 };
+const sortOptions = sel => [['new', 'Newest first'], ['az', 'A to Z'], ['quick', 'Quickest first'], ['cooked', 'Made most often'], ['recent', 'Made most recently']]
+  .map(([v, l]) => `<option value="${v}"${sel === v ? ' selected' : ''}>${l}</option>`).join('');
+
+/* ───────── books ───────── */
+// A category book on the main shelf. key is what goes in the address: 'cuisine:italian', 'all', 'fav'…
+// Colours go round the list 5 at a time, so every colour gets used and books side by side never match.
+const spine = i => SPINES[(i * 5) % SPINES.length];
+function categoryBook(key, emoji, label, count, special, i) {
+  const h = 150 + hash(key) % 34, w = 50 + Math.min(count, 14) * 3;
+  const c = special ? '#2f4a35' : spine(i);
+  return `<div class="slot"><a class="book${special ? ' special' : ''}" href="#b=${encodeURIComponent(key)}"
+      style="--h:${h}px;--w:${w}px;--c:${c}" aria-label="${esc(label)}, ${count} recipe${count === 1 ? '' : 's'}" title="${esc(label)}">
+    <span class="b-top">${emoji}</span><span class="b-title">${esc(label)}</span><span class="b-n">${count}</span></a></div>`;
+}
+// A recipe standing on the shelf of an opened book.
+function recipeBook(id, r, i) {
+  const h = 152 + hash(id) % 30, w = 42 + Math.min((r.ingredients || []).length, 16) * 1.2;
+  const c = spine(i + 3);
+  const prot = Cook.find('protein', r.protein), meal = Cook.find('meal', r.meal);
+  const emoji = (r.protein && !['none', 'veg'].includes(r.protein) ? prot?.emoji : meal?.emoji) || '🍽️';
+  const fav = (r.favs || {})[Family.me()];
+  return `<div class="slot"><a class="book rbook" href="#r=${encodeURIComponent(id)}" style="--h:${h}px;--w:${Math.round(w)}px;--c:${c}"
+      title="${esc(r.title)}" aria-label="${esc(r.title)}">
+    <span class="b-top">${emoji}</span><span class="b-title">${esc(r.title)}</span>
+    <span class="b-n">${fav ? '❤️' : ''}${shortMin(timeOf(r))}</span></a></div>`;
+}
+function shelfOfRecipes(list, endEmoji, emptyText) {
+  if (!list.length) return `<div class="bookcase small"><div class="shelf-empty">${emptyText}</div></div>`;
+  return `<div class="bookcase small">
+    <div class="slot"><div class="bookend left" aria-hidden="true">${endEmoji}</div></div>
+    ${list.map(([id, r], i) => recipeBook(id, r, i)).join('')}
+    <div class="slot"><div class="bookend right" aria-hidden="true">${endEmoji}</div></div>
+  </div>`;
+}
+
+// What's in a book: [[id, recipe], …] for an address key like 'cuisine:italian'.
+function bookContents(key) {
+  const all = Object.entries(recipes);
+  const me = Family.me();
+  if (key === 'all') return { emoji: '📚', label: 'All recipes', list: all };
+  if (key === 'fav') return { emoji: '❤️', label: `${me}’s favourites`, list: all.filter(([, r]) => (r.favs || {})[me]) };
+  if (key === 'recent') return { emoji: '🕘', label: 'Made lately', list: all.filter(([, r]) => (r.cooked || []).length), sort: 'recent' };
+  const [cat, ...rest] = key.split(':');
+  const val = rest.join(':');
+  if (cat === 'tag') return { emoji: '🏷️', label: val, list: all.filter(([, r]) => (r.tags || []).includes(val)) };
+  if (!CATS[cat]) return null;
+  if (val === '_none') return { emoji: '📦', label: `${CATS[cat].label}: not sorted`, list: all.filter(([, r]) => !valueOf(r, cat)) };
+  const c = Cook.find(cat, val);
+  return c ? { emoji: c.emoji, label: c.label, list: all.filter(([, r]) => valueOf(r, cat) === val) } : null;
+}
+
+/* ───────── the main bookshelf ───────── */
+function showShelf() {
+  $('#arrange').innerHTML = '<span class="lbl">Arrange by</span>' + ARRANGE.map(([k, l]) =>
+    `<button class="chipbtn${F.shelf === k ? ' on' : ''}" data-k="${k}">${l}</button>`).join('');
+  $('#arrange').querySelectorAll('button').forEach(b => b.onclick = () => { F.shelf = b.dataset.k; saveView(); showShelf(); });
+
+  const box = $('#shelf');
+  const all = Object.entries(recipes);
+  if (!loaded) { box.innerHTML = `<div class="bookcase"><div class="shelf-empty">Dusting off the shelves…</div></div>`; return; }
+  if (!all.length) {
+    box.innerHTML = `<div class="bookcase"><div class="shelf-empty">🍳 The shelf is empty. Paste a link or a recipe above to put the first book on it.</div></div>`;
+    return;
+  }
+
+  // Searching: the matching recipes stand on their own shelf.
+  if (F.q.trim()) {
+    const list = all.filter(([, r]) => searchMatch(r, F.q)).sort(SORTS.az);
+    box.innerHTML = `<div class="bookhead"><span class="n">🔍 ${list.length} recipe${list.length === 1 ? '' : 's'} match “${esc(F.q.trim())}”</span>
+      <button class="linkbtn" id="clearQ">Clear search</button></div>` +
+      shelfOfRecipes(list, '🔍', 'Nothing matches. Try another word.');
+    $('#clearQ').onclick = () => { F.q = ''; $('#q').value = ''; saveView(); showShelf(); };
+    return;
+  }
+
+  const me = Family.me();
+  const books = [categoryBook('all', '📚', 'All recipes', all.length, true)];
+  const favs = all.filter(([, r]) => (r.favs || {})[me]).length;
+  if (favs) books.push(categoryBook('fav', '❤️', 'My favourites', favs, true));
+  const made = all.filter(([, r]) => (r.cooked || []).length).length;
+  if (made) books.push(categoryBook('recent', '🕘', 'Made lately', made, true));
+
+  if (F.shelf === 'tag') {
+    allTags().forEach(t => {
+      const n = all.filter(([, r]) => (r.tags || []).includes(t)).length;
+      if (n) books.push(categoryBook('tag:' + t, '🏷️', t, n, false, books.length));
+    });
+  } else {
+    CATS[F.shelf].items.forEach(([id, emoji, label]) => {
+      const n = all.filter(([, r]) => valueOf(r, F.shelf) === id).length;
+      if (n) books.push(categoryBook(F.shelf + ':' + id, emoji, label, n, false, books.length));
+    });
+    const none = all.filter(([, r]) => !valueOf(r, F.shelf)).length;
+    if (none) books.push(categoryBook(F.shelf + ':_none', '📦', 'Not sorted', none, false, books.length));
+  }
+  // The last book leans over a little, like on a real shelf.
+  if (books.length > 3) books[books.length - 1] = books[books.length - 1].replace('class="slot"', 'class="slot lean"');
+  box.innerHTML = `<div class="bookcase">${books.join('')}</div>`;
+}
+$('#q').value = F.q;
+$('#q').oninput = e => { F.q = e.target.value; saveView(); showShelf(); };
+$('#surprise').onclick = () => {
+  const ids = Object.keys(recipes);
+  if (ids.length) location.hash = 'r=' + encodeURIComponent(ids[Math.floor(Math.random() * ids.length)]);
+};
+
+/* ───────── one book opened ───────── */
+function showBook(key) {
+  const box = $('#bookView');
+  const b = bookContents(key);
+  if (!b) { box.innerHTML = `<div class="empty"><span class="big">🤷</span>That book isn’t on the shelf. <a href="#">Back to the bookshelf</a></div>`; return; }
+  const sort = b.sort && F.sort === 'new' ? b.sort : F.sort;
+  const list = b.list.slice().sort(SORTS[sort] || SORTS.new);
+  box.innerHTML = `
+    <div class="rv-top"><a class="btn ghost sm" href="#">← Bookshelf</a></div>
+    <div class="bookhead">
+      <h2>${b.emoji} ${esc(b.label)}</h2><span class="n">${list.length} recipe${list.length === 1 ? '' : 's'}</span>
+      <span style="flex:1"></span>
+      <select class="sortsel" id="bookSort" aria-label="Order">${sortOptions(sort)}</select>
+      <button class="btn sky sm" id="bookPick" title="Pick a random recipe from this book">🎲 Surprise me</button>
+    </div>
+    ${shelfOfRecipes(list, b.emoji, 'No recipes in this book yet.')}
+    <p class="hint" style="margin:0">Tap a book to open the recipe.</p>`;
+  box.querySelector('#bookSort').onchange = e => { F.sort = e.target.value; saveView(); showBook(key); };
+  box.querySelector('#bookPick').onclick = () => {
+    if (list.length) location.hash = 'r=' + encodeURIComponent(list[Math.floor(Math.random() * list.length)][0]);
+  };
+}
+
+/* ───────── "when we make it" ───────── */
+function cookStats(r) {
+  const days = (r.cooked || []).map(c => ({ day: cookedDay(c), by: c.by || '?' })).sort((a, b) => a.day.localeCompare(b.day));
+  if (!days.length) return `<p class="statline">Not made yet. Tap <b>✅ We made this</b> above when you do, and this fills up.</p>`;
+  const n = days.length, first = days[0].day, last = days[n - 1].day;
+  const ago = daysBetween(last, todayKey());
+  const agoText = ago <= 0 ? 'today' : ago === 1 ? 'yesterday' : ago < 60 ? `${ago} days ago` : `${Math.round(ago / 30)} months ago`;
+  let every = '';
+  if (n >= 2) {
+    const gap = daysBetween(first, last) / (n - 1);
+    every = gap < 1.5 ? 'every day or so' : gap < 13 ? `every ${Math.round(gap)} days` : gap < 60 ? `every ${Math.round(gap / 7)} weeks` : `every ${Math.round(gap / 30)} months`;
+  }
+  const year = String(new Date().getFullYear());
+  const thisYear = days.filter(d => d.day.startsWith(year)).length;
+  // Busiest weekday, if one stands out.
+  const wd = [0, 0, 0, 0, 0, 0, 0];
+  days.forEach(d => wd[keyDate(d.day).getDay()]++);
+  const topWd = wd.indexOf(Math.max(...wd));
+  const who = {};
+  days.forEach(d => { who[d.by] = (who[d.by] || 0) + 1; });
+  // The last 12 months, as little bars.
+  const now = new Date();
+  const months = [];
+  for (let i = 11; i >= 0; i--) {
+    const m = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const prefix = `${m.getFullYear()}-${pad(m.getMonth() + 1)}`;
+    months.push({ label: MONTHS[m.getMonth()][0], full: `${MONTHS[m.getMonth()]} ${m.getFullYear()}`, n: days.filter(d => d.day.startsWith(prefix)).length });
+  }
+  const most = Math.max(1, ...months.map(m => m.n));
+  return `
+    <div class="stats">
+      <div class="stat"><b>${n}×</b><span>made in all</span></div>
+      <div class="stat"><b>${esc(agoText)}</b><span>last time (${esc(fmtDay(last))})</span></div>
+      <div class="stat"><b>${thisYear}×</b><span>this year</span></div>
+      ${every ? `<div class="stat"><b>${esc(every)}</b><span>about how often</span></div>` : ''}
+      <div class="stat"><b>${esc(fmtDay(first))}</b><span>first time</span></div>
+    </div>
+    ${n >= 3 && wd[topWd] >= 2 ? `<p class="statline">📆 Most often on a <b>${WEEKDAYS[topWd]}</b> (${wd[topWd]} of ${n} times).</p>` : ''}
+    <p class="statline">👩‍🍳 Made by ${Object.entries(who).sort((a, b) => b[1] - a[1]).map(([p, c]) => `<b>${esc(p)}</b> ${c}×`).join(', ')}.</p>
+    <div class="bars" aria-label="Times made each month, last 12 months">
+      ${months.map(m => `<div class="${m.n ? '' : 'zero'}" style="height:${m.n ? Math.max(12, m.n / most * 100) : 3}%" title="${m.full}: ${m.n}×"></div>`).join('')}
+    </div>
+    <div class="barlbl">${months.map(m => `<span>${m.label}</span>`).join('')}</div>
+    <details class="hist"><summary>Every time we made it (${n})</summary>
+      ${(r.cooked || []).map((c, i) => [c, i]).sort((a, b) => cookedDay(b[0]).localeCompare(cookedDay(a[0]))).map(([c, i]) => `
+        <div class="histrow"><span style="flex:1">${esc(fmtDay(cookedDay(c)))} · ${WEEKDAYS[keyDate(cookedDay(c)).getDay()]}</span>
+          <span class="who-pill">${esc(c.by || '?')}</span><button class="del" data-uncook="${i}" title="Remove this one">✕</button></div>`).join('')}
+    </details>`;
+}
 
 /* ───────── one recipe ───────── */
 const ticks = {};        // recipe id → { i3: true, s1: true }: what's been ticked off while cooking (this device only)
 const servingsNow = {};  // recipe id → servings being cooked for
+let logOpen = false;     // is the "we made this" date box showing?
 
 function showRecipe(id) {
   const r = recipes[id];
   const box = $('#recipeView');
-  if (!r) { box.innerHTML = `<div class="empty"><span class="big">🤷</span>That recipe isn’t here (maybe it was deleted). <a href="#">See all recipes</a></div>`; return; }
+  if (!r) {
+    box.innerHTML = loaded ? `<div class="empty"><span class="big">🤷</span>That recipe isn’t here (maybe it was deleted). <a href="#">Back to the bookshelf</a></div>`
+      : '<div class="empty">Opening the book…</div>';
+    return;
+  }
   const me = Family.me();
   const tk = ticks[id] = ticks[id] || {};
   const base = Cook.servingsNumber(r.servings);
@@ -364,13 +546,12 @@ function showRecipe(id) {
   const img = safeUrl(r.image), src = safeUrl(r.source);
   const favs = Object.keys(r.favs || {}).filter(n => r.favs[n]);
   const cooked = r.cooked || [];
-  const last = cooked[cooked.length - 1];
 
-  // Category chips: tap one to see every recipe like it.
-  const chips = ['meal', 'protein', 'cuisine', 'time', 'difficulty', 'cost'].map(cat => {
+  // Category chips: tap one to open that book on the shelf.
+  const chips = CAT_KEYS.map(cat => {
     const c = Cook.find(cat, valueOf(r, cat));
-    return c ? `<button class="fact c-${cat}" data-cat="${cat}" data-val="${c.id}" title="${esc(CATS[cat].label)}: show all like this">${c.emoji} ${esc(c.label)}</button>` : '';
-  }).join('') + (r.tags || []).map(t => `<button class="fact c-tag" data-cat="tag" data-val="${esc(t)}">🏷️ ${esc(t)}</button>`).join('');
+    return c ? `<a class="fact c-${cat}" href="#b=${encodeURIComponent(cat + ':' + c.id)}" title="${esc(CATS[cat].label)}: open that book">${c.emoji} ${esc(c.label)}</a>` : '';
+  }).join('') + (r.tags || []).map(t => `<a class="fact c-tag" href="#b=${encodeURIComponent('tag:' + t)}">🏷️ ${esc(t)}</a>`).join('');
 
   const times = [r.prepMin && `Prep ${fmtMin(r.prepMin)}`, r.cookMin && `Cook ${fmtMin(r.cookMin)}`, timeOf(r) && `Total ${fmtMin(timeOf(r))}`].filter(Boolean).join(' · ');
 
@@ -383,7 +564,7 @@ function showRecipe(id) {
 
   box.innerHTML = `
     <div class="rv-top">
-      <a class="btn ghost sm" href="#">← All recipes</a>
+      <a class="btn ghost sm" href="#" id="rvBack">← Bookshelf</a>
       <span style="flex:1"></span>
       <button class="btn ghost sm" id="rvEdit">✏️ Edit</button>
     </div>
@@ -396,14 +577,17 @@ function showRecipe(id) {
         ${times ? `<div class="times">⏱️ ${esc(times)}</div>` : ''}
         <div class="who-line">
           ${src ? `From <a href="${esc(src)}" target="_blank" rel="noopener noreferrer">${esc(domain(src))} ↗</a> · ` : ''}
-          added by ${esc(r.by || '?')}${r.ts ? ', ' + fmtDate(r.ts) : ''}
-          ${cooked.length ? ` · made ${cooked.length === 1 ? 'once' : cooked.length + ' times'} (last ${fmtDate(last.ts)} by ${esc(last.by)})` : ''}
+          added by ${esc(r.by || '?')}${r.ts ? ', ' + esc(fmtDay(dayKey(new Date(r.ts)))) : ''}
         </div>
         <div class="acts">
-          <button class="chipbtn${favs.includes(me) ? ' on' : ''}" id="rvFav">❤️ ${favs.length ? esc(favs.join(' & ')) : 'Favourite'}</button>
-          <button class="chipbtn" id="rvCooked">✅ We made this today</button>
+          <button class="chipbtn pink${favs.includes(me) ? ' on' : ''}" id="rvFav">❤️ ${favs.length ? esc(favs.join(' & ')) : 'Favourite'}</button>
+          <button class="chipbtn${logOpen ? ' on' : ''}" id="rvCooked">✅ We made this</button>
           ${'wakeLock' in navigator ? `<button class="chipbtn${wake ? ' on' : ''}" id="rvWake">📱 ${wake ? 'Screen stays on' : 'Keep screen on'}</button>` : ''}
         </div>
+        ${logOpen ? `<div class="logrow">Made it on
+          <input type="date" id="logDate" value="${todayKey()}" max="${todayKey()}">
+          <button class="btn sm" id="logSave">Save</button>
+          <button class="linkbtn" id="logCancel">Cancel</button></div>` : ''}
       </div>
     </div>
     <div class="rv-grid">
@@ -420,20 +604,30 @@ function showRecipe(id) {
         ${steps ? `<ol class="steps">${steps}</ol>` : `<div class="empty">No steps written down.${src ? ` <a href="${esc(src)}" target="_blank" rel="noopener noreferrer">See the original ↗</a>` : ''}</div>`}
       </div>
     </div>
-    ${r.notes ? `<div class="card"><h3>📝 Our notes</h3><div class="notes">${esc(r.notes)}</div></div>` : ''}`;
+    ${r.notes ? `<div class="card"><h3>📝 Our notes</h3><div class="notes">${esc(r.notes)}</div></div>` : ''}
+    <div class="card"><h3>📊 When we make it</h3>${cookStats(r)}</div>`;
 
+  // "← Bookshelf" goes back to the book you came from, if you came from one.
+  if (/^#b=/.test(cameFrom)) box.querySelector('#rvBack').href = cameFrom;
   box.querySelector('#rvEdit').onclick = () => openEditor(r, id);
   box.querySelectorAll('[data-tick]').forEach(el => el.onclick = () => { tk[el.dataset.tick] = !tk[el.dataset.tick]; showRecipe(id); });
-  box.querySelectorAll('.fact[data-cat]').forEach(b => b.onclick = () => {
-    FILTERS.forEach(k => { F[k] = ''; }); F.tag = ''; F.fav = false; F.q = ''; $('#q').value = '';
-    F[b.dataset.cat] = b.dataset.val; saveFilters(); location.hash = '';
-  });
   box.querySelector('#rvFav').onclick = () => store.update('recipes', id, { favs: Object.assign({}, r.favs, { [me]: !(r.favs || {})[me] }) });
-  box.querySelector('#rvCooked').onclick = () => {
-    const today = new Date().toDateString();
-    if (last && new Date(last.ts).toDateString() === today && !confirm('Already marked as made today. Count it again?')) return;
-    store.update('recipes', id, { cooked: [...cooked, { by: me, ts: Date.now() }] });
-  };
+  box.querySelector('#rvCooked').onclick = () => { logOpen = !logOpen; showRecipe(id); };
+  if (logOpen) {
+    box.querySelector('#logCancel').onclick = () => { logOpen = false; showRecipe(id); };
+    box.querySelector('#logSave').onclick = () => {
+      const day = box.querySelector('#logDate').value;
+      if (!/^\d{4}-\d\d-\d\d$/.test(day)) return;
+      if (cooked.some(c => cookedDay(c) === day) && !confirm(`Already marked as made on ${fmtDay(day)}. Count it again?`)) return;
+      logOpen = false;
+      store.update('recipes', id, { cooked: [...cooked, { by: me, date: day, ts: keyDate(day).getTime() }] });
+    };
+  }
+  box.querySelectorAll('[data-uncook]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.uncook;
+    if (!confirm(`Remove ${fmtDay(cookedDay(cooked[i]))} from the times we made it?`)) return;
+    store.update('recipes', id, { cooked: cooked.filter((_, k) => k !== i) });
+  });
   if (base) {
     box.querySelector('#servLess').onclick = () => { servingsNow[id] = Math.max(1, serves - 1); showRecipe(id); };
     box.querySelector('#servMore').onclick = () => { servingsNow[id] = serves + 1; showRecipe(id); };
@@ -451,16 +645,102 @@ async function setWake(on) {
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && wake && wake.released) { wake = null; setWake(true); } });
 
-/* ───────── which page: the collection, or #r=<id> for one recipe ───────── */
-function route() {
-  const m = location.hash.match(/^#r=(.+)$/);
-  $('#listView').hidden = !!m;
-  $('#recipeView').hidden = !m;
-  if (m) showRecipe(decodeURIComponent(m[1]));
-  else { if (wake) setWake(false); drawList(); }
+/* ───────── the cooking calendar ───────── */
+function allCooked() {
+  const out = [];
+  for (const [id, r] of Object.entries(recipes)) {
+    for (const c of r.cooked || []) out.push({ id, r, day: cookedDay(c), by: c.by || '?' });
+  }
+  return out.sort((a, b) => a.day.localeCompare(b.day));
 }
+function showCalendar(month) {
+  const box = $('#calView');
+  const now = new Date();
+  let [y, m] = (month || '').split('-').map(Number);
+  if (!y || !m) { y = now.getFullYear(); m = now.getMonth() + 1; }
+  const prefix = `${y}-${pad(m)}`;
+  const prev = m === 1 ? `${y - 1}-12` : `${y}-${pad(m - 1)}`;
+  const next = m === 12 ? `${y + 1}-01` : `${y}-${pad(m + 1)}`;
+  const entries = allCooked().filter(e => e.day.startsWith(prefix));
+  const byDay = {};
+  entries.forEach(e => (byDay[e.day] = byDay[e.day] || []).push(e));
+  const emojiOf = r => {
+    const p = Cook.find('protein', r.protein);
+    return (r.protein && !['none', 'veg'].includes(r.protein) ? p?.emoji : Cook.find('meal', r.meal)?.emoji) || '🍽️';
+  };
+
+  // The month grid, Monday first.
+  const first = new Date(y, m - 1, 1);
+  const blanks = (first.getDay() + 6) % 7;
+  const daysIn = new Date(y, m, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < blanks; i++) cells.push('<div class="day blank"></div>');
+  for (let d = 1; d <= daysIn; d++) {
+    const key = `${prefix}-${pad(d)}`;
+    const list = byDay[key] || [];
+    cells.push(`<div class="day${list.length ? ' has' : ''}${key === todayKey() ? ' today' : ''}"><span class="d">${d}</span>
+      ${list.slice(0, 3).map(e => `<a class="ce" href="#r=${encodeURIComponent(e.id)}" title="${esc(e.r.title)} (${esc(e.by)})">${emojiOf(e.r)} <span class="t">${esc(e.r.title)}</span></a>`).join('')}
+      ${list.length > 3 ? `<span class="more">+${list.length - 3} more</span>` : ''}</div>`);
+  }
+
+  // A few numbers for the month.
+  const counts = {};
+  entries.forEach(e => { counts[e.id] = (counts[e.id] || 0) + 1; });
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  const who = {};
+  entries.forEach(e => { who[e.by] = (who[e.by] || 0) + 1; });
+  const total = allCooked().length;
+
+  box.innerHTML = `
+    <div class="card">
+      <div class="calhead">
+        <a class="btn ghost sm" href="#cal=${prev}" aria-label="Previous month">‹</a>
+        <h2>${MONTH_NAMES[m - 1]} ${y}</h2>
+        <a class="btn ghost sm" href="#cal=${next}" aria-label="Next month">›</a>
+      </div>
+      <div class="calgrid">
+        ${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div class="wd">${d}</div>`).join('')}
+        ${cells.join('')}
+      </div>
+    </div>
+    <div class="card">
+      <h3>📊 ${MONTH_NAMES[m - 1]} in the kitchen</h3>
+      ${entries.length ? `
+        <div class="stats">
+          <div class="stat"><b>${entries.length}</b><span>meals logged</span></div>
+          <div class="stat"><b>${Object.keys(counts).length}</b><span>different recipes</span></div>
+          ${top && top[1] > 1 ? `<div class="stat"><b>${top[1]}×</b><span>${esc(recipes[top[0]]?.title || '')}</span></div>` : ''}
+        </div>
+        <p class="statline">👩‍🍳 ${Object.entries(who).sort((a, b) => b[1] - a[1]).map(([p, c]) => `<b>${esc(p)}</b> ${c}×`).join(', ')}</p>
+        ${entries.slice().reverse().map(e => `<div class="calrow"><span class="dt">${WEEKDAYS[keyDate(e.day).getDay()].slice(0, 3)} ${keyDate(e.day).getDate()} ${MONTHS[m - 1]}</span>
+          <a href="#r=${encodeURIComponent(e.id)}">${emojiOf(e.r)} ${esc(e.r.title)}</a><span class="who-pill">${esc(e.by)}</span></div>`).join('')}`
+        : `<div class="empty"><span class="big">🗓️</span>Nothing logged in ${MONTH_NAMES[m - 1]}.${total ? '' : ' Open a recipe and tap <b>✅ We made this</b> to start filling the calendar.'}</div>`}
+    </div>`;
+}
+
+/* ───────── which page is showing ───────── */
+let cameFrom = '';       // the page before this one (so a recipe can go back to its book)
 let lastHash = location.hash;
-window.addEventListener('hashchange', () => { route(); if (location.hash !== lastHash) window.scrollTo(0, 0); lastHash = location.hash; });
+function route() {
+  const h = location.hash;
+  const r = h.match(/^#r=(.+)$/), b = h.match(/^#b=(.+)$/), cal = h.match(/^#cal(?:=(\d{4}-\d\d))?$/);
+  $('#shelfView').hidden = !!(r || b || cal);
+  $('#bookView').hidden = !b;
+  $('#recipeView').hidden = !r;
+  $('#calView').hidden = !cal;
+  $('#tabShelf').classList.toggle('on', !cal);
+  $('#tabCal').classList.toggle('on', !!cal);
+  if (!r && wake) setWake(false);
+  if (r) showRecipe(decodeURIComponent(r[1]));
+  else if (b) showBook(decodeURIComponent(b[1]));
+  else if (cal) showCalendar(cal[1]);
+  else showShelf();
+}
+window.addEventListener('hashchange', () => {
+  if (location.hash !== lastHash) { cameFrom = lastHash; logOpen = false; window.scrollTo(0, 0); }
+  lastHash = location.hash;
+  route();
+});
 
 /* ───────── adding a recipe ───────── */
 function say(text, bad) { const m = $('#addMsg'); m.textContent = text; m.className = 'msg' + (bad ? ' bad' : ''); }
@@ -473,7 +753,9 @@ function onlyLink(text) {
   return '';
 }
 
+let adding = false;
 async function addFromPaste() {
+  if (adding) return;
   const raw = $('#paste').value;
   if (!raw.trim()) { say('Paste a link or a recipe in the box first.', true); return; }
   const link = onlyLink(raw);
@@ -482,8 +764,8 @@ async function addFromPaste() {
   if (link) {
     const already = Object.entries(recipes).find(([, r]) => r.source && sameLink(r.source) === sameLink(link));
     if (already) { say('That one’s already in the cookbook!'); location.hash = 'r=' + encodeURIComponent(already[0]); return; }
-    say('📡 Reading the recipe page…');
-    $('#addBtn').disabled = true;
+    say('📡 Reading the recipe page… (can take up to half a minute for fussy sites)');
+    adding = true; $('#addBtn').disabled = true;
     try {
       const out = await Family.call('recipes', 'import', { url: link });
       if (out.found === 'schema') {
@@ -503,10 +785,10 @@ async function addFromPaste() {
       }
     } catch (e) {
       say(e.message === 'not_family' ? 'Please sign in again.' : '😕 ' + e.message, true);
-      $('#addBtn').disabled = false;
       return;
+    } finally {
+      adding = false; $('#addBtn').disabled = false;
     }
-    $('#addBtn').disabled = false;
   } else {
     draft = Cook.parseText(raw);
     if (!draft.ingredients.length && !draft.steps.length) {
@@ -613,15 +895,15 @@ form.addEventListener('submit', async e => {
   e.preventDefault();
   const r = readForm();
   if (!r.title) { form.title.focus(); return; }
+  const id = editing;
   ed.close();
-  if (editing) {
-    await store.update('recipes', editing, r);
-    location.hash = 'r=' + encodeURIComponent(editing);
-    route();
-  } else {
-    const id = await store.add('recipes', Object.assign(r, { favs: {}, cooked: [] }));
-    $('#paste').value = '';
+  if (id) {
+    await store.update('recipes', id, r);
     location.hash = 'r=' + encodeURIComponent(id);
+  } else {
+    const newId = await store.add('recipes', Object.assign(r, { favs: {}, cooked: [] }));
+    $('#paste').value = '';
+    location.hash = 'r=' + encodeURIComponent(newId);
   }
 });
 $('#edCancel').onclick = () => ed.close();
@@ -644,7 +926,7 @@ store.ready.then(() => {
 store.watch('recipes', items => {
   recipes = items;
   loaded = true;
-  // Don't redraw a recipe under someone's fingers while they edit it.
+  // Don't redraw a page under someone's fingers while they edit a recipe.
   if (!ed.open) route();
 });
 route();

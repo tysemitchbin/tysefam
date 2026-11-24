@@ -45,7 +45,7 @@
       ['cheap', '💰', 'Cheap'], ['mid', '💰💰', 'Middling'], ['pricey', '💰💰💰', 'Pricey'] ] },
   };
   // Little extra labels that can be ticked on any recipe (people can add their own too).
-  const TAGS = ['Vegetarian', 'Vegan', 'Kid-friendly', 'One-pot', 'Slow cooker', 'Air fryer',
+  const TAGS = ['Vegetarian', 'Vegan', 'Kid-friendly', 'One-pot', 'Instant Pot', 'Slow cooker', 'Air fryer',
     'Grill', 'Make ahead', 'Freezes well', 'Weeknight', 'Party', 'Christmas'];
 
   // Look up one choice: Cook.find('protein', 'beef') → { id, emoji, label }
@@ -179,6 +179,7 @@
 
   const TAG_WORDS = {
     'One-pot': words('one-pot', 'one pot', 'one-pan', 'one pan', 'sheet pan', 'sheet-pan', 'traybake', 'tray bake', 'langpanne', 'alt i en'),
+    'Instant Pot': words('instant pot', 'instant-pot', 'instantpot', 'pressure cook', 'pressure-cook', 'trykkoker', 'multicooker', 'multikoker', 'high pressure', 'natural release', 'quick release'),
     'Slow cooker': words('slow cooker', 'slow-cooker', 'crockpot', 'crock-pot', 'crock pot', 'saktekoker', 'slowcooker'),
     'Air fryer': words('air fryer', 'air-fryer', 'airfryer'),
     'Grill': words('grill', 'bbq', 'barbecue', 'braai'),
