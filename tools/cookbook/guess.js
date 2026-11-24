@@ -372,7 +372,7 @@
     return groups.filter((g, k) => k > 0 || g.items.length);
   }
   // → [{ name: 'The sauce', ings: [{ line, i }], steps: [{ line, i }] }, …]   (i = position in the full list)
-  function parts(r) {
+  function parts(r, opts = {}) {
     const out = splitGroups(r.ingredients).map(g => ({ name: g.name, ings: g.items, steps: [] }));
     const named = name => {
       const k = partKey(name);
@@ -394,7 +394,57 @@
       else out.push({ name: g.name, ings: [], steps: loose });
     }
     out.forEach(p => p.steps.sort((a, b) => a.i - b.i));
+    if (!opts.noGuess) guessStepParts(out);
     return out;
+  }
+
+  /* Many recipes split the INGREDIENTS into parts but give one plain list of steps. Then we work
+     out which part each step belongs to from what it mentions: "Put the couscous, salt and butter
+     in a bowl…" uses couscous-part ingredients, so it's a couscous step. A step that brings several
+     parts together goes under "Putting it together"; a step that mentions nothing ("Heat the
+     oven") goes with the step after it. The steps keep their numbers, and on the recipe page
+     "All parts" still lists them in the original order (out.guessed is set). */
+  const STOP = new Set(('and or the with for into from about then cut cuts small large big fresh finely roughly thinly chopped '
+    + 'sliced diced minced grated crushed peeled optional keeps them tender will goes go some more extra each plus '
+    + 'taste serve serving whole half piece pieces inch cm thick thin strips wedges chunks medium ground '
+    + 'pan pans pot tray sheet bowl plate oven dish lid heat side sides top over under').split(' '));
+  const stem = w => w.toLowerCase().replace(/ies$/, 'y').replace(/(?<=.{3})(es|s)$/, '');
+  const wordsOf = text => String(text).toLowerCase().replace(/\([^)]*\)/g, ' ').split(/[^a-zæøåäöüéèáàíóúñç]+/)
+    .filter(w => w.length > 2 && !STOP.has(w) && !UNIT_WORDS.test(w)).map(stem);
+  const UNIT_WORDS = /^(tsp|tbsp|teaspoons?|tablespoons?|cups?|grams?|kg|ml|dl|cl|litres?|liters?|pinch|klype|ss|ts|can|cans|tin|tins|cloves?|fedd|boks|pakke|stk)$/;
+  function guessStepParts(out) {
+    const named = out.filter(p => p.name && p.ings.length);
+    const loose = out.find(p => !p.name && !p.ings.length && p.steps.length);
+    if (named.length < 2 || !loose || out.some(p => p.name && p.steps.length)) return;
+    // The words that point to just one part ("couscous", "breadcrumbs", "cottage"), not shared ones like "salt".
+    const count = {};
+    const partWords = named.map(p => {
+      const set = new Set(p.ings.flatMap(it => wordsOf(it.line)));
+      set.forEach(w => { count[w] = (count[w] || 0) + 1; });
+      return set;
+    });
+    const nameWords = named.map(p => new Set(wordsOf(p.name)));
+    const together = { name: 'Putting it together', ings: [], steps: [] };
+    const pick = loose.steps.map(st => {
+      const ws = new Set(wordsOf(st.line));
+      const scores = named.map((p, k) => [...partWords[k]].filter(w => count[w] === 1 && ws.has(w)).length);
+      const said = named.map((p, k) => [...nameWords[k]].some(w => ws.has(w)));
+      const mentioned = named.filter((p, k) => scores[k] > 0 || said[k]).length;
+      if (mentioned >= 3) return together;
+      const top = Math.max(...scores);
+      if (top > 0 && scores.filter(x => x === top).length === 1) return named[scores.indexOf(top)];
+      if (said.filter(Boolean).length === 1) return named[said.indexOf(true)];
+      return mentioned >= 2 ? together : null;
+    });
+    // Steps that mention nothing go with the next step that does (or the one before, at the end).
+    for (let k = pick.length - 1; k >= 0; k--) if (!pick[k]) pick[k] = pick.slice(k + 1).find(Boolean) || null;
+    for (let k = 0; k < pick.length; k++) if (!pick[k]) pick[k] = pick.slice(0, k).reverse().find(Boolean) || together;
+    // Only worth it if the steps really spread over the parts.
+    if (new Set(pick.filter(p => p !== together)).size < 2) return;
+    loose.steps.forEach((st, k) => pick[k].steps.push(st));
+    out.splice(out.indexOf(loose), 1);
+    if (together.steps.length) out.push(together);
+    out.guessed = true;
   }
   // A little picture for a part, from its name.
   const PART_EMOJI = [[/chicken|kylling/i, '🍗'], [/meat|kjøtt|beef|biff|steak|pork|svin|lamb|lam\b|mince|kjøttdeig|bolle|ball|patt|burger|k[öo]fte|kebab/i, '🥩'],
@@ -409,7 +459,20 @@
   // Pasted text → a recipe (title, ingredients, steps, notes, servings and times when written down).
   function parseText(text) {
     text = String(text || '').replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(/ /g, ' ');
-    const lines = text.split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const raw = text.split('\n').map(l => l.replace(/\s+/g, ' ').trim());
+    const lines = [], afterBlank = new Set();
+    raw.forEach((l, i) => { if (!l) return; if (i > 0 && !raw[i - 1]) afterBlank.add(lines.length); lines.push(l); });
+    // Copied from a chat, the bullets are often gone. A short line on its own after an empty line,
+    // followed by a line with an amount ("Couscous" then "200 g couscous"), is the name of a part.
+    lines.forEach((l, k) => {
+      const prev = lines[k - 1] || '';
+      const afterTop = k === 1 || /serves|servings|porsjon|yield|prep|cook|total|time|minutes|°/i.test(prev);
+      if (!(afterBlank.has(k) || afterTop) || k === 0 || /:$/.test(l)) return;
+      if (l.length > 35 || /\d|[.!?,;]$/.test(l) || BULLET.test(l)) return;
+      if ([H_INGREDIENTS, H_STEPS, H_NOTES].some(re => looksLikeHeading(l, re))) return;
+      const next = (lines[k + 1] || '').replace(BULLET, '');
+      if (/^[\d¼½¾⅓⅔⅛]/.test(next)) lines[k] = l + ':';
+    });
     const r = { title: '', description: '', ingredients: [], steps: [], notes: '', servings: '',
       prepMin: null, cookMin: null, totalMin: null, image: '', source: '' };
 

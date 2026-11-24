@@ -697,7 +697,15 @@ function showRecipe(id) {
   const stepRow = it => `<li class="step${tk['s' + it.i] ? ' done' : ''}" data-tick="s${it.i}">${esc(it.line)}</li>`;
   const ingredients = shown.filter(p => p.ings.length).map(p => head(p) + p.ings.map(ingRow).join('')).join('');
   // Steps in cooking order: the part whose first step comes first goes first.
-  const steps = shown.filter(p => p.steps.length).sort((a, b) => a.steps[0].i - b.steps[0].i).map(p => head(p) + `<ol class="steps">${p.steps.map(stepRow).join('')}</ol>`).join('');
+  let steps = shown.filter(p => p.steps.length).sort((a, b) => a.steps[0].i - b.steps[0].i).map(p => head(p) + `<ol class="steps">${p.steps.map(stepRow).join('')}</ol>`).join('');
+  // When we guessed which part each step belongs to (the recipe had one plain list of steps),
+  // "All parts" keeps the recipe's own order, with each step's part as a little picture.
+  if (ps.guessed && pick < 0) {
+    const partOf = {};
+    ps.forEach(p => p.steps.forEach(st => { partOf[st.i] = p; }));
+    steps = `<ol class="steps">${ps.flatMap(p => p.steps).sort((a, b) => a.i - b.i).map(st =>
+      stepRow(st).replace('">', `"><span title="${esc(nameOf(partOf[st.i]))}">${Cook.partEmoji(nameOf(partOf[st.i]))}</span> `)).join('')}</ol>`;
+  }
   const partBar = multi ? `<div class="partbar">
     <button class="chipbtn${pick < 0 ? ' on' : ''}" data-part="-1">📋 All parts</button>
     ${ps.map((p, k) => `<button class="chipbtn${pick === k ? ' on' : ''}" data-part="${k}">${Cook.partEmoji(nameOf(p))} ${esc(nameOf(p))}</button>`).join('')}
@@ -1016,7 +1024,7 @@ function openEditor(r, id, note, bad) {
   for (const k of ['prepMin', 'cookMin', 'totalMin']) form[k].value = r[k] || '';
   form.priceNok.value = r.priceNok || '';
   // One box per part. A part without a name can only come first, so later ones get a name.
-  const all = Cook.parts(r);
+  const all = Cook.parts(r, { noGuess: true });   // the recipe as written, not our guesses
   // An unnamed part that only has steps can stay unnamed if it holds all the steps.
   const stepsOnly = p => !p.ings.length && !all.some(q => q !== p && q.steps.length);
   edParts = all.map((p, k) => ({
