@@ -7,7 +7,7 @@
    recipe actually asks you to do:
 
      PREP     each ingredient: getting it out and measuring, plus knife work
-              (an onion ≈ 2½ min to peel and dice, a garlic clove ≈ ½ min, 250 g to cube ≈ 4 min…)
+              (an onion ≈ 2½ min to peel and dice, a garlic clove ≈ ½ min, 250 g to cube ≈ 2½ min…)
      ACTIVE   each step you're busy with: frying, stirring, kneading, plus ~1½ min per step
               for reading, moving things and tasting
      WAITING  simmering, baking, resting, rising, marinating: you can do some prep meanwhile,
@@ -39,9 +39,9 @@
     [words('spring onion', 'scallion', 'green onion', 'vårløk'), 0.7],
     [words('garlic', 'hvitløk', 'fedd'), 0.6],
     [words('ginger', 'ingefær'), 2],
-    [words('sweet potato', 'søtpotet'), 3],
-    [words('potato', 'potet'), 2],
-    [words('carrot', 'gulrot', 'gulrøtter'), 1.5],
+    [words('sweet potato', 'søtpotet'), 2],
+    [words('potato', 'potet'), 1.2],
+    [words('carrot', 'gulrot', 'gulrøtter'), 1],
     [words('parsnip', 'pastinakk', 'beet', 'rødbet', 'kålrot', 'swede', 'turnip'), 2.5],
     [words('leek', 'purre'), 2],
     [words('celery', 'stangselleri', 'selleri'), 1],
@@ -95,8 +95,10 @@
   function prepFor(line, why) {
     const l = line.toLowerCase();
     if (TO_SERVE.test(l) && !KNIFE.test(l)) return 0.3;
-    let t = PANTRY.test(l) && !KNIFE.test(l) ? 0.5 : 1;          // get it out and measure it
     const ready = READY.test(l), spoon = SPOONS.test(l);
+    // Get it out and measure it: a spoonful of a spice or a splash of oil is quick.
+    if (/from the (pan|tray|pot|sheet|oven)|from above|reserved|fra (pannen|langpannen|over)/.test(l)) return 0;   // already made
+    let t = (PANTRY.test(l) || spoon) && !KNIFE.test(l) ? 0.3 : 0.6;
     if (ready) t += 0.5;                                          // open the tin / bag
     const item = PER_ITEM.find(([re]) => re.test(l));
     const knife = !ready && !spoon && (KNIFE.test(l) || item);
@@ -104,11 +106,11 @@
       const n = countOf(l), g = grams(l);
       const per = item ? item[1] : 1.5;
       if (n && !g) t += per * Math.min(n, 15);
-      else if (g) t += Math.min(g / 250 * 4, 20);                // ~4 min per 250 g to chop/cube/slice
+      else if (g) t += Math.min(g / 250 * 2.5, 15);              // ~2½ min per 250 g to chop/cube/slice
       else t += Math.max(per, 2.5);
     }
     if (/peel|skrell|skall av|skrelt/.test(l) && !item) t += 1.5;
-    if (/grate|grated|revet|rive/.test(l)) t += 2;
+    if (/grate|grated|revet|rive/.test(l)) t += (grams(l) || 0) > 100 ? 3 : 1;   // a clove of garlic vs a block of cheese
     if (/zest|sitronskall|limeskall|skall av/.test(l)) t += 1.5;
     if (/juice of|juiced|saft av|squeezed|presset/.test(l)) t += 1;
     if (/toasted|ristet|ristede/.test(l)) t += 4;
@@ -126,8 +128,8 @@
   }
 
   /* ───────── the steps ───────── */
-  const PASSIVE = words('simmer', 'småkok', 'bake', 'bak\\b', 'roast', 'stek i ovn', 'i ovnen', 'in the oven', 'oven', 'ovn', 'boil', 'kok\\b',
-    'koke', 'rest', 'hvile', 'marinate', 'mariner', 'chill', 'kjøl', 'refrigerat', 'cool', 'avkjøl', 'rise', 'prove', 'proof', 'heve', 'steam',
+  const PASSIVE = words('simmer', 'småkok', 'bake\\b', 'bak\\b', 'roast\\b', 'stek i ovn', 'i ovnen', 'in the oven', 'oven', 'ovn', 'boil', 'kok\\b',
+    'koke', 'rest\\b(?! of)', 'hvile', 'marinate', 'mariner', 'chill', 'kjøl', 'refrigerat', 'cool', 'avkjøl', 'rise', 'prove', 'proof', 'heve', 'steam',
     'damp', 'braise', 'slow cook', 'saktekok', 'pressure', 'trykk', 'set aside', 'leave', 'la stå', 'la det stå', 'trekke', 'soak', 'bløtlegg',
     'stand', 'release', 'cover and cook', 'lokk på', 'in the fridge', 'kjøleskap');
   // A number of minutes that ISN'T time spent: "stir every 5 minutes", "check after 20 minutes".
@@ -157,7 +159,11 @@
     }
     let stated = statedMinutes(l);
     const isPassive = PASSIVE.test(l);
-    if (/preheat|pre-heat|forvarm|heat the oven|varm opp ovnen/.test(l)) flags.oven = true;
+    if (/preheat|pre-heat|forvarm|heat the oven|varm opp ovnen/.test(l)) {
+      flags.oven = true;
+      // "Heat the oven to 220 °C." is just turning a knob (but "Let rise 30 min. Preheat…" is more).
+      if (l.length < 60 && !statedMinutes(l.replace(/\d+\s*°\s*[cf]?/g, ''))) return { active: 0.5, waiting };
+    }
     if (/oven|ovn|bake|roast/.test(l)) flags.oven = true;
 
     // ── Things recipes famously underestimate ──
@@ -176,7 +182,7 @@
     if (/reduce|reduser|thicken|tykne|koke inn|until syrupy/.test(l)) stated = Math.max(stated, 10) * 1.3;
     if (/until golden|until crisp|gyllen|sprø/.test(l) && stated) stated *= 1.15;
     if (/bring .{0,40}(to a|to the) boil|kok opp|koke opp|boiling water|kokende vann/.test(l)) {
-      const bigPot = /pot|large|pasta|water|vann|kjele/.test(l);
+      const bigPot = /large pot|big pot|large pan|pot of water|pan of water|salted water|pasta|spaghetti|noodle|stor kjele|kjele med vann|saltet vann/.test(l);
       waiting += bigPot ? 10 : 4;
       if (bigPot) flags.water = true;
     }
@@ -185,7 +191,7 @@
 
     if (stated) {
       if (isPassive && !/stir|rør|whisk|visp|flip|snu|fry|stek\b|sauté|fres/.test(l)) waiting += stated;
-      else if (isPassive) { active += stated * 0.4; waiting += stated * 0.6; }   // simmer while stirring now and then
+      else if (isPassive) { active += stated * 0.25; waiting += stated * 0.75; }   // simmer while stirring now and then
       else active += stated;
       return { active, waiting };
     }
@@ -196,16 +202,17 @@
     else if (/cool completely|avkjøl helt/.test(l)) waiting += 45;
     else if (/cool|avkjøl/.test(l)) waiting += 15;
     else if (/marinat|mariner/.test(l)) waiting += 30;
-    else if (/rest|hvile|stand|la stå/.test(l)) waiting += 10;
+    else if (/\brest\b(?! of)|hvile|let (it )?stand|la (det )?stå/.test(l)) waiting += 10;
     else if (/(cook|boil|kok).{0,30}(rice|ris)\b|\b(rice|ris)\b.{0,30}(cook|boil|kok)/.test(l)) waiting += 20;
     else if (/(cook|boil|kok).{0,30}(pasta|spaghetti|noodle|nudler)|\b(pasta|spaghetti|noodles?)\b.{0,30}(cook|boil|kok)/.test(l)) waiting += 10;
     else if (/(boil|kok).{0,30}(potato|potet)|(potato|potet).{0,30}(boil|kok)/.test(l)) waiting += 20;
-    else if (/bake|roast|stek i ovn|i ovnen|in the oven|gratiner/.test(l)) waiting += 25;
+    else if (/\b(bake|roast)\b|stek i ovn|i ovnen|in the oven|gratiner/.test(l)) waiting += 25;   // not "roasted pepper"
     else if (/simmer|småkok|braise|stew|gryte/.test(l)) { active += 4; waiting += 15; }
     else if (/knead|elt/.test(l)) active += 10;
-    else if (/roll out|kjevle|shape|form\b|forme/.test(l)) active += 8;
+    else if (/roll out|kjevle|shape|form\b|forme/.test(l)) active += 6;
     else if (/fry|sauté|saute|stir-fry|wok|stek|fres|brown|brun|sear|cook/.test(l)) active += 6;
     else if (/blend|purée|puree|mix|whisk|stir|combine|bland|visp|rør|toss|vend/.test(l)) active += 2;
+    else if (/^(serve|spoon|divide|plate|garnish|top with|scatter|server|fordel|pynt)/.test(l)) active += 0.5;   // dishing up is already counted
     else active += 2;
     return { active, waiting };
   }
@@ -217,22 +224,25 @@
     if (ings.length < 2 && steps.length < 2) return null;
     const why = [], flags = {};
 
-    let prep = 0;
-    for (const line of ings) prep += prepFor(line, why);
 
     let active = 5 + 3;                                   // getting started + dishing up
     // Each part of the dish (the meat, the sauce, the rice) has its own steps. You only have one
     // pair of hands, so busy time adds up, but parts can wait at the same time: the rice simmers
     // while the sauce reduces. So the longest wait counts in full and the others only a little.
-    const waits = [];
-    for (const part of C.parts(r)) {
-      let w = 0;
-      for (const st of part.steps) { const t = stepTime(st.line, why, flags); active += t.active; w += t.waiting; }
-      waits.push(w);
-    }
+    const per = C.parts(r).map(part => {
+      // "Putting it together" happens after the other parts, so it can't overlap with them.
+      const x = { prep: 0, busy: 0, wait: 0, last: /together|assembl|to finish|finishing|serve|servering|montering|sammen/i.test(part.name) };
+      for (const it of part.ings) x.prep += prepFor(it.line, why);
+      for (const st of part.steps) { const t = stepTime(st.line, why, flags); x.busy += t.active; x.wait += t.waiting; }
+      return x;
+    });
+    let prep = 0;
+    per.forEach(x => { prep += x.prep; active += x.busy; });
+    const waits = per.filter(x => !x.last).map(x => x.wait);
+    const after = per.filter(x => x.last).reduce((sum, x) => sum + x.wait, 0);   // assembly waits come after
     waits.sort((a, b) => b - a);
     const rest = waits.slice(1).reduce((a, b) => a + b, 0);
-    let waiting = (waits[0] || 0) + rest * 0.3;
+    let waiting = (waits[0] || 0) + rest * 0.3 + after;
     if (rest >= 10) why.push('The parts can cook at the same time, so their waiting overlaps');
 
     // The oven heats while you prep: only the part that's left over counts.
@@ -245,7 +255,14 @@
     if (flags.pressure) why.push('An Instant Pot takes ~12 min to come up to pressure before the timer starts');
 
     // While things simmer or bake you can get on with some of the prep (but rarely all of it).
-    const overlap = Math.min(waiting, prep) * 0.4;
+    let overlap = Math.min(waiting, prep) * 0.45;
+    // With parts, the other parts get made during the longest wait: the chicken is fried and the
+    // sauce whisked while the rice simmers. Count most of that work as happening meanwhile.
+    if (per.filter(x => x.busy || x.wait).length > 1) {
+      const main = per.reduce((m, x) => (x.wait > m.wait ? x : m));
+      const others = per.filter(x => x !== main && !x.last).reduce((sum, x) => sum + x.busy + x.prep, 0);
+      overlap = Math.max(overlap, Math.min(main.wait, others) * 0.7);
+    }
     const total = prep + active + waiting - overlap;
     return {
       total: Math.max(5, Math.round(total / 5) * 5),

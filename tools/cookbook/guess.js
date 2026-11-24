@@ -256,7 +256,9 @@
         'sous vide', 'deep-fry', 'deep fry', 'frityr', 'candy thermometer', 'termometer', 'water bath', 'vannbad', 'flambé', 'flambe',
         'pipe\\b', 'piping', 'spritpose', 'roll out', 'kjevle', 'fold in the butter', 'caramel', 'karamell', 'emulsi', 'from scratch',
         'butterfly', 'debone', 'fillet the', 'filetere', 'blind bake', 'blindbake', 'souffl', 'puff pastry from', 'choux'));
-      const points = ings.length + steps.length * 1.5 + tricky * 4 + (total > 120 ? 8 : total > 60 ? 4 : total > 40 ? 2 : 0);
+      // Spices, salt and oil measured with a spoon hardly add to the difficulty.
+      const real = ings.filter(l => !/\b(tsp|tbsp|teaspoons?|tablespoons?|ts|ss|krm|pinch|klype)\b|^(salt|pepper|black pepper|oil|olive oil)\b/i.test(l)).length;
+      const points = real + (ings.length - real) * 0.3 + steps.length * 1.5 + tricky * 4 + (total > 120 ? 8 : total > 60 ? 4 : total > 40 ? 2 : 0);
       out.difficulty = points < 19 ? 'easy' : points < 33 ? 'medium' : 'hard';
     }
 
@@ -290,6 +292,10 @@
   }
   function pickMeal(title, meta) {
     const named = (meta || '').toLowerCase();
+    // "Teriyaki chicken bowls with pickled cucumber": the dish is what comes before "with".
+    const dish = title.split(/\s+(?:with|med|and|og|served with|&)\s+/i)[0];
+    if (dish !== title) for (const [id, re] of MEAL_WORDS) if (re.test(dish)) return id;
+    if (dish !== title && Object.values(MEAT).some(re => re.test(dish))) return 'dinner';
     for (const [id, re] of MEAL_WORDS) if (re.test(title)) return id;
     // Norwegian puts the kind of dish at the END of a word: fiskesuppe, potetsalat, sjokoladekake.
     for (const [id, re] of MEAL_ENDINGS) if (re.test(title)) return id;
@@ -366,7 +372,7 @@
     return groups.filter((g, k) => k > 0 || g.items.length);
   }
   // → [{ name: 'The sauce', ings: [{ line, i }], steps: [{ line, i }] }, …]   (i = position in the full list)
-  function parts(r) {
+  function parts(r, opts = {}) {
     const out = splitGroups(r.ingredients).map(g => ({ name: g.name, ings: g.items, steps: [] }));
     const named = name => {
       const k = partKey(name);
@@ -388,11 +394,61 @@
       else out.push({ name: g.name, ings: [], steps: loose });
     }
     out.forEach(p => p.steps.sort((a, b) => a.i - b.i));
+    if (!opts.noGuess) guessStepParts(out);
     return out;
   }
+
+  /* Many recipes split the INGREDIENTS into parts but give one plain list of steps. Then we work
+     out which part each step belongs to from what it mentions: "Put the couscous, salt and butter
+     in a bowl…" uses couscous-part ingredients, so it's a couscous step. A step that brings several
+     parts together goes under "Putting it together"; a step that mentions nothing ("Heat the
+     oven") goes with the step after it. The steps keep their numbers, and on the recipe page
+     "All parts" still lists them in the original order (out.guessed is set). */
+  const STOP = new Set(('and or the with for into from about then cut cuts small large big fresh finely roughly thinly chopped '
+    + 'sliced diced minced grated crushed peeled optional keeps them tender will goes go some more extra each plus '
+    + 'taste serve serving whole half piece pieces inch cm thick thin strips wedges chunks medium ground '
+    + 'pan pans pot tray sheet bowl plate oven dish lid heat side sides top over under').split(' '));
+  const stem = w => w.toLowerCase().replace(/ies$/, 'y').replace(/(?<=.{3})(es|s)$/, '');
+  const wordsOf = text => String(text).toLowerCase().replace(/\([^)]*\)/g, ' ').split(/[^a-zæøåäöüéèáàíóúñç]+/)
+    .filter(w => w.length > 2 && !STOP.has(w) && !UNIT_WORDS.test(w)).map(stem);
+  const UNIT_WORDS = /^(tsp|tbsp|teaspoons?|tablespoons?|cups?|grams?|kg|ml|dl|cl|litres?|liters?|pinch|klype|ss|ts|can|cans|tin|tins|cloves?|fedd|boks|pakke|stk)$/;
+  function guessStepParts(out) {
+    const named = out.filter(p => p.name && p.ings.length);
+    const loose = out.find(p => !p.name && !p.ings.length && p.steps.length);
+    if (named.length < 2 || !loose || out.some(p => p.name && p.steps.length)) return;
+    // The words that point to just one part ("couscous", "breadcrumbs", "cottage"), not shared ones like "salt".
+    const count = {};
+    const partWords = named.map(p => {
+      const set = new Set(p.ings.flatMap(it => wordsOf(it.line)));
+      set.forEach(w => { count[w] = (count[w] || 0) + 1; });
+      return set;
+    });
+    const nameWords = named.map(p => new Set(wordsOf(p.name)));
+    const together = { name: 'Putting it together', ings: [], steps: [] };
+    const pick = loose.steps.map(st => {
+      const ws = new Set(wordsOf(st.line));
+      const scores = named.map((p, k) => [...partWords[k]].filter(w => count[w] === 1 && ws.has(w)).length);
+      const said = named.map((p, k) => [...nameWords[k]].some(w => ws.has(w)));
+      const mentioned = named.filter((p, k) => scores[k] > 0 || said[k]).length;
+      if (mentioned >= 3) return together;
+      const top = Math.max(...scores);
+      if (top > 0 && scores.filter(x => x === top).length === 1) return named[scores.indexOf(top)];
+      if (said.filter(Boolean).length === 1) return named[said.indexOf(true)];
+      return mentioned >= 2 ? together : null;
+    });
+    // Steps that mention nothing go with the next step that does (or the one before, at the end).
+    for (let k = pick.length - 1; k >= 0; k--) if (!pick[k]) pick[k] = pick.slice(k + 1).find(Boolean) || null;
+    for (let k = 0; k < pick.length; k++) if (!pick[k]) pick[k] = pick.slice(0, k).reverse().find(Boolean) || together;
+    // Only worth it if the steps really spread over the parts.
+    if (new Set(pick.filter(p => p !== together)).size < 2) return;
+    loose.steps.forEach((st, k) => pick[k].steps.push(st));
+    out.splice(out.indexOf(loose), 1);
+    if (together.steps.length) out.push(together);
+    out.guessed = true;
+  }
   // A little picture for a part, from its name.
-  const PART_EMOJI = [[/chicken|kylling/i, '🍗'], [/meat|kjøtt|beef|biff|steak|pork|svin|lamb|lam\b|mince|kjøttdeig|bolle|ball/i, '🥩'],
-    [/fish|fisk|salmon|laks|torsk|cod|prawn|shrimp|reke/i, '🐟'], [/sauce|saus|gravy|jus|curry/i, '🥫'], [/rice|ris\b/i, '🍚'],
+  const PART_EMOJI = [[/chicken|kylling/i, '🍗'], [/meat|kjøtt|beef|biff|steak|pork|svin|lamb|lam\b|mince|kjøttdeig|bolle|ball|patt|burger|k[öo]fte|kebab/i, '🥩'],
+    [/fish|fisk|salmon|laks|torsk|cod|prawn|shrimp|reke/i, '🐟'], [/sauce|saus|gravy|jus|curry/i, '🥫'], [/rice|ris\b|couscous|bulgur|quinoa/i, '🍚'],
     [/noodle|nudler|pasta|spaghetti/i, '🍝'], [/potato|potet|mash|mos\b/i, '🥔'], [/marinade|mariner|rub\b|krydder/i, '🧂'],
     [/dressing|salad|salat|slaw/i, '🥗'], [/dough|deig|bread|brød|crust|bunn|pastry|base/i, '🥖'], [/topping|garnish|pynt|serve|servering/i, '🌿'],
     [/filling|fyll/i, '🥟'], [/frosting|icing|glaze|glasur|syrup|sirup|cream|krem/i, '🍯'], [/veg|grønnsak/i, '🥦'],
@@ -403,7 +459,20 @@
   // Pasted text → a recipe (title, ingredients, steps, notes, servings and times when written down).
   function parseText(text) {
     text = String(text || '').replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(/ /g, ' ');
-    const lines = text.split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const raw = text.split('\n').map(l => l.replace(/\s+/g, ' ').trim());
+    const lines = [], afterBlank = new Set();
+    raw.forEach((l, i) => { if (!l) return; if (i > 0 && !raw[i - 1]) afterBlank.add(lines.length); lines.push(l); });
+    // Copied from a chat, the bullets are often gone. A short line on its own after an empty line,
+    // followed by a line with an amount ("Couscous" then "200 g couscous"), is the name of a part.
+    lines.forEach((l, k) => {
+      const prev = lines[k - 1] || '';
+      const afterTop = k === 1 || /serves|servings|porsjon|yield|prep|cook|total|time|minutes|°/i.test(prev);
+      if (!(afterBlank.has(k) || afterTop) || k === 0 || /:$/.test(l)) return;
+      if (l.length > 35 || /\d|[.!?,;]$/.test(l) || BULLET.test(l)) return;
+      if ([H_INGREDIENTS, H_STEPS, H_NOTES].some(re => looksLikeHeading(l, re))) return;
+      const next = (lines[k + 1] || '').replace(BULLET, '');
+      if (/^[\d¼½¾⅓⅔⅛]/.test(next)) lines[k] = l + ':';
+    });
     const r = { title: '', description: '', ingredients: [], steps: [], notes: '', servings: '',
       prepMin: null, cookMin: null, totalMin: null, image: '', source: '' };
 
@@ -419,6 +488,11 @@
       if ((m = l.match(/(?:serves|servings|portions?|yield|makes|porsjoner|personer|antall)\s*:?\s*(\d+(?:\s*[-–]\s*\d+)?[^,;|]*)/i))
         || (m = l.match(/^(\d+(?:\s*[-–]\s*\d+)?\s*(?:servings|portions|porsjoner|personer|pers\.?|people)\b)/i))) {
         if (!r.servings) r.servings = m[1].trim().slice(0, 40); facts.push(i);
+        // "Serves 2-3, about 30 minutes, 220 °C": the minutes are the recipe's own total time.
+        if (!r.totalMin && !/prep|cook|bake|forbered|steketid|koketid/i.test(l) && /min|hour|hr|time|timer/i.test(l)) {
+          const d = parseDuration(l.replace(/\d+\s*°\s*[CF]?/g, ''));
+          if (d) r.totalMin = d;
+        }
       }
       if ((m = l.match(/(?:prep(?:aration)?(?:\s*time)?|forberedelse(?:stid)?|forb\.?\s*tid)\s*:\s*([^|·;,]+)/i))) { r.prepMin = parseDuration(m[1]); facts.push(i); }
       if ((m = l.match(/(?:cook(?:ing)?\s*time|bake\s*time|baking\s*time|steketid|koketid|cook|bake)\s*:\s*([^|·;,]+)/i))) { r.cookMin = parseDuration(m[1]); facts.push(i); }
@@ -456,11 +530,21 @@
     };
 
     if (iIng >= 0 || iSteps >= 0) {
-      r.ingredients = section(iIng, iSteps, iNotes);
       r.steps = section(iSteps, iIng, iNotes);
-      if (iNotes >= 0) r.notes = section(iNotes, iIng > iNotes ? iIng : -1, iSteps > iNotes ? iSteps : -1).join('\n');
-      // Short intro lines that look like ingredients but come before the headings stay as the description.
-      r.description = intro.filter(l => l.length > 30).slice(0, 3).join(' ');
+      if (iNotes >= 0) r.notes = section(iNotes, iIng > iNotes ? iIng : -1, iSteps > iNotes ? iSteps : -1)
+        .map(l => l.replace(BULLET, '').trim()).join('\n');
+      if (iIng >= 0) {
+        r.ingredients = section(iIng, iSteps, iNotes);
+        // Short intro lines that look like ingredients but come before the headings stay as the description.
+        r.description = intro.filter(l => l.length > 30).slice(0, 3).join(' ');
+      } else {
+        // A "Steps" heading but no "Ingredients" one (it may start straight with "For the meat"):
+        // everything between the title and the steps is ingredients, after any opening sentences.
+        let k = 0;
+        while (k < intro.length && intro[k].length > 60 && /[.!?]$/.test(intro[k]) && !BULLET.test(intro[k])) k++;
+        r.description = intro.slice(0, k).join(' ');
+        r.ingredients = intro.slice(k);
+      }
     } else {
       // No headings: short lines starting with an amount are ingredients, sentences are steps.
       intro.forEach(l => {
@@ -479,9 +563,19 @@
   }
 
   // Bullets off, and an amount on its own line ("200 g" / "flour") joined to the next line.
+  // In a bulleted list, a line WITHOUT a bullet ("Couscous", "Sauce") is the name of a part.
+  function partLine(list, raw) {
+    const bullets = list.filter(l => BULLET.test(l)).length;
+    if (bullets < 3 || bullets < list.length * 0.6 || BULLET.test(raw)) return '';
+    const l = raw.trim();
+    return l.length <= 40 && !/[.!?]$/.test(l) && !/^[\d¼½¾⅓⅔⅛]/.test(l) ? l.replace(/:?$/, ':') : '';
+  }
+
   function tidyIngredients(list) {
     const out = [];
     for (let i = 0; i < list.length; i++) {
+      const part = partLine(list, list[i]);
+      if (part) { out.push(part); continue; }
       let l = list[i].replace(BULLET, '').trim();
       if (!l) continue;
       if (/^[\d¼½¾⅓⅔⅛.,/\s-]+(?:(?:g|kg|ml|cl|dl|l|ss|ts|tbsp|tsp|cups?|stk|oz|lb|pk|boks)\.?)?$/i.test(l) && l.length <= 10 && list[i + 1]) {
@@ -496,6 +590,8 @@
   function tidySteps(list) {
     const out = [];
     for (const raw of list) {
+      const part = partLine(list, raw);
+      if (part) { out.push(part); continue; }
       const l = raw.replace(BULLET, '').replace(STEP_NUMBER, '').trim();
       if (!l || /^\d+$/.test(l)) continue;
       if (isHeading(l)) { out.push(/:$/.test(l) ? l : l + ':'); continue; }

@@ -81,6 +81,8 @@ code readable and commented for a non-expert.
   Category ids in `Cook.CATS` are what's saved, so don't rename them. Parts of a dish (the meat, the
   sauce, the rice) are heading lines ending in ":" inside `ingredients`/`steps`; `Cook.parts()` pairs them
   up, the recipe page has a button per part and the edit box a box per part (steps keep cooking order);
+  when only the ingredients have parts, `guessStepParts` assigns each step by the ingredients it mentions
+  (shown on the page, never saved; the edit box uses `parts(r, {noGuess: true})`);
   the edge function reads ingredient groups from WP Recipe Maker / Tasty Recipes pages. `prices.js`
   (`Cook.price`) costs a dish in kr from typical Norwegian prices; the Cost group is the kr band (under 100,
   100–200 … over 500), or `priceNok` if someone typed the real cost. **Update its PRICES table now and then.**
@@ -91,6 +93,8 @@ code readable and commented for a non-expert.
   Shared in `family_items` (tool `cookbook`, collection `recipes`: also `favs` per person and
   `cooked: [{by, date, ts, min}]`, which feeds the calendar, the stats and the time learning).
   Shelf arrangement, search, ticks and the cooking timer are per device.
+  `tools/cookbook/claude-skill/cookbook-recipes/SKILL.md` is a claude.ai skill that makes Claude write
+  recipes in the layout `parseText` reads best; update it if the paste format changes.
 - `tools/packing/`: shared packing checklists in `family_items` (tool `packing`: `lists`, `items`, `trip`).
 - `tools/energy/`: Tibber prices + usage per house, plus a Bills list. The page calls the `energy`
   edge function (`supabase/functions/energy/`), which reads Tibber/Elvia tokens from

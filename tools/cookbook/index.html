@@ -690,14 +690,22 @@ function showRecipe(id) {
   const ps = Cook.parts(r);
   const multi = ps.length > 1;
   const pick = multi && partNow[id] < ps.length ? partNow[id] ?? -1 : -1;   // -1 = all parts
-  const nameOf = p => p.name || (p.ings.length ? 'The rest' : 'Putting it together');
+  const nameOf = p => p.name || (p.ings.length ? 'The rest' : ps.some(q => q !== p && q.steps.length) ? 'Putting it together' : 'All the steps');
   const shown = pick >= 0 ? [ps[pick]] : ps;
   const head = p => multi && pick < 0 ? `<div class="sub">${Cook.partEmoji(nameOf(p))} ${esc(nameOf(p))}</div>` : '';
   const ingRow = it => `<div class="ing${tk['i' + it.i] ? ' done' : ''}" data-tick="i${it.i}"><div class="check${tk['i' + it.i] ? ' done' : ''}"></div><span class="t">${esc(Cook.scale(it.line, factor))}</span></div>`;
   const stepRow = it => `<li class="step${tk['s' + it.i] ? ' done' : ''}" data-tick="s${it.i}">${esc(it.line)}</li>`;
   const ingredients = shown.filter(p => p.ings.length).map(p => head(p) + p.ings.map(ingRow).join('')).join('');
   // Steps in cooking order: the part whose first step comes first goes first.
-  const steps = shown.filter(p => p.steps.length).sort((a, b) => a.steps[0].i - b.steps[0].i).map(p => head(p) + `<ol class="steps">${p.steps.map(stepRow).join('')}</ol>`).join('');
+  let steps = shown.filter(p => p.steps.length).sort((a, b) => a.steps[0].i - b.steps[0].i).map(p => head(p) + `<ol class="steps">${p.steps.map(stepRow).join('')}</ol>`).join('');
+  // When we guessed which part each step belongs to (the recipe had one plain list of steps),
+  // "All parts" keeps the recipe's own order, with each step's part as a little picture.
+  if (ps.guessed && pick < 0) {
+    const partOf = {};
+    ps.forEach(p => p.steps.forEach(st => { partOf[st.i] = p; }));
+    steps = `<ol class="steps">${ps.flatMap(p => p.steps).sort((a, b) => a.i - b.i).map(st =>
+      stepRow(st).replace('">', `"><span title="${esc(nameOf(partOf[st.i]))}">${Cook.partEmoji(nameOf(partOf[st.i]))}</span> `)).join('')}</ol>`;
+  }
   const partBar = multi ? `<div class="partbar">
     <button class="chipbtn${pick < 0 ? ' on' : ''}" data-part="-1">📋 All parts</button>
     ${ps.map((p, k) => `<button class="chipbtn${pick === k ? ' on' : ''}" data-part="${k}">${Cook.partEmoji(nameOf(p))} ${esc(nameOf(p))}</button>`).join('')}
@@ -1016,8 +1024,11 @@ function openEditor(r, id, note, bad) {
   for (const k of ['prepMin', 'cookMin', 'totalMin']) form[k].value = r[k] || '';
   form.priceNok.value = r.priceNok || '';
   // One box per part. A part without a name can only come first, so later ones get a name.
-  edParts = Cook.parts(r).map((p, k) => ({
-    name: p.name || (k === 0 ? '' : p.ings.length ? 'The rest' : 'Putting it together'),
+  const all = Cook.parts(r, { noGuess: true });   // the recipe as written, not our guesses
+  // An unnamed part that only has steps can stay unnamed if it holds all the steps.
+  const stepsOnly = p => !p.ings.length && !all.some(q => q !== p && q.steps.length);
+  edParts = all.map((p, k) => ({
+    name: p.name || (k === 0 || stepsOnly(p) ? '' : p.ings.length ? 'The rest' : 'Putting it together'),
     ings: p.ings.map(x => x.line), steps: p.steps.map(x => x.line),
     order: p.steps.length ? p.steps[0].i : 1e9 }));   // where this part's steps come in the cooking order
   if (!edParts.length) edParts = [{ name: '', ings: [], steps: [], order: 0 }];
@@ -1087,7 +1098,10 @@ function flattenParts(list) {
   const ingredients = [], steps = [];
   list = list.filter(p => p.name || p.ings.length || p.steps.length);
   // Only the first part may go without a name (its lines come before any heading).
-  list.forEach((p, k) => { p.name = p.name || (k === 0 ? '' : `Part ${k + 1}`); });
+  list.forEach((p, k) => {
+    const stepsOnly = !p.ings.length && !list.some(q => q !== p && q.steps.length);
+    p.name = p.name || (k === 0 || stepsOnly ? '' : `Part ${k + 1}`);
+  });
   list.forEach(p => {
     if (p.name && p.ings.length) ingredients.push(p.name + ':');
     ingredients.push(...p.ings);

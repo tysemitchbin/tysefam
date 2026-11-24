@@ -270,7 +270,7 @@
     // An amount somewhere else in the line: "Chicken thighs (about 600 g)", "juice of 1 lemon".
     m = l.match(/(\d+(?:[.,]\d+)?)\s*(g|kg|ml|cl|dl|l|lb|oz)\b/);
     if (m) { const u = UNIT[m[2]]; return { [u[0]]: num(m[1]) * u[1] }; }
-    m = l.match(/\bof\s+(\d+|an?|one|½)\s/);
+    m = l.match(/\bof\s+(\d+\/\d+|\d+|an?|one|½)\s/);
     if (m) return { n: num(m[1]) };
     return {};
   }
@@ -278,6 +278,8 @@
   // What one ingredient line costs.
   function lineCost(line) {
     const l = line.toLowerCase();
+    // "1 roasted pepper from the pan", "the reserved sauce": already counted earlier in the recipe.
+    if (/from the (pan|tray|pot|sheet|oven)|from above|reserved|fra (pannen|langpannen|over)|fra kjelen/.test(l)) return { line, kr: 0, known: true };
     const hit = PRICES.find(([re]) => re.test(l));
     const p = hit ? hit[1] : UNKNOWN;
     const a = amountOf(line);
