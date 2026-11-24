@@ -7,7 +7,7 @@
 
    Every picture is drawn in a 160 × 100 box; the floor is at y = 88.
    Keys match the page's "done today" ticks:
-     's1-0'  stage 1, exercise 1 (exercises count from 0, as in data.js)
+     's1-0'  stage 1, exercise 1 (exercises count from 0, as in moves-data.js)
      'g-0'   the first game in the movement-play "safe menu"
      'c-0'   the first crawling pattern
    A key with no picture just shows no picture, so it's safe to leave gaps.

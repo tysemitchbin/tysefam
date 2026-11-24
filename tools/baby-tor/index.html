@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Baby Tor</title>
+
+<!-- ════════════════════════════════════════════════════════════════
+     BABY TOR: everything about the baby, in two big tabs.
+       🥄 Food      starting solids: today's meals, a week plan, which foods
+                    have been tried, the nine allergens, and the guide.
+                    App in food.js, words + food list in food-data.js.
+                    Built from Mitch's doc "What Foods to Introduce, and When".
+       🤸 Movement  floor play and motor milestones (what used to be the
+                    "Baby Moves" page). App in moves.js, words in
+                    moves-data.js, diagrams in moves-illus.js.
+     common.js has the date and age helpers both use.
+
+     Saved data (shared by the family):
+       Family.store('baby-moves')  the baby's name/birthday + movement ticks
+       Family.store('baby-food')   meals, plans, allergens… (see food.js)
+     The address ends in #food or #movement, so either can be bookmarked.
+═════════════════════════════════════════════════════════════════ -->
+
+<link rel="stylesheet" href="../../shared/family.css">
+<style>
+[hidden]{display:none !important}
+/* Colours come from shared/family.css (--meadow, --forest, --peach, --cream, --paper, --ink, --line…). */
+:root{
+  --accent:var(--meadow-deep); --accent-soft:#e3f1df;
+  --hot:var(--peach-deep); --hot-soft:#fdeede;
+  --bad:#c2453a; --bad-soft:#fdeceb; --warn:#a87a10; --warn-soft:#fcf3d2;
+  --sunk:#eef0e8; --rr:16px;
+}
+body{line-height:1.55}
+h1,h2,h3,h4{font-family:"Fredoka",system-ui,sans-serif;font-weight:600;color:var(--forest);line-height:1.2;margin:0}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+/* header: title + tabs, stuck to the top while you scroll */
+.top{position:sticky;top:0;z-index:10;background:var(--cream);border-bottom:1px solid var(--line)}
+.top-in{max-width:880px;margin:0 auto;padding:12px 16px 0;display:flex;flex-direction:column;gap:8px}
+.brand{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.brand-l{display:flex;align-items:center;gap:10px;min-width:0}
+.brand-l .mark{font-size:1.7rem;line-height:1}
+.brand h1{font-size:1.25rem}
+.brand small{display:block;font-size:.78rem;color:var(--ink-soft)}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:none;border:0;padding:8px 11px 10px;color:var(--ink-soft);font-weight:700;border-bottom:3px solid transparent;white-space:nowrap;font-size:.93rem}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--hot)}
+.tab:hover{color:var(--ink)}
+
+main.view{max-width:880px;margin:0 auto;padding:22px 16px 72px;display:flex;flex-direction:column;gap:20px}
+
+/* generic pieces */
+.box{background:var(--paper);border:1px solid var(--line);border-radius:var(--rr);padding:18px;box-shadow:var(--shadow)}
+.box > h3{font-size:1.15rem;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.box > h3 .aside{margin-left:auto;font-family:"Nunito",sans-serif;font-size:.8rem;font-weight:800;color:var(--ink-soft)}
+.eyebrow{font-size:.74rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft)}
+.muted{color:var(--ink-soft)}
+.small{font-size:.86rem}
+p{margin:.4em 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+ul.clean,ol.clean{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:2px solid var(--line);background:#fff;color:var(--forest);border-radius:999px;padding:6px 12px;font-weight:800;font-size:.86rem}
+.chip[aria-pressed="true"]{background:var(--meadow);border-color:var(--meadow);color:#fff}
+.note{border-radius:12px;padding:12px 14px;background:var(--sunk);font-size:.92rem}
+.note.warn{background:var(--warn-soft)}
+.note.bad{background:var(--bad-soft)}
+.note.good{background:var(--accent-soft)}
+.pill{display:inline-block;font-size:.72rem;font-weight:800;padding:2px 9px;border-radius:999px;background:var(--sunk);color:var(--ink-soft);white-space:nowrap;vertical-align:middle}
+.pill.ok{background:var(--accent-soft);color:var(--accent)}
+.pill.hot{background:var(--hot-soft);color:#b8693b}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.disclaimer{font-size:.82rem;color:var(--ink-soft);text-align:center;max-width:64ch;margin:0 auto}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;background:#fff;padding:3px;flex-wrap:wrap}
+.seg button{border:0;background:none;border-radius:999px;padding:6px 12px;font-size:.88rem;font-weight:800;color:var(--ink-soft)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+@media (max-width:560px){.seg{border-radius:18px}.brand small{display:none}}
+
+/* tick boxes (shared with family.css .check, but as real buttons) */
+.tick{flex:0 0 auto;width:28px;height:28px;border-radius:9px;border:2px solid var(--meadow);background:#fff;display:grid;place-items:center;padding:0;transition:.15s}
+.tick:hover{background:#eef6ea}
+.tick[aria-pressed="true"]{background:var(--meadow)}
+.tick[aria-pressed="true"]::after{content:"✓";color:#fff;font-weight:800}
+
+/* Today: the baby card */
+.hello{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+.hello .face{font-size:2.6rem;width:72px;height:72px;border-radius:50%;background:var(--blossom);display:grid;place-items:center}
+.hello h2{font-size:clamp(1.4rem,4vw,1.9rem)}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.form label{display:flex;flex-direction:column;gap:4px;font-weight:800;font-size:.82rem;color:var(--ink-soft)}
+.form input{border:2px solid var(--line);border-radius:12px;padding:9px 11px;background:#fff;min-width:0}
+.form input:focus{border-color:var(--meadow);outline:none}
+
+/* exercise cards (Today and Stages) */
+.exs{display:flex;flex-direction:column;gap:8px}
+.ex{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);background:#fff;border-radius:14px;padding:12px}
+.ex.done{background:#f5faf3}
+.ex .body{flex:1;min-width:0}
+.ex .t{font-weight:800;color:var(--forest)}
+.ex .num{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--hot-soft);color:#b8693b;font-size:.75rem;font-weight:800;margin-right:6px;vertical-align:1px}
+.ex .d{margin:.25em 0 0;font-size:.94rem}
+.ex .who{font-size:.74rem;font-weight:800;color:var(--accent)}
+
+/* the week strip */
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}
+.week .d{border-radius:12px;padding:6px 0;background:var(--sunk);font-size:.75rem;font-weight:800;color:var(--ink-soft)}
+.week .d b{display:block;font-family:"Fredoka",sans-serif;font-size:1.1rem;color:var(--ink-soft)}
+.week .d.some{background:var(--accent-soft)} .week .d.some b{color:var(--accent)}
+.week .d.lots{background:var(--meadow);color:#fff} .week .d.lots b{color:#fff}
+.week .d.today{outline:2px solid var(--hot);outline-offset:-2px}
+
+/* skill windows chart */
+.win{display:flex;flex-direction:column;gap:4px}
+.win-row,.win-axis{display:grid;grid-template-columns:170px 1fr 58px;gap:10px;align-items:center}
+.win-row{border:0;background:none;padding:3px 0;text-align:left;border-radius:8px;width:100%}
+.win-row:hover{background:var(--sunk)}
+.win-lbl{font-size:.88rem;font-weight:700}
+.win-rng{font-size:.78rem;color:var(--ink-soft);font-weight:700;text-align:right}
+.win-track{position:relative;height:18px;background:repeating-linear-gradient(90deg,var(--line) 0 1px,transparent 1px calc(100%/13))}
+.win-track i{position:absolute;top:2px;bottom:2px;border-radius:9px;background:rgba(127,168,116,.22);border:1.5px solid var(--meadow)}
+.win-row.key i{background:rgba(232,155,111,.25);border-color:var(--hot)}
+.win-row.key .win-lbl{color:#b8693b}
+.win-track .now{position:absolute;top:-4px;bottom:-4px;width:0;border-left:2px dashed var(--forest)}
+.win-ticks{position:relative;height:18px;font-size:.74rem;font-weight:800;color:var(--ink-soft)}
+.win-ticks span{position:absolute;transform:translateX(-50%)}
+@media (max-width:600px){
+  .win-row,.win-axis{grid-template-columns:1fr 46px;gap:2px 8px}
+  .win-lbl{grid-column:1 / -1}
+  .win-axis > span:first-child{display:none}
+  .win-ticks .odd{display:none}
+}
+
+/* stage picker */
+.stagebar{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.stagebtn{border:2px solid var(--line);background:#fff;border-radius:14px;padding:8px 4px;text-align:center;font-weight:800;color:var(--forest);line-height:1.2}
+.stagebtn .e{font-size:1.4rem;display:block}
+.stagebtn small{display:block;font-size:.72rem;color:var(--ink-soft);font-weight:700}
+.stagebtn[aria-pressed="true"]{border-color:var(--hot);background:var(--hot-soft)}
+.stagebtn.mine{box-shadow:inset 0 -4px 0 var(--meadow)}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.fact{border-radius:12px;background:var(--sunk);padding:12px 14px;font-size:.93rem}
+.fact .eyebrow{display:block;margin-bottom:4px}
+.fact.good{background:var(--accent-soft)}
+
+/* plain tables and card lists */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.mini{border:1px solid var(--line);background:#fff;border-radius:14px;padding:12px 14px;font-size:.93rem}
+.mini h4{font-size:1rem;margin-bottom:4px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.mini.later{opacity:.55}
+.mini.ok{border-left:5px solid var(--meadow)}
+.mini.watch{border-left:5px solid var(--sun-deep)}
+.mini.flag{border-left:5px solid var(--bad)}   /* not .check: that's the tick box in family.css */
+.mini.skip{border-left:5px solid var(--bad)}
+.mini.limit{border-left:5px solid var(--sun-deep)}
+.mini.use{border-left:5px solid var(--meadow)}
+.mini.big{background:var(--bad-soft);grid-column:1 / -1}
+table.t{width:100%;border-collapse:collapse;font-size:.93rem}
+table.t th{text-align:left;font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);padding:6px 8px;border-bottom:2px solid var(--line)}
+table.t td{padding:9px 8px;border-bottom:1px dashed var(--line);vertical-align:top}
+table.t tr.here td{background:var(--hot-soft)}
+table.t td.n{white-space:nowrap;font-weight:800;color:var(--forest)}
+@media (max-width:560px){
+  table.t.stack thead{display:none}
+  table.t.stack tr{display:block;border-bottom:1px dashed var(--line);padding:8px 0}
+  table.t.stack td{display:block;border:0;padding:2px 8px}
+}
+
+/* safety */
+.never{display:flex;flex-direction:column;gap:8px}
+.never .n{display:flex;gap:12px;background:var(--bad-soft);border-radius:12px;padding:12px 14px}
+.never .n .x{font-size:1.2rem;line-height:1.3}
+.never .n b{color:#8f2f26}
+.checklist{display:flex;flex-direction:column}
+.checklist .it{display:flex;gap:12px;align-items:flex-start;padding:9px 2px;border-bottom:1px dashed var(--line)}
+.checklist .it:last-child{border-bottom:0}
+.checklist .it .txt{flex:1;min-width:0}
+.checklist .it.done .txt{color:var(--ink-soft)}
+.principles{counter-reset:p;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.principles details{border:1px solid var(--line);background:#fff;border-radius:14px;padding:12px 14px}
+.principles summary{cursor:pointer;font-weight:800;color:var(--forest);list-style:none;display:flex;gap:10px;align-items:baseline}
+.principles summary::-webkit-details-marker{display:none}
+.principles summary::before{counter-increment:p;content:counter(p);font-family:"Fredoka",sans-serif;font-size:1.3rem;color:var(--hot);line-height:1}
+.principles p{font-size:.93rem;margin:.5em 0 0}
+
+/* tracker */
+.tgroup{display:flex;flex-direction:column}
+.titem{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:9px 2px;border-bottom:1px dashed var(--line)}
+.titem:last-child{border-bottom:0}
+.titem .when{display:flex;align-items:center;gap:6px;font-size:.78rem;font-weight:800;color:var(--accent)}
+.titem input[type=date]{border:1px solid var(--line);border-radius:8px;padding:3px 6px;font-size:.8rem;color:var(--accent);background:#fff}
+@media (max-width:560px){.titem{grid-template-columns:auto 1fr}.titem .when{grid-column:2}}
+.bar{height:8px;border-radius:999px;background:var(--sunk);overflow:hidden;flex:1;min-width:80px}
+.bar > i{display:block;height:100%;background:var(--meadow);border-radius:999px}
+.box.here{border-color:var(--hot);box-shadow:0 0 0 3px var(--hot-soft),var(--shadow)}
+
+.foot-actions{display:flex;justify-content:center}
+
+/* the little diagrams (drawn in illus.js), floated beside the words */
+.pic{float:right;width:150px;margin:0 0 6px 12px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.pic svg{display:block;width:100%;height:auto}
+.mini .pic{width:120px}
+.ex .body::after,.mini::after{content:"";display:block;clear:both}
+@media (max-width:560px){.pic{width:112px;margin-left:8px}.mini .pic{width:104px}}
+
+/* ───────── Baby Tor: the Food / Movement switch ───────── */
+.sections{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px}
+.sections button{border:0;border-radius:999px;padding:8px 10px;background:none;font-family:"Fredoka",sans-serif;font-weight:600;font-size:1.05rem;color:var(--ink-soft)}
+.sections button[aria-selected="true"]{background:var(--forest);color:#fff}
+.sections button:hover:not([aria-selected="true"]){background:var(--sunk)}
+
+/* ───────── Food tab ───────── */
+.form select{border:2px solid var(--line);border-radius:12px;padding:9px 11px;background:#fff;min-width:0;font-size:1rem}
+.chip.sm{padding:4px 10px;font-size:.82rem}
+label.chip{display:inline-flex;gap:5px;align-items:center;cursor:pointer}
+.tick.auto{cursor:default;border-style:dashed}
+.tick.auto[aria-pressed="true"]{border-style:solid}
+.week .d small{display:block;font-size:.66rem;color:inherit}
+
+/* a food as a little label */
+.fchip{display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:.86rem;font-weight:700;margin:2px 4px 2px 0;white-space:nowrap}
+.fchip.alg{border-color:var(--peach)}
+
+/* meals on the Today tab */
+.meals{display:flex;flex-direction:column;gap:8px}
+.meal{display:grid;grid-template-columns:110px 1fr auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:#fff}
+.meal.planned{background:var(--sunk);border-style:dashed}
+.meal.eaten{border-left:5px solid var(--meadow)}
+.meal.bad{border-left-color:var(--bad);background:var(--bad-soft)}
+.meal .slot{font-weight:800;color:var(--forest);font-size:.9rem}
+.meal .acts{display:flex;gap:6px}
+@media (max-width:560px){.meal{grid-template-columns:1fr auto}.meal .what{grid-column:1 / -1;grid-row:2}}
+
+/* the three numbers on the Foods tab */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.stats div{background:var(--sunk);border-radius:12px;padding:10px 4px}
+.stats b{display:block;font-family:"Fredoka",sans-serif;font-size:1.6rem;color:var(--forest)}
+.stats span{font-size:.78rem;font-weight:800;color:var(--ink-soft)}
+
+/* food tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.tile{display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;border:2px solid var(--line);background:#fff;border-radius:14px;padding:10px 6px}
+.tile:hover{border-color:var(--meadow)}
+.tile .e{font-size:1.7rem;line-height:1}
+.tile .n{font-weight:800;font-size:.86rem;color:var(--forest);line-height:1.2}
+.tile .b{font-size:.8rem;display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:center}
+.tile.tried{background:#f5faf3;border-color:#cfe3c8}
+.tile.nope{background:var(--warn-soft);border-color:#eedc9c}
+.tile.later{opacity:.5}
+
+/* the week plan */
+.box.day{padding:14px}
+.box.day > h3{font-size:1.05rem;margin-bottom:8px}
+.box.day.past{opacity:.7}
+.prows{display:flex;flex-direction:column;gap:6px}
+.prow{display:grid;grid-template-columns:105px 1fr auto;gap:8px;align-items:center;text-align:left;border:1px dashed var(--line);background:#fff;border-radius:12px;padding:8px 10px;width:100%}
+.prow:hover{border-color:var(--meadow)}
+.prow.eaten{border-style:solid;background:#f5faf3}
+.prow .slot{font-weight:800;font-size:.86rem;color:var(--forest)}
+@media (max-width:560px){.prow{grid-template-columns:1fr auto}.prow .what{grid-column:1 / -1;grid-row:2}}
+
+/* Learn: fold-out boxes */
+details.box.learn > summary{cursor:pointer;list-style:none}
+details.box.learn > summary::-webkit-details-marker{display:none}
+details.box.learn > summary h3{display:flex;align-items:center;gap:8px;font-size:1.15rem}
+details.box.learn > summary h3::after{content:"▾";margin-left:auto;color:var(--ink-soft);transition:.15s}
+details.box.learn[open] > summary h3::after{transform:rotate(180deg)}
+details.box.learn[open] > summary{margin-bottom:8px}
+
+/* the pop-up sheet (log a meal, plan a meal, a food's card) */
+body.sheet-open{overflow:hidden}
+.sheet-wrap{position:fixed;inset:0;z-index:50;background:rgba(40,50,35,.45);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--paper);width:min(640px,100%);max-height:92vh;overflow:auto;border-radius:22px 22px 0 0;padding:18px 16px 24px;box-shadow:var(--shadow-lg)}
+@media (min-width:700px){.sheet-wrap{align-items:center}.sheet{border-radius:22px}}
+.sheet h3{font-size:1.25rem;margin-bottom:10px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.sheet h3 .aside{font-family:"Nunito",sans-serif;font-size:.85rem;color:var(--ink-soft);font-weight:700}
+.picked{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;min-height:36px;align-items:center}
+.pk{display:inline-flex;border:2px solid var(--meadow);border-radius:999px;background:#fff;overflow:hidden}
+.pkm{border:0;background:none;padding:5px 4px 5px 11px;font-weight:800;font-size:.88rem;color:var(--forest)}
+span.pkm{display:inline-block}
+.pkx{border:0;background:none;padding:5px 10px 5px 6px;color:var(--ink-soft);font-size:1rem;font-weight:800}
+.pkx:hover{color:var(--bad)}
+.picker .field{width:100%}
+.weeknav{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;text-align:center;margin-bottom:6px}
+.weeknav h3{font-size:1.2rem}
+.weeknav small{font-size:.82rem;font-weight:700;color:var(--ink-soft)}
+.plist{display:flex;flex-wrap:wrap;gap:6px;max-height:34vh;overflow:auto;padding:2px}
+.pf{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;font-size:.86rem;font-weight:700;color:var(--ink)}
+.pf small{font-size:.68rem;color:var(--ink-soft);font-weight:800}
+.pf.on{background:var(--meadow);border-color:var(--meadow);color:#fff}
+.pf.on small{color:#fff}
+.pf.later{opacity:.55}
+.dots{display:flex;gap:5px;margin:6px 0}
+.dots i{width:16px;height:16px;border-radius:50%;background:var(--sunk);border:2px solid var(--line)}
+.dots i.on{background:var(--meadow);border-color:var(--meadow)}
+</style>
+</head>
+<body data-tool="baby-tor">
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <div class="brand-l">
+        <span class="mark" aria-hidden="true">👶</span>
+        <div><h1 id="babyTitle">Baby Tor</h1><small id="babyAge">Food and movement</small></div>
+      </div>
+      <span class="badge local" id="sync">…</span>
+    </div>
+    <div class="sections" role="tablist" aria-label="Section">
+      <button role="tab" data-sec="food" aria-selected="true">🥄 Food</button>
+      <button role="tab" data-sec="movement" aria-selected="false">🤸 Movement</button>
+    </div>
+    <nav class="tabs" role="tablist" id="foodTabs" aria-label="Food"></nav>
+    <nav class="tabs" role="tablist" id="movesTabs" aria-label="Movement" hidden></nav>
+  </div>
+</header>
+<main class="view" id="foodView" aria-live="polite"></main>
+<main class="view" id="movesView" aria-live="polite" hidden></main>
+
+<script src="../../site.js"></script>
+<script src="../../shared/family.js"></script>
+<script src="common.js"></script>
+<script src="moves-data.js"></script>
+<script src="moves-illus.js"></script>
+<script src="moves.js"></script>
+<script src="food-data.js"></script>
+<script src="food.js"></script>
+<script>
+(function () {
+'use strict';
+const $ = s => document.querySelector(s);
+
+// Both halves share the baby's details, so one copy of that store is passed to both.
+const movesStore = Family.store('baby-moves');
+const foodStore = Family.store('baby-food');
+
+/* ── Food / Movement switch ── */
+const SEC_KEY = 'baby-tor-section';
+function show(sec) {
+  if (sec !== 'movement') sec = 'food';
+  document.querySelectorAll('.sections button').forEach(b => b.setAttribute('aria-selected', b.dataset.sec === sec));
+  $('#foodTabs').hidden = $('#foodView').hidden = sec !== 'food';
+  $('#movesTabs').hidden = $('#movesView').hidden = sec !== 'movement';
+  history.replaceState(null, '', '#' + sec);
+  try { localStorage.setItem(SEC_KEY, sec); } catch (e) { /* private window: fine */ }
+}
+document.querySelector('.sections').addEventListener('click', e => {
+  const b = e.target.closest('[data-sec]'); if (!b) return;
+  show(b.dataset.sec); window.scrollTo(0, 0);
+});
+let start = location.hash.slice(1);
+if (!start) { try { start = localStorage.getItem(SEC_KEY); } catch (e) { /* fine */ } }
+show(start);
+
+/* ── the two apps ── */
+MovesApp.start(movesStore, { tabs: $('#movesTabs'), view: $('#movesView') });
+FoodApp.start(foodStore, movesStore, {
+  tabs: $('#foodTabs'), view: $('#foodView'),
+  editBaby: () => { show('movement'); MovesApp.editBaby(); window.scrollTo(0, 0); }
+});
+
+/* ── header: the baby's name and age, and whether data is shared ── */
+movesStore.watch('baby', items => {
+  const baby = items.main || {};
+  const name = (baby.name || '').trim() || 'Tor';
+  $('#babyTitle').textContent = 'Baby ' + name;
+  document.title = 'Baby ' + name;
+  const ages = BabyKit.babyAges(baby);
+  $('#babyAge').textContent = ages ? BabyKit.ageText(ages.actual) + ' old' : 'Food and movement';
+});
+foodStore.ready.then(() => {
+  const cloud = foodStore.mode === 'cloud';
+  $('#sync').className = 'badge ' + (cloud ? 'ok' : 'local');
+  $('#sync').textContent = cloud ? '☁️ Shared' : '📴 This device only';
+});
+})();
+</script>
+</body>
+</html>

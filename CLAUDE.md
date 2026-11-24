@@ -49,11 +49,21 @@ code readable and commented for a non-expert.
   Baseball). View-only: the numbers are in `data.js` (one line per season; add new seasons there),
   the page works out AVG/OBP/ERA etc., totals and Chart.js charts. Brought over from
   `D:\Documents\Claude projects\Baseball Stat` (its SQLite DB/build scripts are no longer needed).
-- `tools/baby-moves/`: floor play and motor milestones, 5–18 months, from Mitch's doc "Baby Acrobatics".
-  `data.js` = the guide's words (stages, exercises, clinics, safety, equipment, tracker, red flags);
-  tracker keys in it are what ticks are saved under, so don't rename them. `illus.js` = simple SVG
-  diagrams (one per exercise `s1-0`…, game `g-0`…, crawl pattern `c-0`…), built from shared poses/props. Shared in `family_items`
-  (tool `baby-moves`: `baby` (name, birthday, due date, stage), `skills`, `log` per day, `setup`).
+- `tools/baby-tor/`: "Baby Tor", one page with two big tabs (address ends `#food` or `#movement`).
+  `index.html` is the shell + CSS; `common.js` (`window.BabyKit`) has the date/age helpers.
+  **Movement** (what used to be `tools/baby-moves/`, now a redirect stub): floor play and motor milestones,
+  5–18 months, from Mitch's doc "Baby Acrobatics". `moves.js` (`MovesApp.start`) is the app; `moves-data.js` =
+  the guide's words (stages, exercises, clinics, safety, equipment, tracker, red flags); tracker keys in it are
+  what ticks are saved under, so don't rename them. `moves-illus.js` = simple SVG diagrams (one per exercise
+  `s1-0`…, game `g-0`…, crawl pattern `c-0`…). Data still in `family_items` tool `baby-moves`: `baby` (name,
+  birthday, due date, stage; the Food tab reads it too), `skills`, `log` per day, `setup`.
+  **Food**: starting solids, from Mitch's doc "What Foods to Introduce, and When (6–24 months)" (Norwegian advice
+  first: Helsedirektoratet, Mattilsynet). `food.js` (`FoodApp.start`) is the app: Today (meals planned vs eaten,
+  daily boxes for iron / iron+vitamin C / veg / vitamin D / water, fish and allergen nudges), Plan (week planner
+  with a "fill empty meals" suggester and shopping list), Foods (tiles, tries, how it went), Allergens (the nine
+  Norway says to include in year one), Learn. `food-data.js` = the food list (ids are what meals/plans are saved
+  under, so don't rename them), allergens, stages and guide text. Data in `family_items` tool `baby-food`:
+  `meals`, `plan` (per day), `daily`, `allergy`, `custom` foods, `settings`.
 - `tools/trx/`: TRX (suspension strap) exercise database, workouts and a workout timer.
   `data.js` = exercises (strap length, position, steps, cues, easier/harder) + ready-made workouts;
   exercise ids are used by saved workouts and the diagrams, so don't rename them. `illus.js` = start → finish
