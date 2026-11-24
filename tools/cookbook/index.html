@@ -27,7 +27,10 @@
                    ingredients: [lines], steps: [lines], notes,
                    meal, protein, cuisine, difficulty, cost   (ids from Cook.CATS in guess.js),
                    tags: ['Vegetarian', …], favs: { Mitch: true },
-                   cooked: [{ by, date: '2026-11-24', ts }]   (every time we made it), ts, by }
+                   cooked: [{ by, date: '2026-11-24', ts, min }]   (every time we made it; min = how long
+                   it really took, if logged), ts, by }
+     Times: what the recipe says is kept, but what we SHOW is realistic: your own logged times for
+     that recipe, or else our estimate (timing.js) adjusted by how your logged cooks compare with it.
      A line ending in ":" in ingredients or steps ("For the sauce:") is shown as a little heading.
      How the shelf is arranged, search and ticked-off ingredients stay on this device only.
 ═════════════════════════════════════════════════════════════════ -->
@@ -111,7 +114,15 @@ textarea.field{width:100%;resize:vertical;line-height:1.4;}
 a.fact:hover{filter:brightness(.95);}
 .fact.c-cost{background:#fdf3d6;color:#9a7a17;} .fact.c-difficulty{background:#fde9dc;color:#b86a3c;}
 .fact.c-cuisine{background:#e2f1f4;color:#3f7f8f;} .fact.c-tag{background:#fbe4ea;color:#b4566f;}
-.times{font-size:.85rem;color:var(--ink-soft);font-weight:700;margin:4px 0 8px;}
+.timebox{background:#f6faf3;border-radius:14px;padding:10px 12px;margin:6px 0 10px;}
+.tb-main{font-size:1.05rem;color:var(--forest);font-weight:700;}
+.tb-main b{font-family:'Fredoka',sans-serif;font-size:1.25rem;}
+.tb-how{font-size:.8rem;color:var(--ink-soft);font-weight:700;}
+.tb-line{font-size:.85rem;color:var(--ink-soft);font-weight:700;margin-top:2px;}
+.timebox summary{cursor:pointer;font-weight:800;color:var(--meadow-deep);font-size:.85rem;margin-top:6px;}
+.tb-parts{display:flex;flex-direction:column;gap:3px;margin:8px 0;font-size:.88rem;}
+.tb-why{margin:4px 0 8px;padding-left:20px;font-size:.85rem;color:var(--ink);}
+.tb-note{font-size:.8rem;color:var(--ink-soft);font-weight:600;flex-basis:100%;}
 .who-line{font-size:.82rem;color:var(--ink-soft);font-weight:700;}
 .logrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;padding:10px;background:#eef6ea;border-radius:12px;font-weight:700;}
 .logrow input{border:2px solid var(--line);border-radius:10px;padding:7px 9px;}
@@ -246,10 +257,11 @@ dialog .field{width:100%;}
     </div>
     <div class="row4">
       <label>Serves<input class="field" name="servings" placeholder="4" maxlength="40"></label>
-      <label>Prep (min)<input class="field" name="prepMin" type="number" min="0" max="5000"></label>
-      <label>Cook (min)<input class="field" name="cookMin" type="number" min="0" max="5000"></label>
-      <label>Total (min)<input class="field" name="totalMin" type="number" min="0" max="5000"></label>
+      <label>Recipe’s prep (min)<input class="field" name="prepMin" type="number" min="0" max="5000"></label>
+      <label>Recipe’s cook (min)<input class="field" name="cookMin" type="number" min="0" max="5000"></label>
+      <label>Recipe’s total (min)<input class="field" name="totalMin" type="number" min="0" max="5000"></label>
     </div>
+    <p class="hint" id="edEst" style="margin:-4px 0 0"></p>
     <div class="cats" id="edCats"></div>
     <div>
       <div style="font-weight:800;font-size:.82rem;color:var(--ink-soft);margin-bottom:6px">Labels</div>
@@ -275,6 +287,7 @@ dialog .field{width:100%;}
 <script src="../../site.js"></script>
 <script src="../../shared/family.js"></script>
 <script src="guess.js"></script>
+<script src="timing.js"></script>
 <script>
 const TOOL_ID = 'cookbook';
 const store = Family.store(TOOL_ID);
@@ -295,7 +308,40 @@ let wake = null;         // the "keep screen on" lock while cooking
 
 /* ───────── small helpers ───────── */
 const safeUrl = u => (/^https?:\/\/[^\s"'<>]+$/i.test(String(u || '').trim()) ? String(u).trim() : '');
-const timeOf = r => r.totalMin || ((r.prepMin || 0) + (r.cookMin || 0)) || 0;
+/* ───────── how long a recipe REALLY takes ─────────
+   1. Your own logged times for this recipe (the average of the last 5), if there are any.
+   2. Otherwise our estimate (timing.js) × how your kitchen compares with our estimates.
+   3. Otherwise what the recipe says. */
+const siteTime = r => r.totalMin || ((r.prepMin || 0) + (r.cookMin || 0)) || 0;
+const loggedMins = r => (r.cooked || []).filter(c => c.min > 0)
+  .sort((a, b) => cookedDay(a).localeCompare(cookedDay(b))).map(c => c.min);
+const round5 = m => Math.max(5, Math.round(m / 5) * 5);
+let speedCache = null;   // worked out once, forgotten whenever recipes change
+// Compare every logged cook with our estimate for that recipe. 1.2 = you take 20% longer.
+function kitchenSpeed() {
+  if (speedCache) return speedCache;
+  const ratios = [];
+  for (const r of Object.values(recipes)) {
+    const e = Cook.estimate(r);
+    if (e) loggedMins(r).forEach(m => ratios.push(m / e.total));
+  }
+  const n = ratios.length;
+  if (n < 2) return (speedCache = { factor: 1, n });
+  ratios.sort((a, b) => a - b);
+  const median = n % 2 ? ratios[(n - 1) / 2] : (ratios[n / 2 - 1] + ratios[n / 2]) / 2;
+  // The more cooks are logged, the more we trust them (two cooks only nudge it a little).
+  const factor = Math.min(2, Math.max(0.5, 1 + (median - 1) * n / (n + 3)));
+  return (speedCache = { factor, n });
+}
+function realTime(r) {
+  const est = Cook.estimate(r);
+  const mine = loggedMins(r).slice(-5);
+  if (mine.length) return { min: round5(mine.reduce((a, b) => a + b, 0) / mine.length), how: 'yours', n: mine.length, est };
+  if (est) return { min: round5(est.total * kitchenSpeed().factor), how: 'estimate', est };
+  const s = siteTime(r);
+  return { min: s, how: s ? 'site' : '', est };
+}
+const timeOf = r => realTime(r).min;
 function fmtMin(m) {
   if (!m) return '';
   if (m < 60) return m + ' min';
@@ -507,6 +553,7 @@ function cookStats(r) {
   return `
     <div class="stats">
       <div class="stat"><b>${n}×</b><span>made in all</span></div>
+      ${loggedMins(r).length ? `<div class="stat"><b>${fmtMin(round5(loggedMins(r).reduce((a, b) => a + b, 0) / loggedMins(r).length))}</b><span>it usually takes us (${loggedMins(r).length} timed)</span></div>` : ''}
       <div class="stat"><b>${esc(agoText)}</b><span>last time (${esc(fmtDay(last))})</span></div>
       <div class="stat"><b>${thisYear}×</b><span>this year</span></div>
       ${every ? `<div class="stat"><b>${esc(every)}</b><span>about how often</span></div>` : ''}
@@ -521,8 +568,56 @@ function cookStats(r) {
     <details class="hist"><summary>Every time we made it (${n})</summary>
       ${(r.cooked || []).map((c, i) => [c, i]).sort((a, b) => cookedDay(b[0]).localeCompare(cookedDay(a[0]))).map(([c, i]) => `
         <div class="histrow"><span style="flex:1">${esc(fmtDay(cookedDay(c)))} · ${WEEKDAYS[keyDate(cookedDay(c)).getDay()]}</span>
+          ${c.min ? `<span class="mini">⏱️ ${fmtMin(c.min)}</span>` : `<button class="linkbtn" data-addmin="${i}" title="How long did it take?">＋ time</button>`}
           <span class="who-pill">${esc(c.by || '?')}</span><button class="del" data-uncook="${i}" title="Remove this one">✕</button></div>`).join('')}
     </details>`;
+}
+
+/* ───────── the cooking timer (on this device; survives closing the page) ───────── */
+const TIMER_KEY = 'cookbook:timers';
+const timers = () => { try { return JSON.parse(localStorage.getItem(TIMER_KEY)) || {}; } catch (e) { return {}; } };
+function setTimer(id, start) {
+  const t = timers();
+  if (start) t[id] = start; else delete t[id];
+  try { localStorage.setItem(TIMER_KEY, JSON.stringify(t)); } catch (e) { /* private window */ }
+}
+// Tick the timer on the page every 20 seconds.
+setInterval(() => {
+  const el = document.getElementById('tmr'), m = location.hash.match(/^#r=(.+)$/);
+  const start = m && timers()[decodeURIComponent(m[1])];
+  if (el && start) el.textContent = fmtMin(Math.max(1, Math.round((Date.now() - start) / 60000)));
+}, 20000);
+
+/* The time box on a recipe: our realistic time, what the recipe claims, and how we worked it out. */
+function timeBox(r) {
+  const rt = realTime(r), site = siteTime(r), sp = kitchenSpeed(), e = rt.est;
+  if (!rt.min) return '';
+  const adjusted = e ? round5(e.total * sp.factor) : 0;
+  const how = rt.how === 'yours' ? `your average from ${rt.n} timed cook${rt.n === 1 ? '' : 's'}`
+    : rt.how === 'estimate' ? (sp.n >= 2 ? 'our estimate, tuned to your kitchen' : 'our own estimate') : 'what the recipe says';
+  const compare = [
+    site && rt.how !== 'site' ? `the recipe says ${fmtMin(site)}` : '',
+    e && rt.how === 'yours' ? `we’d have guessed ${fmtMin(adjusted)}` : '',
+  ].filter(Boolean).join(' · ');
+  const pct = Math.round(Math.abs(sp.factor - 1) * 100);
+  const learning = sp.n >= 2
+    ? (pct < 5 ? `Your ${sp.n} timed cooks match our estimates nicely, so we leave them as they are.`
+      : `From your ${sp.n} timed cooks, your kitchen takes about ${pct}% ${sp.factor > 1 ? 'longer' : 'less time'} than our plain estimate, so every estimate is adjusted by that.`)
+    : 'Log how long it really took when you tap ✅ We made this (or use the timer), and the estimates learn how fast your kitchen is.';
+  return `<div class="timebox">
+    <div class="tb-main">⏱️ About <b>${fmtMin(rt.min)}</b> <span class="tb-how">${how}</span></div>
+    ${compare ? `<div class="tb-line">${esc(compare)}</div>` : ''}
+    ${e && e.overnight ? '<div class="tb-line">🌙 Plus some time overnight (see the steps): start the day before.</div>' : ''}
+    ${e ? `<details><summary>How we worked it out</summary>
+      <div class="tb-parts">
+        <span>🔪 Prep (fetching, measuring, chopping) <b>${e.prep} min</b></span>
+        <span>🍳 Busy cooking (frying, stirring, dishing up) <b>${e.active} min</b></span>
+        <span>⏳ Waiting (simmering, baking, resting) <b>${e.waiting} min</b>${e.waiting && e.prep ? ', with some prep done meanwhile' : ''}</span>
+      </div>
+      ${e.why.length ? `<ul class="tb-why">${e.why.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
+      <div class="tb-note">${esc(learning)}</div>
+    </details>` : ''}
+  </div>`;
 }
 
 /* ───────── one recipe ───────── */
@@ -553,7 +648,8 @@ function showRecipe(id) {
     return c ? `<a class="fact c-${cat}" href="#b=${encodeURIComponent(cat + ':' + c.id)}" title="${esc(CATS[cat].label)}: open that book">${c.emoji} ${esc(c.label)}</a>` : '';
   }).join('') + (r.tags || []).map(t => `<a class="fact c-tag" href="#b=${encodeURIComponent('tag:' + t)}">🏷️ ${esc(t)}</a>`).join('');
 
-  const times = [r.prepMin && `Prep ${fmtMin(r.prepMin)}`, r.cookMin && `Cook ${fmtMin(r.cookMin)}`, timeOf(r) && `Total ${fmtMin(timeOf(r))}`].filter(Boolean).join(' · ');
+  const timer = timers()[id];
+  const elapsed = timer ? Math.max(1, Math.round((Date.now() - timer) / 60000)) : 0;
 
   const ingredients = (r.ingredients || []).map((line, i) => Cook.isHeading(line)
     ? `<div class="sub">${esc(line.replace(/:$/, ''))}</div>`
@@ -574,20 +670,24 @@ function showRecipe(id) {
         <h1>${esc(r.title)}</h1>
         ${r.description ? `<p class="rv-desc">${esc(r.description)}</p>` : ''}
         <div class="facts">${chips}</div>
-        ${times ? `<div class="times">⏱️ ${esc(times)}</div>` : ''}
+        ${timeBox(r)}
         <div class="who-line">
           ${src ? `From <a href="${esc(src)}" target="_blank" rel="noopener noreferrer">${esc(domain(src))} ↗</a> · ` : ''}
           added by ${esc(r.by || '?')}${r.ts ? ', ' + esc(fmtDay(dayKey(new Date(r.ts)))) : ''}
         </div>
         <div class="acts">
           <button class="chipbtn pink${favs.includes(me) ? ' on' : ''}" id="rvFav">❤️ ${favs.length ? esc(favs.join(' & ')) : 'Favourite'}</button>
+          <button class="chipbtn${timer ? ' on' : ''}" id="rvTimer">${timer ? `⏱️ <span id="tmr">${fmtMin(elapsed)}</span>… done?` : '⏱️ Start cooking timer'}</button>
           <button class="chipbtn${logOpen ? ' on' : ''}" id="rvCooked">✅ We made this</button>
           ${'wakeLock' in navigator ? `<button class="chipbtn${wake ? ' on' : ''}" id="rvWake">📱 ${wake ? 'Screen stays on' : 'Keep screen on'}</button>` : ''}
         </div>
         ${logOpen ? `<div class="logrow">Made it on
           <input type="date" id="logDate" value="${todayKey()}" max="${todayKey()}">
+          <span>and it took <input type="number" id="logMin" min="1" max="1440" placeholder="?" value="${elapsed || ''}" style="width:76px"> min</span>
           <button class="btn sm" id="logSave">Save</button>
-          <button class="linkbtn" id="logCancel">Cancel</button></div>` : ''}
+          <button class="linkbtn" id="logCancel">Cancel</button>
+          ${timer ? '<button class="linkbtn" id="logDrop">Throw the timer away</button>' : ''}
+          <div class="tb-note">From starting to food on the table, if you know. That’s what teaches the estimates.</div></div>` : ''}
       </div>
     </div>
     <div class="rv-grid">
@@ -619,10 +719,29 @@ function showRecipe(id) {
       const day = box.querySelector('#logDate').value;
       if (!/^\d{4}-\d\d-\d\d$/.test(day)) return;
       if (cooked.some(c => cookedDay(c) === day) && !confirm(`Already marked as made on ${fmtDay(day)}. Count it again?`)) return;
+      const min = Math.round(+box.querySelector('#logMin').value);
+      const entry = { by: me, date: day, ts: keyDate(day).getTime() };
+      if (min > 0 && min <= 1440) entry.min = min;
       logOpen = false;
-      store.update('recipes', id, { cooked: [...cooked, { by: me, date: day, ts: keyDate(day).getTime() }] });
+      setTimer(id, null);
+      store.update('recipes', id, { cooked: [...cooked, entry] });
     };
+    const drop = box.querySelector('#logDrop');
+    if (drop) drop.onclick = () => { setTimer(id, null); logOpen = false; showRecipe(id); };
   }
+  // The timer: tap to start; tap again when the food's on the table to log it with the time filled in.
+  box.querySelector('#rvTimer').onclick = async () => {
+    if (timer) { logOpen = true; showRecipe(id); return; }
+    setTimer(id, Date.now());
+    if ('wakeLock' in navigator && !wake) await setWake(true);   // keep the screen on while cooking
+    showRecipe(id);
+  };
+  box.querySelectorAll('[data-addmin]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.addmin;
+    const min = Math.round(+prompt(`How many minutes did it take on ${fmtDay(cookedDay(cooked[i]))}? (from starting to food on the table)`));
+    if (!(min > 0 && min <= 1440)) return;
+    store.update('recipes', id, { cooked: cooked.map((c, k) => k === i ? Object.assign({}, c, { min }) : c) });
+  });
   box.querySelectorAll('[data-uncook]').forEach(b => b.onclick = () => {
     const i = +b.dataset.uncook;
     if (!confirm(`Remove ${fmtDay(cookedDay(cooked[i]))} from the times we made it?`)) return;
@@ -799,7 +918,7 @@ async function addFromPaste() {
   }
   say('');
   Object.assign(draft, Cook.guess(draft));
-  if (!note) note = `✨ Sorted for you${draft.timeGuessed ? ' (the time is a rough guess)' : ''}. Check it looks right, then save.`;
+  if (!note) note = '✨ Sorted for you. Check it looks right, then save.';
   openEditor(draft, null, note, bad);
 }
 $('#addBtn').onclick = addFromPaste;
@@ -851,10 +970,19 @@ function openEditor(r, id, note, bad) {
   catSelects(r);
   edTags = [...(r.tags || [])];
   tagBoxes();
+  showEstimate();
   ed.showModal();
   ed.scrollTop = 0;
   if (!r.title) form.title.focus();
 }
+
+// Our own time estimate, updated as the ingredients and steps are typed.
+function showEstimate() {
+  const e = Cook.estimate(readForm());
+  $('#edEst').textContent = e ? `⏱️ Our own estimate: about ${fmtMin(round5(e.total * kitchenSpeed().factor))}${e.overnight ? ' plus overnight' : ''}. Recipe sites tend to say less; the times you log when you cook it will make this better.` : '';
+}
+form.ingredients.addEventListener('input', () => showEstimate());
+form.steps.addEventListener('input', () => showEstimate());
 
 const lines = text => String(text || '').split('\n').map(s => s.trim()).filter(Boolean);
 const minutesField = v => { const n = Math.round(+v); return n > 0 ? n : null; };
@@ -882,7 +1010,6 @@ $('#edGuess').onclick = () => {
   const r = readForm();
   const g = Cook.guess(r);
   catSelects(g);
-  if (!form.totalMin.value) form.totalMin.value = g.totalMin || '';
   const own = edTags.filter(t => !Cook.TAGS.includes(t));
   edTags = [...new Set([...g.tags, ...own])];
   tagBoxes();
@@ -926,6 +1053,7 @@ store.ready.then(() => {
 store.watch('recipes', items => {
   recipes = items;
   loaded = true;
+  speedCache = null;      // logged times may have changed
   // Don't redraw a page under someone's fingers while they edit a recipe.
   if (!ed.open) route();
 });

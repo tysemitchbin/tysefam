@@ -68,9 +68,13 @@ code readable and commented for a non-expert.
   Machine (many sites block cloud servers), reads schema.org Recipe JSON-LD, or sends back the page text.
   `guess.js` (`window.Cook`) reads pasted text and guesses meal, main protein, cuisine, time, difficulty,
   cost and labels by keyword spotting (English + Norwegian); the edit box shows the guesses before saving.
-  Category ids in `Cook.CATS` are what's saved, so don't rename them. Shared in `family_items` (tool
-  `cookbook`, collection `recipes`: also `favs` per person and `cooked: [{by, date, ts}]`, which feeds the
-  calendar and each recipe's "when we make it" stats). Shelf arrangement, search and ticks are per device.
+  Category ids in `Cook.CATS` are what's saved, so don't rename them. `timing.js` (`Cook.estimate`) works
+  out a realistic time from the ingredients and steps (knife work, batches, water boiling, oven heating,
+  caramelising…); the page shows the family's own logged times first, else that estimate × a "kitchen
+  speed" learned from logged cooks vs estimates; the recipe's own times are only shown for comparison.
+  Shared in `family_items` (tool `cookbook`, collection `recipes`: also `favs` per person and
+  `cooked: [{by, date, ts, min}]`, which feeds the calendar, the stats and the time learning).
+  Shelf arrangement, search, ticks and the cooking timer are per device.
 - `tools/packing/`: shared packing checklists in `family_items` (tool `packing`: `lists`, `items`, `trip`).
 - `tools/energy/`: Tibber prices + usage per house, plus a Bills list. The page calls the `energy`
   edge function (`supabase/functions/energy/`), which reads Tibber/Elvia tokens from

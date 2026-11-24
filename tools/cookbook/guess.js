@@ -5,7 +5,8 @@
      Cook.CATS              every category and its choices (labels + emoji)
      Cook.parseText(text)   pasted recipe text → { title, ingredients, steps, … }
      Cook.fromSchema(r)     a recipe read from a web page (by the `recipes` edge function) → same shape
-     Cook.guess(recipe)     fills in cost, difficulty, protein, cuisine, meal, tags and total time
+     Cook.guess(recipe)     fills in cost, difficulty, protein, cuisine, meal and tags
+     (Cook.estimate, our realistic cooking time, lives in timing.js)
      Cook.timeBucket(min)   45 → 'medium'  (which "time to make" group a recipe is in)
      Cook.scale(line, x)    "2 cups flour", 1.5 → "3 cups flour"  (for changing the servings)
 
@@ -235,17 +236,10 @@
     // CUISINE: what the recipe site says first, otherwise count give-away words.
     out.cuisine = pickCuisineName(r.cuisineNames || []) || pickCuisine(title, meta, body);
 
-    // TIME: the site's total, or prep + cook, or add up the minutes mentioned in the steps.
-    let total = r.totalMin || ((r.prepMin || 0) + (r.cookMin || 0)) || 0;
-    out.timeGuessed = false;
-    if (!total) {
-      const mentioned = steps.reduce((sum, s) => sum + durationsIn(s), 0);
-      total = Math.round(Math.min(mentioned, 600) + 10 + Math.min(ings.length, 15) * 1.5);
-      if (!mentioned) total = 15 + steps.length * 6 + ings.length;
-      total = Math.round(total / 5) * 5;
-      out.timeGuessed = true;
-    }
-    out.totalMin = total;
+    // TIME: what the recipe says is kept as it is; our own realistic estimate (timing.js)
+    // is worked out fresh whenever it's needed, so it's not stored here.
+    const est = window.Cook.estimate ? window.Cook.estimate(r) : null;
+    const total = (est && est.total) || r.totalMin || ((r.prepMin || 0) + (r.cookMin || 0)) || 30;
 
     // DIFFICULTY: more ingredients, more steps, longer time and tricky techniques = harder.
     if (r.difficultyWord) out.difficulty = r.difficultyWord;
@@ -275,7 +269,7 @@
       if (veganTitle || !ings.some(l => DAIRY_EGG.test(l) && !VEGAN_OK.test(l))) tags.add('Vegan');
     }
     for (const [tag, re] of Object.entries(TAG_WORDS)) if (re.test(title + '\n' + meta) || (tag !== 'Grill' && tag !== 'Christmas' && re.test(body))) tags.add(tag);
-    if (out.totalMin <= 35 && out.difficulty === 'easy' && ['dinner', 'soup', 'salad'].includes(out.meal)) tags.add('Weeknight');
+    if (total <= 35 && out.difficulty === 'easy' && ['dinner', 'soup', 'salad'].includes(out.meal)) tags.add('Weeknight');
     (r.diet || []).forEach(d => { if (/vegan/i.test(d)) { tags.add('Vegan'); tags.add('Vegetarian'); } else if (/vegetarian/i.test(d)) tags.add('Vegetarian'); });
     out.tags = [...tags];
     return out;
@@ -337,12 +331,7 @@
     if (/1½\s*(hours?|timer|time)/i.test(text)) min += 30;
     return Math.round(min) || null;
   }
-  // Minutes mentioned in one step, e.g. "Bake for 25-30 minutes" → 30. Marinating overnight isn't counted.
-  function durationsIn(step) {
-    if (/overnight|over natten|day before|dagen før/i.test(step)) return 0;
-    const n = parseDuration(step) || 0;
-    return n > 600 ? 0 : n;
-  }
+
 
   /* ───────── reading pasted text ───────── */
   const H_INGREDIENTS = /^(?:ingredients?|ingredienser|ingrediensar|you(?:'|’)?ll need|you will need|what you need|du trenger|det(?: du)? trenger|handleliste|shopping list)\b/i;
