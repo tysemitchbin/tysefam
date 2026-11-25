@@ -58,9 +58,12 @@ textarea.field{width:100%;resize:vertical;line-height:1.4;}
 .linkbtn{border:none;background:none;color:var(--meadow-deep);font-weight:800;text-decoration:underline;padding:4px;}
 
 /* tabs under the title */
-.tabs{display:flex;gap:6px;margin:-6px 0 16px;flex-wrap:wrap;}
-.tab{padding:8px 14px;border-radius:999px;font-weight:800;font-size:.92rem;text-decoration:none;color:var(--forest);background:#fff;border:2px solid var(--line);}
-.tab.on{background:var(--forest);border-color:var(--forest);color:#fff;}
+.tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin:-6px 0 14px;background:#fff;border:2px solid var(--line);border-radius:18px;padding:4px;}
+.tab{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 2px;border-radius:14px;font-weight:800;font-size:.78rem;text-decoration:none;color:var(--forest);}
+.tab span{font-size:1.25rem;line-height:1.2;}
+.tab.on{background:var(--forest);color:#fff;}
+.page-head .btn{padding:9px 14px;min-height:44px;}
+@media(max-width:480px){.page-head #sync{display:none;}.page-head h1{font-size:1.45rem;}}
 
 /* "arrange the shelf by" chips */
 .arrange{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin:0 0 12px;scrollbar-width:thin;}
@@ -139,7 +142,6 @@ a.fact:hover{filter:brightness(.95);}
 .nut{display:inline-block;font-size:.8rem;font-weight:800;padding:2px 8px;border-radius:999px;margin-right:4px;white-space:nowrap;}
 .nut-great{background:#dcefd6;color:#3f7a3f;} .nut-ok{background:#fdf0c8;color:#8a6d10;} .nut-low{background:#fbdcd0;color:#a64b25;}
 .bar.nut-great{background:#7fa874;} .bar.nut-ok{background:#e0bd4d;} .bar.nut-low{background:#e8946c;}
-.tabs .btn{padding:8px 14px;}
 .kinds{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
 @media(max-width:520px){.kinds{grid-template-columns:1fr 1fr;}}
 .kind{border:2px solid var(--line);background:#fff;border-radius:14px;padding:8px 4px;font-size:1.4rem;display:flex;flex-direction:column;align-items:center;gap:2px;}
@@ -196,6 +198,35 @@ a.fact:hover{filter:brightness(.95);}
   input,select,textarea,.sortsel,.goalrow input,.logrow input{font-size:16px;}
   .book:hover{transform:none;}
 }
+.calhead h2 small{display:block;font-size:.8rem;color:var(--ink-soft);font-family:'Nunito',sans-serif;font-weight:700;}
+.planweek{display:flex;flex-direction:column;}
+.pday{display:flex;gap:10px;align-items:center;padding:8px 2px;border-bottom:1px dashed var(--line);min-height:56px;}
+.pday:last-child{border-bottom:none;}
+.pday.today{background:#f6faf3;border-radius:12px;padding:8px;}
+.pday.past{opacity:.55;}
+.pd-date{flex:0 0 44px;text-align:center;line-height:1.1;}
+.pd-date b{display:block;font-size:.78rem;color:var(--ink-soft);text-transform:uppercase;}
+.pd-date span{font-family:'Fredoka',sans-serif;font-size:1.3rem;color:var(--forest);}
+.pd-items{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
+.pitem{display:flex;align-items:center;gap:6px;}
+.pitem a,.pitem .pn{font-weight:700;color:var(--forest);text-decoration:none;flex:1;min-width:0;line-height:1.25;}
+.pitem .pe{font-size:1.15rem;}
+.pempty{color:var(--ink-soft);font-style:italic;font-size:.9rem;}
+.plogged{font-size:.82rem;font-weight:700;color:var(--meadow-deep);}
+.padd{flex:0 0 auto;width:44px;height:44px;border-radius:50%;border:2px dashed var(--meadow);background:#fff;color:var(--meadow-deep);font-size:1.4rem;font-weight:800;}
+.padd:active{background:#eef6ea;}
+.aisle h3{margin-bottom:6px;}
+.sitem{display:flex;gap:12px;align-items:center;width:100%;text-align:left;border:none;background:none;padding:9px 2px;border-bottom:1px dashed var(--line);font:inherit;color:var(--ink);min-height:44px;}
+.aisle .sitem:last-child{border-bottom:none;}
+.sitem .st{flex:1;min-width:0;line-height:1.3;}
+.sitem .st small{display:block;font-size:.74rem;color:var(--ink-soft);font-weight:700;}
+.sitem.got .st{text-decoration:line-through;color:var(--ink-soft);}
+.sitem-row{display:flex;align-items:center;}
+.pantry summary{cursor:pointer;list-style:none;}
+.pantry summary::-webkit-details-marker{display:none;}
+.shopbar{display:flex;gap:10px;align-items:center;margin-top:10px;font-weight:800;font-size:.85rem;color:var(--ink-soft);}
+.shopbar .bar{flex:1;height:10px;border-radius:999px;background:#eef0e8;overflow:hidden;}
+.shopbar .bar div{height:100%;background:var(--meadow);}
 .tb-note{font-size:.8rem;color:var(--ink-soft);font-weight:600;flex-basis:100%;}
 .who-line{font-size:.82rem;color:var(--ink-soft);font-weight:700;}
 .logrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;padding:10px;background:#eef6ea;border-radius:12px;font-weight:700;}
@@ -272,6 +303,7 @@ dialog::backdrop{background:rgba(60,65,56,.35);}
 dialog form{display:flex;flex-direction:column;flex:1;min-height:0;}
 .dlg-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:18px;display:flex;flex-direction:column;gap:12px;}
 .dlg-body h3:focus{outline:none;}
+.dlg-body > *{flex-shrink:0;}   /* the box scrolls; the things inside it never get squeezed */
 dialog h3{margin:0;color:var(--forest);}
 dialog label{font-weight:800;font-size:.82rem;color:var(--ink-soft);display:flex;flex-direction:column;gap:5px;}
 dialog .field{width:100%;}
@@ -295,13 +327,14 @@ dialog .field{width:100%;}
     <span class="emoji">📖</span><h1>Cookbook</h1>
     <span style="flex:1"></span>
     <span id="sync" class="badge local">…</span>
+    <button class="btn" id="logBtn">🍽️ Log dinner</button>
   </div>
   <nav class="tabs">
-    <a class="tab" id="tabShelf" href="#">📚 Bookshelf</a>
-    <a class="tab" id="tabCal" href="#cal">📅 Dinner log</a>
-    <a class="tab" id="tabIns" href="#ins">📊 Insights</a>
-    <span style="flex:1"></span>
-    <button class="btn" id="logBtn">🍽️ Log dinner</button>
+    <a class="tab" id="tabShelf" href="#"><span>📚</span>Recipes</a>
+    <a class="tab" id="tabPlan" href="#plan"><span>🗓️</span>Plan</a>
+    <a class="tab" id="tabShop" href="#shop"><span>🛒</span>Shopping</a>
+    <a class="tab" id="tabCal" href="#cal"><span>📅</span>Log</a>
+    <a class="tab" id="tabIns" href="#ins"><span>📊</span>Insights</a>
   </nav>
   <div id="nudgeSlot"></div>
 
@@ -332,6 +365,10 @@ dialog .field{width:100%;}
 
   <!-- ───── the cooking calendar (filled in by showCalendar) ───── -->
   <section id="calView" hidden></section>
+
+  <!-- ───── the week plan and the shopping list (filled in by showPlan / showShop) ───── -->
+  <section id="planView" hidden></section>
+  <section id="shopView" hidden></section>
 
   <!-- ───── insights (filled in by showInsights) ───── -->
   <section id="insView" hidden></section>
@@ -430,6 +467,33 @@ dialog .field{width:100%;}
   </form>
 </dialog>
 
+<!-- ───── plan a dinner for a day ───── -->
+<dialog id="planDlg" aria-labelledby="planTitle">
+  <form method="dialog" id="planForm" onsubmit="return false">
+    <div class="dlg-body" id="planBody">
+      <h3 id="planTitle" tabindex="-1" autofocus>🗓️ Dinner for…</h3>
+      <div id="planIdeas"></div>
+      <div class="sub">Or pick a recipe</div>
+      <input class="field" id="planSearch" placeholder="🔍 Find a recipe" autocomplete="off">
+      <div class="pickList" id="planPick"></div>
+      <div class="sub">Or something quick</div>
+      <div class="chiprow" id="planQuick"></div>
+    </div>
+    <div class="dlg-acts"><button type="button" class="btn ghost" id="planClose">Close</button></div>
+  </form>
+</dialog>
+
+<!-- ───── pick a day for a recipe ───── -->
+<dialog id="dayDlg" aria-labelledby="dayTitle">
+  <form method="dialog" onsubmit="return false">
+    <div class="dlg-body">
+      <h3 id="dayTitle" tabindex="-1" autofocus>🗓️ When?</h3>
+      <div class="pickList" id="dayList" style="max-height:none"></div>
+    </div>
+    <div class="dlg-acts"><button type="button" class="btn ghost" id="dayClose">Close</button></div>
+  </form>
+</dialog>
+
 <!-- ───── "Logged! Undo" bar ───── -->
 <div id="toast" class="toast" role="status" hidden><span></span><button type="button" class="btn sm ghost">Undo</button></div>
 
@@ -439,6 +503,7 @@ dialog .field{width:100%;}
 <script src="timing.js"></script>
 <script src="prices.js"></script>
 <script src="nutrition.js"></script>
+<script src="shopping.js"></script>
 <script>
 const TOOL_ID = 'cookbook';
 const store = Family.store(TOOL_ID);
@@ -457,7 +522,10 @@ let recipes = {};        // id → recipe, kept up to date live
 let loaded = false;
 let wake = null;         // the "keep screen on" lock while cooking
 let meals = {};          // dinners that aren't "we cooked this recipe": leftovers, quick dinners, eating out
-let targets = { protein: 30, fiber: 10 };   // our goals per dinner per person (saved in settings → targets)
+let targets = { protein: 30, fiber: 10 };
+let plans = {};          // planned dinners (collection plan)
+let shopTicks = {};      // shopping list: what's in the trolley (collection shop, one per thing)
+let shopExtra = {};      // shopping list: things we added ourselves (collection shopExtra)   // our goals per dinner per person (saved in settings → targets)
 
 /* ───────── small helpers ───────── */
 const safeUrl = u => (/^https?:\/\/[^\s"'<>]+$/i.test(String(u || '').trim()) ? String(u).trim() : '');
@@ -915,6 +983,7 @@ function showRecipe(id) {
           <button class="chipbtn${timer ? ' on' : ''}" id="rvTimer">${timer ? `⏱️ <span id="tmr">${fmtMin(elapsed)}</span>… done?` : '⏱️ Start cooking timer'}</button>
           <button class="chipbtn${logOpen ? ' on' : ''}" id="rvCooked">✅ We made this</button>
           <button class="chipbtn" id="rvLeft">🥡 We ate leftovers</button>
+          <button class="chipbtn" id="rvPlan">🗓️ Plan it</button>
           ${'wakeLock' in navigator ? `<button class="chipbtn${wake ? ' on' : ''}" id="rvWake">📱 ${wake ? 'Screen stays on' : 'Keep screen on'}</button>` : ''}
         </div>
         ${logOpen ? `<div class="logrow">Made it on
@@ -951,6 +1020,7 @@ function showRecipe(id) {
   box.querySelectorAll('[data-tick]').forEach(el => el.onclick = () => { tk[el.dataset.tick] = !tk[el.dataset.tick]; showRecipe(id); });
   box.querySelector('#rvFav').onclick = () => store.update('recipes', id, { favs: Object.assign({}, r.favs, { [me]: !(r.favs || {})[me] }) });
   box.querySelector('#rvCooked').onclick = () => { logOpen = !logOpen; showRecipe(id); };
+  box.querySelector('#rvPlan').onclick = () => openDayPicker(id);
   box.querySelector('#rvLeft').onclick = () => { logState.day = todayKey(); logNow({ kind: 'leftovers', recipeId: id, name: r.title, emoji: '🥡' }); };
   if (logOpen) {
     box.querySelector('#logCancel').onclick = () => { logOpen = false; showRecipe(id); };
@@ -1108,6 +1178,13 @@ function drawLog() {
 function suggestions(day) {
   const out = [], seen = new Set();
   const add = t => { const key = t.kind + ':' + (t.recipeId || t.name.toLowerCase()); if (!seen.has(key) && out.length < 6) { seen.add(key); out.push(t); } };
+  // 0. What was planned for that day comes first.
+  plansOn(day).forEach(([, p]) => {
+    const pi = planInfo(p);
+    if (p.kind === 'recipe' && pi.r) add({ kind: 'cooked', recipeId: p.recipeId, emoji: pi.emoji, name: pi.name, sub: '🗓️ Planned' });
+    else if (p.kind === 'leftovers' && pi.r) add({ kind: 'leftovers', recipeId: p.recipeId, emoji: '🥡', name: pi.name, sub: '🗓️ Planned leftovers' });
+    else if (p.kind === 'quick' || p.kind === 'out') add(Object.assign({ kind: p.kind, name: pi.name, emoji: pi.emoji, sub: '🗓️ Planned' }, Cook.quickMatch(pi.name, p.kind === 'out') || {}, { name: pi.name }));
+  });
   // 1. Leftovers of anything cooked in the 4 days before
   Object.entries(recipes).map(([id, r]) => [id, r, (r.cooked || []).map(cookedDay).filter(x => x < day && daysBetween(x, day) <= 4).sort().pop()])
     .filter(x => x[2]).sort((a, b) => b[2].localeCompare(a[2]))
@@ -1281,7 +1358,9 @@ function nudge() {
   let dismissed = '';
   try { dismissed = localStorage.getItem('cookbook:nudge') || ''; } catch (e) { /* private window */ }
   if (!day || dismissed === day) return '';
-  return `<div class="nudge"><span>🍽️ ${day === t ? 'Tonight’s' : 'Last night’s'} dinner isn’t logged yet.</span>
+  const planned = plansOn(day).map(([, p]) => planInfo(p).name)[0];
+  const what = planned ? ` Was it ${planned.length > 30 ? planned.slice(0, 28) + '…' : planned}?` : '';
+  return `<div class="nudge"><span>🍽️ ${day === t ? 'Tonight’s' : 'Last night’s'} dinner isn’t logged yet.${esc(what)}</span>
     <button class="btn sm" data-nudge="${day}">Log it</button><button class="del" data-nudge-x="${day}" aria-label="Not now" title="Not now">✕</button></div>`;
 }
 function wireNudge(box) {
@@ -1290,6 +1369,313 @@ function wireNudge(box) {
     try { localStorage.setItem('cookbook:nudge', b.dataset.nudgeX); } catch (e) { /* private window */ }
     b.closest('.nudge').remove();
   });
+}
+
+/* ───────── planning dinners ahead ─────────
+   collection `plan`: { date, kind: 'recipe' | 'leftovers' | 'quick' | 'out', recipeId?, name?, emoji?, by, ts }
+   A week runs Monday to Sunday (#plan = this week, #plan=2026-11-30 = the week starting that Monday).
+   The plan feeds the shopping list (#shop) and the log box ("Tonight: Köfte is planned"). */
+const mondayOf = day => { const x = keyDate(day); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return dayKey(x); };
+const addDays = (day, n) => { const x = keyDate(day); x.setDate(x.getDate() + n); return dayKey(x); };
+const weekNumber = day => {   // ISO week number, as on Norwegian calendars ("uke 48")
+  const x = keyDate(day); x.setDate(x.getDate() + 3 - (x.getDay() + 6) % 7);
+  const jan4 = new Date(x.getFullYear(), 0, 4);
+  return 1 + Math.round(((x - jan4) / 864e5 - 3 + (jan4.getDay() + 6) % 7) / 7);
+};
+const plansOn = day => Object.entries(plans).filter(([, p]) => p.date === day).sort((a, b) => (a[1].ts || 0) - (b[1].ts || 0));
+// What a planned dinner is, for showing it: name, picture, link.
+function planInfo(p) {
+  const r = p.recipeId ? recipes[p.recipeId] : null;
+  if (p.kind === 'recipe' && r) return { name: r.title, emoji: recipeEmoji(r), link: '#r=' + encodeURIComponent(p.recipeId), r };
+  if (p.kind === 'leftovers') return { name: r ? r.title : 'Leftovers', emoji: '🥡', sub: 'Leftovers', link: r ? '#r=' + encodeURIComponent(p.recipeId) : '', r };
+  return { name: p.name || 'Dinner', emoji: p.emoji || KINDS[p.kind]?.emoji || '🍽️', sub: p.kind === 'out' ? 'Eating out' : 'Quick' };
+}
+// How well a recipe fits our goals: 0 (nothing) to 4 (both goals reached).
+function goalScore(r) {
+  const n = perServing(r);
+  return Math.min(2, (n.protein || 0) / targets.protein * 2) + Math.min(2, (n.fiber || 0) / targets.fiber * 2);
+}
+// Recipes that make sense as a dinner (not cakes, bread or drinks).
+const dinnerish = r => !['dessert', 'baking', 'drink', 'breakfast', 'snack'].includes(r.meal);
+// Leftover dinners per time cooked, from what's been logged (null when it's never been cooked).
+function leftoverRate(id) {
+  const cooks = (recipes[id]?.cooked || []).length;
+  if (!cooks) return null;
+  return Object.values(meals).filter(m => m.kind === 'leftovers' && m.recipeId === id).length / cooks;
+}
+
+function showPlan(week) {
+  const box = $('#planView');
+  const mon = /^\d{4}-\d\d-\d\d$/.test(week || '') ? mondayOf(week) : mondayOf(todayKey());
+  const days = [0, 1, 2, 3, 4, 5, 6].map(i => addDays(mon, i));
+  const today = todayKey();
+  const planned = days.flatMap(d => plansOn(d).map(([id, p]) => ({ id, p, d })));
+  // Week totals: how many dinners are planned, and what they add up to.
+  const recipeDinners = planned.filter(x => (x.p.kind === 'recipe' || x.p.kind === 'leftovers') && recipes[x.p.recipeId]);
+  const avg = key => { const v = recipeDinners.map(x => perServing(recipes[x.p.recipeId])[key]).filter(v => v != null); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
+  const cost = planned.filter(x => x.p.kind === 'recipe' && recipes[x.p.recipeId]).reduce((s, x) => s + priceOf(recipes[x.p.recipeId]), 0)
+    + planned.filter(x => x.p.kind === 'quick').reduce((s, x) => s + 2 * (Cook.quickMatch(x.p.name)?.kr || 40), 0);
+  const filledDays = new Set(planned.map(x => x.d)).size;
+  const emptyAhead = days.filter(d => d >= today && !plansOn(d).length).length;
+
+  box.innerHTML = `
+    <div class="card">
+      <div class="calhead">
+        <a class="btn ghost sm" href="#plan=${addDays(mon, -7)}" aria-label="Week before">‹</a>
+        <h2>Week ${weekNumber(mon)}<small>${esc(fmtDay(mon))} – ${esc(fmtDay(addDays(mon, 6)))}</small></h2>
+        <a class="btn ghost sm" href="#plan=${addDays(mon, 7)}" aria-label="Week after">›</a>
+      </div>
+      <div class="planweek">
+        ${days.map(d => {
+          const items = plansOn(d), past = d < today;
+          const logged = allDinners().filter(e => e.day === d);
+          return `<div class="pday${d === today ? ' today' : ''}${past ? ' past' : ''}">
+            <div class="pd-date"><b>${WEEKDAYS[keyDate(d).getDay()].slice(0, 3)}</b><span>${keyDate(d).getDate()}</span></div>
+            <div class="pd-items">
+              ${items.map(([id, p]) => { const pi = planInfo(p); return `<div class="pitem">
+                <span class="pe">${pi.emoji}</span>
+                ${pi.link ? `<a href="${pi.link}">${esc(pi.name)}</a>` : `<span class="pn">${esc(pi.name)}</span>`}
+                ${pi.sub ? `<span class="mini">${esc(pi.sub)}</span>` : ''}
+                <button class="del" data-unplan="${esc(id)}" aria-label="Take off the plan" title="Take off the plan">✕</button></div>`; }).join('')}
+              ${past && logged.length ? `<div class="plogged">✓ ${logged.map(e => esc(dinnerInfo(e).name)).join(', ')}</div>` : ''}
+              ${!items.length && !(past && logged.length) ? `<span class="pempty">${past ? '–' : 'Nothing planned'}</span>` : ''}
+            </div>
+            ${past ? '' : `<button class="padd" data-plan-day="${d}" aria-label="Plan a dinner for ${esc(fmtDay(d))}">＋</button>`}
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="acts">
+        ${emptyAhead ? `<button class="btn" id="planFill">✨ Fill the ${emptyAhead} empty day${emptyAhead === 1 ? '' : 's'}</button>` : ''}
+        <a class="btn ghost" href="#shop=${mon}">🛒 Shopping list for this week</a>
+      </div>
+    </div>
+    <div class="card">
+      <h3>📋 This week’s plan</h3>
+      <div class="stats">
+        <div class="stat"><b>${filledDays} of 7</b><span>days planned</span></div>
+        ${avg('protein') != null ? `<div class="stat"><b>${nutChip(avg('protein'), 'protein')}</b><span>protein per dinner</span></div>` : ''}
+        ${avg('fiber') != null ? `<div class="stat"><b>${nutChip(avg('fiber'), 'fiber')}</b><span>fibre per dinner</span></div>` : ''}
+        ${cost ? `<div class="stat"><b>≈ ${Math.round(cost / 10) * 10} kr</b><span>for the dinners</span></div>` : ''}
+      </div>
+      <p class="hint" style="margin:0">Tap ＋ to plan a day. ✨ fills empty days with dinners that hit your protein and fibre goals, mixes up meat, fish and veggie,
+        skips what you’ve had lately, and adds a leftovers night after dishes that usually leave some.</p>
+    </div>`;
+  box.querySelectorAll('[data-plan-day]').forEach(b => b.onclick = () => openPlan(b.dataset.planDay));
+  box.querySelectorAll('[data-unplan]').forEach(b => b.onclick = () => {
+    const id = b.dataset.unplan, keep = plans[id];
+    store.remove('plan', id);
+    toast(`Taken off ${fmtDay(keep.date)}`, () => store.set('plan', id, keep));
+  });
+  const fill = box.querySelector('#planFill');
+  if (fill) fill.onclick = () => fillWeek(days.filter(d => d >= today));
+}
+
+// ✨ Fill the empty days with good dinners.
+async function fillWeek(days) {
+  const inPlan = new Set(Object.values(plans).filter(p => days.includes(p.date) && p.recipeId).map(p => p.recipeId));
+  const pool = Object.entries(recipes).filter(([id, r]) => dinnerish(r) && !inPlan.has(id));
+  if (!pool.length) { toast('Add a few dinner recipes to the cookbook first, then ✨ can plan with them.'); return; }
+  const added = [];
+  let prevProtein = '';
+  for (let i = 0; i < days.length; i++) {
+    const d = days[i];
+    if (plansOn(d).length || added.some(a => a.date === d)) { prevProtein = ''; continue; }
+    const choices = pool.filter(([id]) => !inPlan.has(id)).map(([id, r]) => {
+      const last = lastCooked(r);
+      const recent = last && daysBetween(last, d) < 14 ? 3 : 0;
+      const fav = (r.favs || {})[Family.me()] ? 1 : 0;
+      const same = r.protein && r.protein === prevProtein ? 1.5 : 0;
+      return { id, r, score: goalScore(r) + fav + ((r.cooked || []).length ? 0.5 : 0) - recent - same + Math.random() * 0.8 };
+    }).sort((a, b) => b.score - a.score);
+    const pick = choices[0];
+    if (!pick) break;
+    inPlan.add(pick.id);
+    prevProtein = pick.r.protein;
+    added.push({ date: d, kind: 'recipe', recipeId: pick.id });
+    // A leftovers night after a dish that usually leaves some (if the next day is free).
+    const next = days[i + 1];
+    if (next && (leftoverRate(pick.id) || 0) >= 0.8 && !plansOn(next).length) {
+      added.push({ date: next, kind: 'leftovers', recipeId: pick.id });
+      i++;
+      prevProtein = '';
+    }
+  }
+  const ids = [];
+  for (const p of added) ids.push(await store.add('plan', p));
+  toast(`✨ Planned ${added.length} dinner${added.length === 1 ? '' : 's'}`, () => ids.forEach(id => store.remove('plan', id)));
+}
+
+/* The "plan a dinner" box: ideas first, then search, then quick dinners. One tap adds it. */
+const planDlg = $('#planDlg');
+let planDay = todayKey();
+function openPlan(day) {
+  planDay = day;
+  $('#planSearch').value = '';
+  drawPlanBox();
+  planDlg.showModal();
+  $('#planBody').scrollTop = 0;
+}
+function planIdeas(day) {
+  const out = [], seen = new Set();
+  const add = t => { const k = t.kind + ':' + (t.recipeId || t.name); if (!seen.has(k) && out.length < 6) { seen.add(k); out.push(t); } };
+  // Leftovers of something planned or cooked in the 3 days before
+  for (let i = 1; i <= 3; i++) {
+    const before = addDays(day, -i);
+    plansOn(before).filter(([, p]) => p.kind === 'recipe' && recipes[p.recipeId]).forEach(([, p]) =>
+      add({ kind: 'leftovers', recipeId: p.recipeId, emoji: '🥡', name: recipes[p.recipeId].title, sub: `Leftovers from ${WEEKDAYS[keyDate(before).getDay()]}` }));
+  }
+  // Best for our goals, not had lately and not already planned this week
+  const week = new Set(Object.values(plans).filter(p => p.date >= mondayOf(day) && p.date <= addDays(mondayOf(day), 6)).map(p => p.recipeId));
+  Object.entries(recipes).filter(([id, r]) => dinnerish(r) && !week.has(id) && !(lastCooked(r) && daysBetween(lastCooked(r), day) < 10))
+    .map(([id, r]) => [id, r, goalScore(r) + ((r.favs || {})[Family.me()] ? 1 : 0)]).sort((a, b) => b[2] - a[2]).slice(0, 4)
+    .forEach(([id, r]) => { const n = perServing(r); add({ kind: 'recipe', recipeId: id, emoji: recipeEmoji(r), name: r.title, sub: `💪 ${n.protein ?? '?'} g · 🌾 ${n.fiber ?? '?'} g` }); });
+  pastQuick('quick').slice(0, 2).forEach(q => add({ kind: 'quick', name: q.name, emoji: q.emoji || '⚡', sub: 'Quick dinner' }));
+  return out;
+}
+function drawPlanBox() {
+  $('#planTitle').textContent = `🗓️ Dinner for ${WEEKDAYS[keyDate(planDay).getDay()]} ${fmtDay(planDay)}`;
+  const ideas = planIdeas(planDay);
+  $('#planIdeas').innerHTML = ideas.length ? `<div class="sub" style="margin-top:0">Ideas</div><div class="tiles">${ideas.map((t, i) => `
+    <button type="button" class="tile" data-idea="${i}"><span class="te">${t.emoji}</span><span class="tn">${esc(t.name)}</span><span class="ts">${esc(t.sub)}</span></button>`).join('')}</div>` : '';
+  $('#planIdeas').querySelectorAll('[data-idea]').forEach(b => b.onclick = () => addPlan(ideas[+b.dataset.idea]));
+  drawPlanPick();
+  const quick = quickChoices('quick').slice(0, 8);
+  $('#planQuick').innerHTML = quick.map((q, i) => `<button type="button" class="chipbtn" data-pq="${i}">${q.emoji || '⚡'} ${esc(q.name)}</button>`).join('')
+    + `<button type="button" class="chipbtn" data-pout="1">🍔 Eating out</button>`;
+  $('#planQuick').querySelectorAll('[data-pq]').forEach(b => b.onclick = () => { const q = quick[+b.dataset.pq]; addPlan({ kind: 'quick', name: q.name, emoji: q.emoji }); });
+  $('#planQuick').querySelector('[data-pout]').onclick = () => addPlan({ kind: 'out', name: 'Eating out', emoji: '🍔' });
+}
+function drawPlanPick() {
+  const q = $('#planSearch').value.trim();
+  const list = Object.entries(recipes).filter(([, r]) => !q || searchMatch(r, q))
+    .sort((a, b) => (b[1].cooked || []).length - (a[1].cooked || []).length || (a[1].title || '').localeCompare(b[1].title || '')).slice(0, 40);
+  $('#planPick').innerHTML = list.length ? list.map(([id, r]) => {
+    const n = perServing(r);
+    return `<button type="button" class="pick" data-pp="${esc(id)}"><span>${recipeEmoji(r)} ${esc(r.title)}</span>${nutChip(n.protein, 'protein')}</button>`;
+  }).join('') : `<div class="empty">No recipes ${q ? 'match' : 'yet'}.</div>`;
+  $('#planPick').querySelectorAll('[data-pp]').forEach(b => b.onclick = () => addPlan({ kind: 'recipe', recipeId: b.dataset.pp }));
+}
+async function addPlan(t) {
+  const p = { date: planDay, kind: t.kind };
+  if (t.recipeId) p.recipeId = t.recipeId;
+  if (t.name && !t.recipeId) { p.name = t.name; p.emoji = t.emoji || ''; }
+  const id = await store.add('plan', p);
+  planDlg.close();
+  const pi = planInfo(p);
+  toast(`🗓️ ${pi.name.length > 30 ? pi.name.slice(0, 28) + '…' : pi.name} · ${WEEKDAYS[keyDate(planDay).getDay()]}`, () => store.remove('plan', id));
+}
+$('#planSearch').addEventListener('input', drawPlanPick);
+$('#planClose').onclick = () => planDlg.close();
+planDlg.addEventListener('close', () => route());
+
+/* "🗓️ Plan it" on a recipe: pick a day from the next two weeks. */
+const dayDlg = $('#dayDlg');
+let dayRecipe = null;
+function openDayPicker(id) {
+  dayRecipe = id;
+  const today = todayKey();
+  $('#dayTitle').textContent = `🗓️ When will you make ${recipes[id].title.length > 40 ? recipes[id].title.slice(0, 38) + '…' : recipes[id].title}?`;
+  $('#dayList').innerHTML = Array.from({ length: 14 }, (_, i) => addDays(today, i)).map(d => {
+    const taken = plansOn(d).map(([, p]) => planInfo(p).name);
+    return `<button type="button" class="pick" data-dday="${d}"><span><b>${i0(d, today)}</b></span>
+      <span class="mini">${taken.length ? esc(taken.join(', ').slice(0, 30)) : 'free'}</span></button>`;
+  }).join('');
+  $('#dayList').querySelectorAll('[data-dday]').forEach(b => b.onclick = () => { planDay = b.dataset.dday; dayDlg.close(); addPlan({ kind: 'recipe', recipeId: dayRecipe }); });
+  dayDlg.showModal();
+}
+const i0 = (d, today) => d === today ? 'Today' : d === addDays(today, 1) ? 'Tomorrow' : `${WEEKDAYS[keyDate(d).getDay()]} ${fmtDay(d)}`;
+$('#dayClose').onclick = () => dayDlg.close();
+
+/* ───────── the shopping list ─────────
+   Made from the planned dinners for a stretch of days. Ticks are shared (collection `shop`, one
+   per thing, so two people can shop at once); your own extras live in `shopExtra`. */
+const SHOP_RANGES = [['next', 'Next 7 days'], ['this', 'This week'], ['nextweek', 'Next week']];
+function shopDays(range) {
+  const today = todayKey();
+  if (/^\d{4}-\d\d-\d\d$/.test(range)) { const m = mondayOf(range); return [m, addDays(m, 6), `Week ${weekNumber(m)}`]; }
+  if (range === 'this') return [today, addDays(mondayOf(today), 6), 'This week'];
+  if (range === 'nextweek') { const m = addDays(mondayOf(today), 7); return [m, addDays(m, 6), 'Next week']; }
+  return [today, addDays(today, 6), 'Next 7 days'];
+}
+const shopId = key => 'i_' + key.toLowerCase().replace(/[^a-z0-9æøåäöü]+/g, '-').slice(0, 80);
+function buildShop(range) {
+  const [from, to] = shopDays(range);
+  const entries = Object.values(plans).filter(p => p.date >= from && p.date <= to).sort((a, b) => a.date.localeCompare(b.date));
+  const items = [];
+  for (const p of entries) {
+    if (p.kind === 'recipe' && recipes[p.recipeId]) items.push({ recipe: recipes[p.recipeId], factor: 1 });
+    else if (p.kind === 'quick') items.push({ name: p.name, emoji: p.emoji });
+  }
+  return { entries, aisles: Cook.shoppingList(items) };
+}
+function showShop(range) {
+  range = range || 'next';
+  const box = $('#shopView');
+  const [from, to, label] = shopDays(range);
+  const { entries, aisles } = buildShop(range);
+  const extras = Object.entries(shopExtra).sort((a, b) => (a[1].ts || 0) - (b[1].ts || 0));
+  const ticked = key => !!shopTicks[shopId(key)];
+  const row = (it, aisle) => `<button type="button" class="sitem${ticked(it.key) ? ' got' : ''}" data-tick-item="${esc(it.key)}">
+      <span class="check${ticked(it.key) ? ' done' : ''}"></span>
+      <span class="st">${it.emoji ? it.emoji + ' ' : ''}${it.amount ? `<b>${esc(it.amount)}</b> ` : ''}${esc(it.name)}
+        ${it.from && it.from.length && aisle !== 'ready' ? `<small>${esc(it.from.map(f => f.split(/\s+(?:with|med)\s+/i)[0]).join(', '))}</small>` : ''}</span></button>`;
+  const main = aisles.filter(a => a.id !== 'pantry'), pantry = aisles.find(a => a.id === 'pantry');
+  const total = aisles.reduce((s, a) => s + a.items.length, 0) - (pantry ? pantry.items.length : 0) + extras.length;
+  const got = aisles.filter(a => a.id !== 'pantry').reduce((s, a) => s + a.items.filter(i => ticked(i.key)).length, 0) + extras.filter(([, x]) => x.checked).length;
+  box.innerHTML = `
+    <div class="card">
+      <div class="partbar">${SHOP_RANGES.map(([k, l]) => `<a class="chipbtn${k === range ? ' on' : ''}" href="#shop=${k}">${l}</a>`).join('')}</div>
+      <p class="statline">${esc(label)}: ${esc(fmtDay(from))} – ${esc(fmtDay(to))} · ${entries.length ? entries.map(p => `${planInfo(p).emoji} ${esc(WEEKDAYS[keyDate(p.date).getDay()].slice(0, 3))}`).join(' · ') : 'nothing planned yet'}</p>
+      ${!entries.length ? `<div class="empty"><span class="big">🗓️</span>Plan some dinners and their ingredients show up here.<br><a class="btn sm" href="#plan" style="margin-top:10px;display:inline-flex;align-items:center">🗓️ Go to the plan</a></div>` : ''}
+      <form class="addrow" id="shopAddForm" style="margin:10px 0 0"><input id="shopAdd" placeholder="Add something else (milk, nappies…)" maxlength="80" autocomplete="off"><button class="btn">Add</button></form>
+      ${total ? `<div class="shopbar"><div class="bar"><div style="width:${Math.round(100 * got / total)}%"></div></div><span>${got} of ${total} in the trolley</span></div>` : ''}
+      <div class="acts">
+        <button class="btn ghost sm" id="shopCopy">📋 Copy / share list</button>
+        <button class="btn ghost sm" id="shopClear">🧹 Clear ticks</button>
+      </div>
+    </div>
+    ${extras.length ? `<div class="card aisle"><h3>📝 Added by us</h3>${extras.map(([id, x]) => `
+      <div class="sitem-row"><button type="button" class="sitem${x.checked ? ' got' : ''}" data-tick-extra="${esc(id)}"><span class="check${x.checked ? ' done' : ''}"></span>
+      <span class="st">${esc(x.text)}<small>${esc(x.by || '')}</small></span></button><button class="del" data-del-extra="${esc(id)}" aria-label="Remove">✕</button></div>`).join('')}</div>` : ''}
+    ${main.map(a => `<div class="card aisle"><h3>${a.emoji} ${esc(a.label)}</h3>
+      ${a.items.slice().sort((x, y) => ticked(x.key) - ticked(y.key)).map(it => row(it, a.id)).join('')}</div>`).join('')}
+    ${pantry ? `<details class="card aisle pantry"><summary><h3 style="display:inline">🧂 Probably at home (${pantry.items.length})</h3> <span class="mini">tap to check the cupboard</span></summary>
+      ${pantry.items.map(it => row(it, 'pantry')).join('')}</details>` : ''}`;
+
+  box.querySelectorAll('[data-tick-item]').forEach(b => b.onclick = () => {
+    const id = shopId(b.dataset.tickItem);
+    if (shopTicks[id]) store.remove('shop', id); else store.set('shop', id, { checked: true, by: Family.me(), ts: Date.now() });
+  });
+  box.querySelectorAll('[data-tick-extra]').forEach(b => b.onclick = () => store.update('shopExtra', b.dataset.tickExtra, { checked: !shopExtra[b.dataset.tickExtra].checked }));
+  box.querySelectorAll('[data-del-extra]').forEach(b => b.onclick = () => store.remove('shopExtra', b.dataset.delExtra));
+  box.querySelector('#shopAddForm').onsubmit = ev => {
+    ev.preventDefault();
+    const t = $('#shopAdd').value.trim();
+    if (!t) return;
+    store.add('shopExtra', { text: t, checked: false });
+    $('#shopAdd').value = '';
+  };
+  box.querySelector('#shopClear').onclick = () => {
+    if (!confirm('Untick everything and remove the ticked things you added?')) return;
+    Object.keys(shopTicks).forEach(id => store.remove('shop', id));
+    Object.entries(shopExtra).filter(([, x]) => x.checked).forEach(([id]) => store.remove('shopExtra', id));
+  };
+  box.querySelector('#shopCopy').onclick = async () => {
+    const lines = [`🛒 Shopping, ${fmtDay(from)} – ${fmtDay(to)}`];
+    extras.filter(([, x]) => !x.checked).forEach(([, x]) => lines.push('• ' + x.text));
+    main.forEach(a => {
+      const left = a.items.filter(it => !ticked(it.key));
+      if (left.length) { lines.push('', a.emoji + ' ' + a.label); left.forEach(it => lines.push('• ' + (it.amount ? it.amount + ' ' : '') + it.name)); }
+    });
+    const text = lines.join('\n');
+    try {
+      if (navigator.share) await navigator.share({ text });
+      else { await navigator.clipboard.writeText(text); toast('📋 Copied: paste it into a message'); }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;   // closed the share sheet
+      try { await navigator.clipboard.writeText(text); toast('📋 Copied: paste it into a message'); } catch (e2) { prompt('Copy this:', text); }
+    }
+  };
 }
 
 /* ───────── the calendar ───────── */
@@ -1490,22 +1876,29 @@ let lastHash = location.hash;
 function route() {
   const h = location.hash;
   const r = h.match(/^#r=(.+)$/), b = h.match(/^#b=(.+)$/), cal = h.match(/^#cal(?:=(\d{4}-\d\d))?$/), ins = h.match(/^#ins(?:=(\w+))?$/);
-  $('#shelfView').hidden = !!(r || b || cal || ins);
+  const plan = h.match(/^#plan(?:=([\d-]+))?$/), shop = h.match(/^#shop(?:=([\w-]+))?$/);
+  $('#shelfView').hidden = !!(r || b || cal || ins || plan || shop);
   $('#bookView').hidden = !b;
   $('#recipeView').hidden = !r;
   $('#calView').hidden = !cal;
   $('#insView').hidden = !ins;
-  $('#tabShelf').classList.toggle('on', !cal && !ins);
+  $('#planView').hidden = !plan;
+  $('#shopView').hidden = !shop;
+  $('#tabShelf').classList.toggle('on', !cal && !ins && !plan && !shop);
+  $('#tabPlan').classList.toggle('on', !!plan);
+  $('#tabShop').classList.toggle('on', !!shop);
   $('#tabCal').classList.toggle('on', !!cal);
   $('#tabIns').classList.toggle('on', !!ins);
   if (!r && wake) setWake(false);
   // The "not logged yet" reminder, on the bookshelf and the dinner log.
-  $('#nudgeSlot').innerHTML = (!r && !b && !ins && loaded) ? nudge() : '';
+  $('#nudgeSlot').innerHTML = (!r && !b && !ins && !shop && loaded) ? nudge() : '';
   wireNudge($('#nudgeSlot'));
   if (r) showRecipe(decodeURIComponent(r[1]));
   else if (b) showBook(decodeURIComponent(b[1]));
   else if (cal) showCalendar(cal[1]);
   else if (ins) showInsights(ins[1]);
+  else if (plan) showPlan(plan[1]);
+  else if (shop) showShop(shop[1]);
   else showShelf();
 }
 window.addEventListener('hashchange', () => {
@@ -1796,7 +2189,11 @@ store.ready.then(() => {
   $('#sync').className = 'badge ' + (cloud ? 'ok' : 'local');
   $('#sync').textContent = cloud ? '☁️ Synced' : '📴 This device only';
 });
-store.watch('meals', items => { meals = items; if (!ed.open && !logDlg.open) route(); });
+const quiet = () => !ed.open && !logDlg.open && !planDlg.open && !dayDlg.open;   // don't redraw under an open box
+store.watch('meals', items => { meals = items; if (quiet()) route(); });
+store.watch('plan', items => { plans = items; if (quiet()) route(); });
+store.watch('shop', items => { shopTicks = items; if (quiet()) route(); });
+store.watch('shopExtra', items => { shopExtra = items; if (quiet()) route(); });
 store.watch('settings', items => {
   if (items.targets) targets = Object.assign({ protein: 30, fiber: 10 }, items.targets);
   if (!ed.open && !logDlg.open) route();

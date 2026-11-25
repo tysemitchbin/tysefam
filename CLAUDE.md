@@ -96,6 +96,10 @@ code readable and commented for a non-expert.
   `cooked: [{by, date, ts, min}]`, which feeds the calendar, the stats and the time learning; collection
   `meals`: every other dinner, `{kind: leftovers|quick|out, date, recipeId?, name, protein, fiber, kr}`).
   The 🍽️ Log dinner box, `#cal` dinner log and `#ins` insights all read `allDinners()` (both together).
+  Planning: `#plan` (week Mon–Sun) stores dinners in collection `plan` `{date, kind: recipe|leftovers|quick|out,
+  recipeId?, name?}`; ✨ fill picks by protein/fibre goals, variety and leftovers rate. `#shop` builds the shopping
+  list from the plan with `shopping.js` (`Cook.shoppingList`: amounts combined, grouped by aisle, cupboard items
+  folded); ticks in collection `shop` (id = item key), own items in `shopExtra`. The log box suggests planned dinners first.
   Shelf arrangement, search, ticks and the cooking timer are per device.
   `tools/cookbook/claude-skill/cookbook-recipes/SKILL.md` is a claude.ai skill that makes Claude write
   recipes in the layout `parseText` reads best; update it if the paste format changes.
