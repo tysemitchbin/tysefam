@@ -16,19 +16,35 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#3f5e44">
 <link rel="stylesheet" href="shared/family.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap">
 <style>
 /* header scene */
-.scene{position:relative;height:260px;overflow:hidden;background:linear-gradient(#cfeef2 0%,#e7f5ec 60%,#f3f7e6 100%);}
+.scene{position:relative;height:330px;overflow:hidden;background:linear-gradient(#cfeef2 0%,#e7f5ec 60%,#f3f7e6 100%);}
 .scene svg{position:absolute;inset:0;width:100%;height:100%;}
 .cloud{animation:drift 60s linear infinite;}
 .cloud.b{animation-duration:90s;animation-delay:-30s;}
 @keyframes drift{from{transform:translateX(-120px);}to{transform:translateX(900px);}}
-.title-wrap{position:absolute;left:0;right:0;bottom:62px;text-align:center;z-index:2;padding:0 16px;}
+.title-wrap{position:absolute;left:0;right:0;top:20px;text-align:center;z-index:2;padding:0 16px;}
 .title-wrap h1{margin:0;font-size:2.4rem;font-weight:700;color:#fff;letter-spacing:.5px;
   text-shadow:0 2px 6px rgba(63,94,68,.35);}
 .title-wrap .sub{margin:2px 0 0;color:#fff;font-weight:700;font-size:.95rem;opacity:.95;
   text-shadow:0 1px 4px rgba(63,94,68,.4);}
 @media(prefers-reduced-motion:reduce){.cloud{animation:none;}}
+
+/* Two sticky notes on the fridge, under the title: anyone can write on either one.
+   Saved in family_items (tool 'home', collection 'notes', ids note1 / note2) and shared live. */
+.notes{position:absolute;left:0;right:0;top:84px;z-index:4;display:flex;justify-content:center;gap:16px;padding:0 14px;}
+.note{position:relative;width:min(44vw,220px);background:#fff3a6;border-radius:2px 2px 12px 2px;padding:16px 12px 6px;
+  box-shadow:0 8px 16px rgba(40,60,40,.2);transform:rotate(-2deg);}
+.note.b{background:#ffd5e2;transform:rotate(2.5deg);}
+.note::before{content:"";position:absolute;top:-8px;left:50%;width:18px;height:18px;margin-left:-9px;border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,#9fd0db,#3f8fa3);box-shadow:0 2px 3px rgba(0,0,0,.3);}
+.note.b::before{background:radial-gradient(circle at 35% 35%,#b6dba8,#5d8a5f);}
+.note textarea{display:block;width:100%;height:84px;border:none;background:transparent;resize:none;outline:none;padding:0;
+  font:700 1.3rem/1.1 'Caveat','Comic Sans MS',cursive;color:#4a4636;}
+.note textarea::placeholder{color:rgba(74,70,54,.45);}
+.note small{display:block;min-height:1em;text-align:right;font-size:.66rem;font-weight:700;color:rgba(0,0,0,.4);}
+@media(max-width:420px){.note textarea{height:96px;font-size:1.2rem;}}
 
 /* Wanderlings creatures strolling on the hills (drawn by tools/wanderlings/creatures.js) */
 .critter{position:absolute;left:0;z-index:3;cursor:pointer;will-change:transform;
@@ -130,7 +146,10 @@
   </svg>
   <div class="title-wrap">
     <h1 id="siteName">🏔️ Family</h1>
-    <p class="sub" id="siteTag"></p>
+  </div>
+  <div class="notes">
+    <div class="note a"><textarea id="note1" maxlength="200" placeholder="Leave a note…" aria-label="Sticky note 1"></textarea><small id="note1by"></small></div>
+    <div class="note b"><textarea id="note2" maxlength="200" placeholder="Leave a note…" aria-label="Sticky note 2"></textarea><small id="note2by"></small></div>
   </div>
 </header>
 
@@ -151,7 +170,6 @@
 const { site, esc } = Family;
 document.title = site.name;
 document.getElementById('siteName').textContent = '🏔️ ' + site.name + ' 🌸';
-document.getElementById('siteTag').textContent = site.tagline || '';
 
 const h = new Date().getHours();
 const part = h < 5 ? 'Late night' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : h < 22 ? 'Good evening' : 'Late night';
@@ -222,6 +240,70 @@ drawTools();
 // (Redrawn either way: by now we know who's signed in, which decides tools marked `only` in site.js.)
 Family.archived().then(ids => { archivedIds = ids; drawTools(); });
 if (location.hash === '#archived') shelf.scrollIntoView();
+
+/* ───────── Sticky notes on the fridge ─────────
+   Two notes anyone can write on. They're shared through Supabase (family_items: tool 'home',
+   collection 'notes', ids note1 / note2) when someone's signed in on this device, and update live.
+   This page never asks anyone to sign in by itself: tapping a note does, if nobody is signed in yet.
+   A copy is kept on the device so the notes show straight away. */
+(function fridgeNotes() {
+  const ids = ['note1', 'note2'];
+  const box = id => document.getElementById(id);
+  const ago = ts => {
+    const m = Math.round((Date.now() - ts) / 60000);
+    return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 24 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
+  };
+  const show = (id, note) => {
+    if (!note) return;
+    if (document.activeElement !== box(id)) box(id).value = note.text || '';   // never overwrite while typing
+    box(id + 'by').textContent = note.text ? `${note.by || ''}${note.ts ? ', ' + ago(note.ts) : ''}` : '';
+  };
+  const local = () => { try { return JSON.parse(localStorage.getItem('family_notes')) || {}; } catch (e) { return {}; } };
+  const keepLocal = (id, note) => { try { const all = local(); all[id] = note; localStorage.setItem('family_notes', JSON.stringify(all)); } catch (e) { /* private window */ } };
+  ids.forEach(id => show(id, local()[id]));
+
+  let sb = null, ready = null;
+  // The Supabase client, once someone is signed in (asks to sign in only when `ask` is true).
+  function connect(ask) {
+    if (sb) return Promise.resolve(sb);
+    if (ready) return ready;
+    ready = (ask ? Family.client() : Family.peek()).then(async client => {
+      ready = null;
+      if (!client) return null;
+      sb = client;
+      const { data } = await sb.from('family_items').select('id,data').eq('tool', 'home').eq('collection', 'notes');
+      (data || []).forEach(r => { show(r.id, r.data); keepLocal(r.id, r.data); });
+      sb.channel('home-notes').on('postgres_changes', { event: '*', schema: 'public', table: 'family_items' }, p => {
+        const r = p.new && p.new.tool === 'home' && p.new.collection === 'notes' ? p.new : null;
+        if (r && ids.includes(r.id)) { show(r.id, r.data); keepLocal(r.id, r.data); }
+      }).subscribe();
+      return sb;
+    }).catch(() => { ready = null; return null; });
+    return ready;
+  }
+  connect(false);
+
+  // Save a moment after typing stops.
+  const timers = {};
+  ids.forEach(id => {
+    const el = box(id);
+    el.addEventListener('focus', () => { if (!sb && site.supabase && site.supabase.url) connect(true); });
+    el.addEventListener('input', () => {
+      clearTimeout(timers[id]);
+      timers[id] = setTimeout(async () => {
+        const note = { text: el.value.trim(), by: Family.me(), ts: Date.now() };
+        keepLocal(id, note);
+        box(id + 'by').textContent = note.text ? `${note.by}, just now` : '';
+        const client = await connect(false);
+        if (!client) return;
+        const { error } = await client.from('family_items').upsert({ id, tool: 'home', collection: 'notes', data: note }, { onConflict: 'tool,collection,id' });
+        if (error) console.warn('Sticky note: could not save', error);
+      }, 700);
+    });
+  });
+  // Keep "2 h ago" fresh.
+  setInterval(() => ids.forEach(id => show(id, local()[id])), 60000);
+})();
 
 /* ───────── "Coming up": the next few things on the shared calendar ─────────
    Only when someone's already signed in on this device and a calendar has been added

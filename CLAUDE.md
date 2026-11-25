@@ -29,6 +29,8 @@ code readable and commented for a non-expert.
   project, same origin).
 - `index.html` (home): borrows `SPECIES`/`creatureSVG` from `tools/wanderlings/creatures.js` so a few
   creatures stroll on the header hills, and shows a "Coming up" box from the calendar via `Family.peek()`.
+  Under the title are two shared sticky notes (instead of `SITE.tagline`): `family_items` tool `home`,
+  collection `notes`, ids `note1`/`note2` `{text, by, ts}`, live via realtime, with a copy in localStorage.
 - `tools/calendar/`: view-only shared Google Calendar. The `calendar` edge function
   (`supabase/functions/calendar/`, verify_jwt ON, checks the guest list) reads each calendar's secret
   iCal link from `calendar_feeds` (`supabase/calendar.sql`; RLS on, no policies) and expands repeats
