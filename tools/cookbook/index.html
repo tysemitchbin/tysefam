@@ -44,7 +44,14 @@
 
 <link rel="stylesheet" href="../../shared/family.css">
 <style>
+/* Anything switched off with the "hidden" attribute stays hidden, whatever its other styles say. */
+[hidden]{display:none !important;}
 textarea.field{width:100%;resize:vertical;line-height:1.4;}
+/* The add-a-recipe card is one line until you tap into it, so the shelf shows without scrolling. */
+.addcard{padding:12px;}
+.addcard .acts{display:none;}
+.addcard.open .acts{display:flex;}
+.addcard textarea{min-height:46px;}
 .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
 .msg{font-weight:700;font-size:.9rem;color:var(--ink-soft);}
 .msg.bad{color:var(--peach-deep);}
@@ -162,6 +169,33 @@ a.fact:hover{filter:brightness(.95);}
 .goalline span{position:absolute;right:0;top:-18px;font-size:.66rem;font-weight:800;color:var(--ink-soft);background:var(--paper);padding:0 4px;}
 .goalrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-weight:800;color:var(--forest);}
 .goalrow input{width:70px;border:2px solid var(--line);border-radius:10px;padding:6px 8px;}
+.daychips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.daychips .field{width:auto;flex:1;min-width:150px;}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
+.tile{border:2px solid var(--line);background:#fff;border-radius:16px;padding:10px;text-align:left;display:flex;flex-direction:column;gap:2px;min-height:76px;}
+.tile:active{background:#eef6ea;border-color:var(--meadow);}
+.tile .te{font-size:1.4rem;line-height:1.1;}
+.tile .tn{font-weight:800;color:var(--forest);font-size:.92rem;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.tile .ts{font-size:.74rem;font-weight:700;color:var(--ink-soft);}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom));z-index:400;display:flex;gap:10px;align-items:center;
+  background:var(--forest);color:#fff;font-weight:700;padding:10px 12px 10px 16px;border-radius:16px;box-shadow:var(--shadow-lg);max-width:calc(100% - 24px);width:max-content;}
+.toast .btn.ghost{background:#fff;color:var(--forest);}
+.nudge{display:flex;gap:8px;align-items:center;background:#fdf3d6;border-radius:14px;padding:8px 8px 8px 14px;margin:-4px 0 14px;font-weight:700;color:#7d6414;}
+.nudge span{flex:1;}
+/* Fingers need bigger targets than mouse pointers (about 44 px), and text fields under 16 px make iPhones zoom in. */
+@media(pointer:coarse),(max-width:700px){
+  .chipbtn,.btn.sm,.tab{min-height:42px;}
+  .fact{min-height:36px;display:inline-flex;align-items:center;}
+  .del{min-width:42px;min-height:42px;}
+  .calhead .btn{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;font-size:1.2rem;}
+  .cr-name a{display:inline-block;padding:6px 0;}
+  .serv button{width:42px;height:42px;font-size:1.2rem;}
+  .linkbtn{padding:10px 6px;}
+  .taglist label{padding:8px 12px;border:2px solid var(--line);border-radius:999px;}
+  .taglist input{width:20px;height:20px;}
+  input,select,textarea,.sortsel,.goalrow input,.logrow input{font-size:16px;}
+  .book:hover{transform:none;}
+}
 .tb-note{font-size:.8rem;color:var(--ink-soft);font-weight:600;flex-basis:100%;}
 .who-line{font-size:.82rem;color:var(--ink-soft);font-weight:700;}
 .logrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;padding:10px;background:#eef6ea;border-radius:12px;font-weight:700;}
@@ -228,9 +262,16 @@ details.hist summary{cursor:pointer;font-weight:800;color:var(--meadow-deep);}
 .calrow a{font-weight:700;color:var(--forest);text-decoration:none;flex:1;min-width:0;}
 
 /* the edit box */
-dialog{border:none;border-radius:20px;padding:0;max-width:680px;width:calc(100% - 16px);max-height:94vh;box-shadow:var(--shadow-lg);background:var(--paper);color:var(--ink);}
+/* Dialogs: the buttons sit in a bar that never scrolls away, and the box fits the screen that's
+   really visible (dvh), so iPhone toolbars can't cover the Save button. On phones it's a bottom sheet. */
+dialog{border:none;border-radius:20px;padding:0;max-width:680px;width:calc(100% - 16px);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);
+  box-shadow:var(--shadow-lg);background:var(--paper);color:var(--ink);overflow:hidden;}
+dialog[open]{display:flex;flex-direction:column;}
+@media(max-width:560px){dialog{width:100%;max-width:none;margin:auto 0 0;border-radius:20px 20px 0 0;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);}}
 dialog::backdrop{background:rgba(60,65,56,.35);}
-dialog form{padding:18px;display:flex;flex-direction:column;gap:12px;}
+dialog form{display:flex;flex-direction:column;flex:1;min-height:0;}
+.dlg-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:18px;display:flex;flex-direction:column;gap:12px;}
+.dlg-body h3:focus{outline:none;}
 dialog h3{margin:0;color:var(--forest);}
 dialog label{font-weight:800;font-size:.82rem;color:var(--ink-soft);display:flex;flex-direction:column;gap:5px;}
 dialog .field{width:100%;}
@@ -242,7 +283,8 @@ dialog .field{width:100%;}
 @media(max-width:520px){.row2{grid-template-columns:1fr;}.row4{grid-template-columns:1fr 1fr;}}
 .taglist{display:flex;flex-wrap:wrap;gap:6px 12px;}
 .taglist label{flex-direction:row;align-items:center;gap:6px;font-size:.9rem;color:var(--ink);font-weight:700;}
-.dlg-acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;position:sticky;bottom:-18px;background:var(--paper);padding:10px 0 4px;}
+.dlg-acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;background:var(--paper);border-top:1px solid var(--line);
+  padding:10px 18px;padding-bottom:max(12px, env(safe-area-inset-bottom));}
 .dlg-acts .danger{background:#fff;color:var(--blossom-deep);border:2px solid #f6d3de;margin-right:auto;}
 </style>
 </head>
@@ -261,12 +303,12 @@ dialog .field{width:100%;}
     <span style="flex:1"></span>
     <button class="btn" id="logBtn">🍽️ Log dinner</button>
   </nav>
+  <div id="nudgeSlot"></div>
 
   <!-- ───── the bookshelf ───── -->
   <section id="shelfView">
-    <div class="card">
-      <h3>➕ Add a recipe</h3>
-      <textarea id="paste" class="field" rows="2" placeholder="Paste a link (https://…) or a whole recipe: name, ingredients and steps"></textarea>
+    <div class="card addcard" id="addCard">
+      <textarea id="paste" class="field" rows="1" placeholder="➕ Add a recipe: paste a link or text"></textarea>
       <div class="acts">
         <button class="btn" id="addBtn">Add to cookbook</button>
         <button class="btn ghost" id="blankBtn">✍️ Type one in</button>
@@ -298,7 +340,8 @@ dialog .field{width:100%;}
 <!-- ───── add / edit a recipe ───── -->
 <dialog id="ed">
   <form id="edForm">
-    <h3 id="edHead">📝 New recipe</h3>
+    <div class="dlg-body" id="edBody">
+    <h3 id="edHead" tabindex="-1" autofocus>📝 New recipe</h3>
     <p class="guessnote" id="edNote" hidden></p>
     <label>Name<input class="field" name="title" required maxlength="140"></label>
     <div class="row2">
@@ -331,6 +374,7 @@ dialog .field{width:100%;}
     <button type="button" class="btn ghost sm" id="edAddPart" style="align-self:flex-start">➕ Add a part (e.g. the meat, the sauce, the rice)</button>
     <label>About it (optional)<textarea class="field" name="description" rows="2" maxlength="800"></textarea></label>
     <label>Our notes (optional)<textarea class="field" name="notes" rows="3" placeholder="Less chilli for the little one, doubles well…"></textarea></label>
+    </div>
     <div class="dlg-acts">
       <button type="button" class="btn danger" id="edDel" hidden>🗑 Delete</button>
       <button type="button" class="btn ghost" id="edGuess" title="Sort it again from the ingredients and steps above">✨ Guess again</button>
@@ -341,41 +385,53 @@ dialog .field{width:100%;}
 </dialog>
 
 <!-- ───── log a dinner ───── -->
-<dialog id="logDlg">
+<dialog id="logDlg" aria-labelledby="logTitle">
   <form id="logForm">
-    <h3>🍽️ Log a dinner</h3>
-    <label>Day<input class="field" type="date" name="date" required></label>
-    <div class="kinds">
-      <button type="button" class="kind" data-kind="cooked">🍳<span>Cooked a recipe</span></button>
-      <button type="button" class="kind" data-kind="leftovers">🥡<span>Leftovers</span></button>
-      <button type="button" class="kind" data-kind="quick">⚡<span>Something quick</span></button>
-      <button type="button" class="kind" data-kind="out">🍔<span>Ate out / takeaway</span></button>
-    </div>
-    <div id="logRecipeBox">
-      <div class="sub" id="logRecipeHint" style="margin-top:0">Which recipe?</div>
-      <input class="field" id="logSearch" placeholder="🔍 Find the recipe" autocomplete="off">
-      <div class="pickList" id="logPick"></div>
-    </div>
-    <div id="logQuickBox">
-      <label>What was it?<input class="field" name="qname" list="quickNames" maxlength="60" autocomplete="off"></label>
-      <datalist id="quickNames"></datalist>
-      <div class="chiprow" id="quickChips"></div>
-      <div class="row3">
-        <label>💪 Protein per person (g)<input class="field" type="number" name="qprotein" min="0" max="200"></label>
-        <label>🌾 Fibre per person (g)<input class="field" type="number" name="qfiber" min="0" max="100"></label>
-        <label>💰 Cost per person (kr)<input class="field" type="number" name="qkr" min="0" max="5000"></label>
+    <div class="dlg-body" id="logBody">
+      <h3 id="logTitle" tabindex="-1" autofocus>🍽️ What was dinner tonight?</h3>
+      <div class="daychips">
+        <button type="button" class="chipbtn" data-when="0">Tonight</button>
+        <button type="button" class="chipbtn" data-when="1">Last night</button>
+        <button type="button" class="chipbtn" data-when="other">📅 Other day</button>
+        <input class="field" type="date" name="date" hidden aria-label="Which day">
       </div>
-      <p class="hint" style="margin:0">Tap a suggestion to fill in typical numbers; change them if you know better.</p>
+      <div id="logSuggest"></div>
+      <div class="sub">Something else</div>
+      <div class="kinds">
+        <button type="button" class="kind" data-kind="cooked">🍳<span>Cooked a recipe</span></button>
+        <button type="button" class="kind" data-kind="leftovers">🥡<span>Leftovers</span></button>
+        <button type="button" class="kind" data-kind="quick">⚡<span>Something quick</span></button>
+        <button type="button" class="kind" data-kind="out">🍔<span>Ate out / takeaway</span></button>
+      </div>
+      <div id="logRecipeBox" hidden>
+        <div class="sub" id="logRecipeHint" style="margin-top:0">Which recipe?</div>
+        <label id="logMinBox">How long it took, start to table (optional, fill in first)<input class="field" type="number" name="lmin" min="1" max="1440" inputmode="numeric" placeholder="minutes"></label>
+        <input class="field" id="logSearch" placeholder="🔍 Find the recipe" autocomplete="off" style="margin-top:8px">
+        <div class="pickList" id="logPick"></div>
+      </div>
+      <div id="logQuickBox" hidden>
+        <div class="sub" style="margin-top:0">Tap one to log it</div>
+        <div class="chiprow" id="quickChips"></div>
+        <label style="margin-top:10px">Or type it<input class="field" name="qname" list="quickNames" maxlength="60" autocomplete="off"></label>
+        <datalist id="quickNames"></datalist>
+        <div class="row3">
+          <label>💪 Protein (g)<input class="field" type="number" name="qprotein" min="0" max="200" inputmode="numeric"></label>
+          <label>🌾 Fibre (g)<input class="field" type="number" name="qfiber" min="0" max="100" inputmode="numeric"></label>
+          <label>💰 kr<input class="field" type="number" name="qkr" min="0" max="5000" inputmode="numeric"></label>
+        </div>
+        <p class="hint" style="margin:6px 0 0">Per person. Leave empty and we’ll use typical numbers if we know the dish.</p>
+      </div>
+      <div id="logDay"></div>
     </div>
-    <label id="logMinBox">How long it took, start to table (min, optional)<input class="field" type="number" name="lmin" min="1" max="1440"></label>
-    <label>Note (optional)<input class="field" name="note" maxlength="200" placeholder="e.g. doubled the beans, kids loved it"></label>
-    <div id="logDay"></div>
     <div class="dlg-acts">
       <button type="button" class="btn ghost" id="logClose">Close</button>
-      <button type="submit" class="btn">Save</button>
+      <button type="submit" class="btn" id="logSave" hidden>Save</button>
     </div>
   </form>
 </dialog>
+
+<!-- ───── "Logged! Undo" bar ───── -->
+<div id="toast" class="toast" role="status" hidden><span></span><button type="button" class="btn sm ghost">Undo</button></div>
 
 <script src="../../site.js"></script>
 <script src="../../shared/family.js"></script>
@@ -895,7 +951,7 @@ function showRecipe(id) {
   box.querySelectorAll('[data-tick]').forEach(el => el.onclick = () => { tk[el.dataset.tick] = !tk[el.dataset.tick]; showRecipe(id); });
   box.querySelector('#rvFav').onclick = () => store.update('recipes', id, { favs: Object.assign({}, r.favs, { [me]: !(r.favs || {})[me] }) });
   box.querySelector('#rvCooked').onclick = () => { logOpen = !logOpen; showRecipe(id); };
-  box.querySelector('#rvLeft').onclick = () => openLog({ kind: 'leftovers', recipeId: id });
+  box.querySelector('#rvLeft').onclick = () => { logState.day = todayKey(); logNow({ kind: 'leftovers', recipeId: id, name: r.title, emoji: '🥡' }); };
   if (logOpen) {
     box.querySelector('#logCancel').onclick = () => { logOpen = false; showRecipe(id); };
     box.querySelector('#logSave').onclick = () => {
@@ -1000,42 +1056,121 @@ function removeDinner(e) {
   else store.remove('meals', e.mid);
 }
 
-/* ───────── the "Log a dinner" box ───────── */
+/* ───────── the "Log a dinner" box ─────────
+   Made to be quick: open it, tap one suggestion, done (2 taps), with an Undo bar in case of a slip.
+     • Tonight / Last night / Other day at the top (no fiddly date picker unless you want one)
+     • "Tap to log" suggestions: leftovers of what was cooked the last few days, your usual quick
+       dinners, your most-made recipes
+     • or "Something else": pick the kind, then tap a recipe or a quick dinner (also one tap), or type
+       your own quick dinner and press Save. */
 const logDlg = $('#logDlg'), logForm = $('#logForm');
-const logState = { kind: 'cooked', recipeId: null };
-function openLog({ date, kind, recipeId } = {}) {
+const logState = { kind: '', day: todayKey() };
+const yesterdayKey = () => dayKey(new Date(Date.now() - 864e5));
+const hasDinner = day => allDinners().some(e => e.day === day);
+// Which day to log for when the box opens: last night if it's still morning and last night is missing.
+const defaultDay = () => (new Date().getHours() < 14 && !hasDinner(yesterdayKey()) ? yesterdayKey() : todayKey());
+
+function openLog({ date, kind } = {}) {
   logForm.reset();
-  logForm.date.value = date || todayKey();
-  logForm.date.max = todayKey();
-  logState.kind = kind || 'cooked';
-  logState.recipeId = recipeId || null;
+  logState.day = date || defaultDay();
+  logState.kind = kind || '';
   $('#logSearch').value = '';
   drawLog();
   logDlg.showModal();
+  $('#logBody').scrollTop = 0;
+}
+function dayWord(day) {
+  return day === todayKey() ? 'tonight' : day === yesterdayKey() ? 'last night' : fmtDay(day);
 }
 function drawLog() {
-  const k = logState.kind;
+  const k = logState.kind, day = logState.day;
+  // The day buttons
+  const which = day === todayKey() ? '0' : day === yesterdayKey() ? '1' : 'other';
+  logForm.querySelectorAll('[data-when]').forEach(b => b.classList.toggle('on', b.dataset.when === which));
+  logForm.date.hidden = which !== 'other';
+  logForm.date.value = day;
+  logForm.date.max = todayKey();
+  $('#logTitle').textContent = `🍽️ What was dinner ${dayWord(day)}?`;
+  // The suggestions, the kinds and each kind's box
+  drawSuggest();
   logForm.querySelectorAll('[data-kind]').forEach(b => b.classList.toggle('on', b.dataset.kind === k));
   $('#logRecipeBox').hidden = !(k === 'cooked' || k === 'leftovers');
   $('#logQuickBox').hidden = !(k === 'quick' || k === 'out');
+  $('#logSave').hidden = !(k === 'quick' || k === 'out');
   $('#logMinBox').hidden = k !== 'cooked';
-  $('#logRecipeHint').textContent = k === 'leftovers' ? 'Leftovers of which recipe?' : 'Which recipe?';
-  drawPick();
+  $('#logRecipeHint').textContent = k === 'leftovers' ? 'Leftovers of which recipe? Tap it to log.' : 'Which recipe? Tap it to log.';
+  if (k === 'cooked' || k === 'leftovers') drawPick();
   if (k === 'quick' || k === 'out') drawQuickChips();
   drawLogDay();
 }
-// The list of recipes to pick from: recently made first, filtered by the search box.
+
+// "Tap to log": the few dinners it most likely was.
+function suggestions(day) {
+  const out = [], seen = new Set();
+  const add = t => { const key = t.kind + ':' + (t.recipeId || t.name.toLowerCase()); if (!seen.has(key) && out.length < 6) { seen.add(key); out.push(t); } };
+  // 1. Leftovers of anything cooked in the 4 days before
+  Object.entries(recipes).map(([id, r]) => [id, r, (r.cooked || []).map(cookedDay).filter(x => x < day && daysBetween(x, day) <= 4).sort().pop()])
+    .filter(x => x[2]).sort((a, b) => b[2].localeCompare(a[2]))
+    .forEach(([id, r, last]) => add({ kind: 'leftovers', recipeId: id, emoji: '🥡', name: r.title, sub: `Leftovers · made ${fmtDay(last)}` }));
+  // 2. Quick dinners you've had before (most often first), and Friday taco
+  pastQuick('quick').slice(0, 2).forEach(q => add({ kind: 'quick', name: q.name, emoji: q.emoji || '⚡', protein: q.protein, fiber: q.fiber, kr: q.kr, sub: 'Quick dinner' }));
+  if (keyDate(day).getDay() === 5) { const t = Cook.quickMatch('Taco'); add(Object.assign({ kind: 'quick', sub: 'Fredagstaco' }, t)); }
+  // 3. Recipes you make most (favourites count double), not made in the last 3 days
+  const me = Family.me();
+  Object.entries(recipes)
+    .filter(([, r]) => !lastCooked(r) || daysBetween(lastCooked(r), day) > 3 || lastCooked(r) > day)
+    .map(([id, r]) => [id, r, (r.cooked || []).length + ((r.favs || {})[me] ? 2 : 0)])
+    .filter(x => x[2] > 0).sort((a, b) => b[2] - a[2]).slice(0, 3)
+    .forEach(([id, r]) => add({ kind: 'cooked', recipeId: id, emoji: recipeEmoji(r), name: r.title, sub: 'Cooked it' }));
+  // 4. Fill up with the everyday quick ones
+  for (const name of ['Frozen pizza', 'Hot dogs', 'Taco']) { const t = Cook.quickMatch(name); add(Object.assign({ kind: 'quick', sub: 'Quick dinner' }, t)); }
+  return out;
+}
+function drawSuggest() {
+  const list = suggestions(logState.day);
+  $('#logSuggest').innerHTML = `<div class="sub" style="margin-top:0">Tap to log</div><div class="tiles">${list.map((t, i) => `
+    <button type="button" class="tile" data-tile="${i}"><span class="te">${t.emoji}</span><span class="tn">${esc(t.name)}</span><span class="ts">${esc(t.sub)}</span></button>`).join('')}</div>`;
+  $('#logSuggest').querySelectorAll('[data-tile]').forEach(b => b.onclick = () => logNow(list[+b.dataset.tile]));
+}
+
+// Log it straight away, close the box, and offer Undo.
+async function logNow(t) {
+  const day = logState.day, me = Family.me();
+  const same = allDinners().find(e => e.day === day && e.kind === t.kind && (t.recipeId ? e.id === t.recipeId : (e.m?.name || '').toLowerCase() === (t.name || '').toLowerCase()));
+  if (same && !confirm(`${t.name} is already logged for ${dayWord(day)}. Log it again?`)) return;
+  let undo;
+  if (t.kind === 'cooked') {
+    const r = recipes[t.recipeId];
+    const entry = { by: me, date: day, ts: Date.now() };
+    const min = Math.round(+logForm.lmin.value);
+    if (min > 0 && min <= 1440) entry.min = min;
+    await store.update('recipes', t.recipeId, { cooked: [...(r.cooked || []), entry] });
+    undo = () => { const now = recipes[t.recipeId]; if (now) store.update('recipes', t.recipeId, { cooked: (now.cooked || []).filter(c => c.ts !== entry.ts) }); };
+  } else {
+    const meal = t.kind === 'leftovers' ? { kind: 'leftovers', date: day, recipeId: t.recipeId }
+      : { kind: t.kind, date: day, name: t.name, emoji: t.emoji || KINDS[t.kind].emoji, protein: t.protein ?? null, fiber: t.fiber ?? null, kr: t.kr ?? null };
+    const id = await store.add('meals', meal);
+    undo = () => store.remove('meals', id);
+  }
+  logDlg.close();
+  const short = t.name.length > 34 ? t.name.slice(0, 32).replace(/\s+\S*$/, '') + '…' : t.name;
+  toast(`✓ ${t.kind === 'leftovers' ? '🥡 ' : ''}${short} · ${dayWord(day)}`, undo);
+}
+
+// The list of recipes to pick from: recently made first, filtered by the search box. One tap logs.
 function drawPick() {
   const q = $('#logSearch').value.trim();
   const list = Object.entries(recipes).filter(([, r]) => !q || searchMatch(r, q))
     .sort((a, b) => lastCooked(b[1]).localeCompare(lastCooked(a[1])) || (a[1].title || '').localeCompare(b[1].title || ''))
     .slice(0, 40);
-  if (logState.recipeId && !list.some(([id]) => id === logState.recipeId) && recipes[logState.recipeId]) list.unshift([logState.recipeId, recipes[logState.recipeId]]);
   $('#logPick').innerHTML = list.length ? list.map(([id, r]) => `
-    <button type="button" class="pick${id === logState.recipeId ? ' on' : ''}" data-pick="${esc(id)}">
-      ${recipeEmoji(r)} ${esc(r.title)}${lastCooked(r) ? `<span class="mini">made ${esc(fmtDay(lastCooked(r)))}</span>` : ''}</button>`).join('')
-    : '<div class="empty">No recipes match. For a dinner without a recipe, pick ⚡ Something quick.</div>';
-  $('#logPick').querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { logState.recipeId = b.dataset.pick; drawPick(); });
+    <button type="button" class="pick" data-pick="${esc(id)}">
+      <span>${recipeEmoji(r)} ${esc(r.title)}</span>${lastCooked(r) ? `<span class="mini">made ${esc(fmtDay(lastCooked(r)))}</span>` : ''}</button>`).join('')
+    : `<div class="empty">No recipes ${q ? 'match' : 'yet'}. For a dinner without a recipe, pick ⚡ Something quick.</div>`;
+  $('#logPick').querySelectorAll('[data-pick]').forEach(b => b.onclick = () => {
+    const r = recipes[b.dataset.pick];
+    logNow({ kind: logState.kind, recipeId: b.dataset.pick, name: r.title, emoji: recipeEmoji(r) });
+  });
 }
 // Quick dinners: the ready-made list plus anything you've logged before (most used first).
 function pastQuick(kind) {
@@ -1057,73 +1192,105 @@ function drawQuickChips() {
   const choices = quickChoices(kind);
   $('#quickChips').innerHTML = choices.slice(0, 14).map((c, i) =>
     `<button type="button" class="chipbtn" data-q="${i}">${c.emoji || KINDS[kind].emoji} ${esc(c.name)}</button>`).join('');
-  $('#quickChips').querySelectorAll('[data-q]').forEach(b => b.onclick = () => fillQuick(choices[+b.dataset.q], true));
+  $('#quickChips').querySelectorAll('[data-q]').forEach(b => b.onclick = () => logNow(Object.assign({ kind }, choices[+b.dataset.q])));
   $('#quickNames').innerHTML = choices.map(c => `<option value="${esc(c.name)}">`).join('');
-  logForm.qname.placeholder = kind === 'out' ? 'e.g. Kebab, sushi, the pizza place' : 'e.g. Hot dogs, frozen pizza';
+  logForm.qname.placeholder = kind === 'out' ? 'Something else? e.g. the pizza place' : 'Something else? e.g. egg fried rice';
 }
-function fillQuick(c, force) {
+function fillQuick(c) {
   if (!c) return;
-  logForm.qname.value = c.name;
-  logForm.qname.dataset.emoji = c.emoji || '';
   for (const [field, key] of [['qprotein', 'protein'], ['qfiber', 'fiber'], ['qkr', 'kr']]) {
-    if (force || !logForm[field].value) logForm[field].value = c[key] ?? '';
+    if (!logForm[field].value) logForm[field].value = c[key] ?? '';
   }
+  logForm.qname.dataset.emoji = c.emoji || '';
 }
 // Typing a name we know fills in its numbers.
 logForm.qname.addEventListener('change', () => {
   const t = logForm.qname.value.trim();
-  const mine = pastQuick(logState.kind).find(m => m.name.toLowerCase() === t.toLowerCase());
-  fillQuick(mine || Cook.quickMatch(t, logState.kind === 'out'), false);
+  fillQuick(pastQuick(logState.kind).find(m => m.name.toLowerCase() === t.toLowerCase()) || Cook.quickMatch(t, logState.kind === 'out'));
 });
 // What's already logged on the chosen day (with ✕ to take one away).
 function drawLogDay() {
-  const day = logForm.date.value;
+  const day = logState.day;
   const list = allDinners().filter(e => e.day === day);
-  $('#logDay').innerHTML = list.length ? `<div class="sub">Already logged for ${esc(fmtDay(day))}</div>` + list.map((e, i) => {
+  $('#logDay').innerHTML = list.length ? `<div class="sub">Already logged for ${esc(dayWord(day))}</div>` + list.map((e, i) => {
     const d = dinnerInfo(e);
     return `<div class="histrow"><span style="flex:1">${d.emoji} ${esc(d.name)} <span class="mini">${esc(KINDS[e.kind]?.label || '')}</span></span>
-      <span class="who-pill">${esc(e.by)}</span><button type="button" class="del" data-undo="${i}" title="Remove">✕</button></div>`;
+      <span class="who-pill">${esc(e.by)}</span><button type="button" class="del" data-undo="${i}" title="Remove" aria-label="Remove">✕</button></div>`;
   }).join('') : '';
   $('#logDay').querySelectorAll('[data-undo]').forEach(b => b.onclick = () => {
     const e = list[+b.dataset.undo];
-    if (!confirm(`Remove “${dinnerInfo(e).name}” from ${fmtDay(day)}?`)) return;
+    if (!confirm(`Remove “${dinnerInfo(e).name}” from ${dayWord(day)}?`)) return;
     removeDinner(e);
     setTimeout(drawLogDay, 300);
   });
 }
-logForm.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => { logState.kind = b.dataset.kind; drawLog(); });
+logForm.querySelectorAll('[data-when]').forEach(b => b.onclick = () => {
+  if (b.dataset.when === 'other') {
+    logForm.date.hidden = false;
+    b.classList.add('on');
+    try { logForm.date.showPicker(); } catch (e) { logForm.date.focus(); }
+    return;
+  }
+  logState.day = b.dataset.when === '0' ? todayKey() : yesterdayKey();
+  drawLog();
+});
+logForm.date.addEventListener('change', () => { if (/^\d{4}-\d\d-\d\d$/.test(logForm.date.value)) { logState.day = logForm.date.value; drawLog(); } });
+logForm.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => {
+  logState.kind = logState.kind === b.dataset.kind ? '' : b.dataset.kind;
+  drawLog();
+  // Bring the chosen kind's box into view.
+  setTimeout(() => (logState.kind ? $(logState.kind === 'quick' || logState.kind === 'out' ? '#logQuickBox' : '#logRecipeBox') : null)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50);
+});
 $('#logSearch').addEventListener('input', drawPick);
-logForm.date.addEventListener('change', drawLogDay);
 $('#logClose').onclick = () => logDlg.close();
 logDlg.addEventListener('close', () => route());
-logForm.addEventListener('submit', async ev => {
+// Save is only for a quick dinner or eating out that you typed yourself.
+logForm.addEventListener('submit', ev => {
   ev.preventDefault();
-  const day = logForm.date.value, k = logState.kind, me = Family.me();
-  if (!/^\d{4}-\d\d-\d\d$/.test(day)) return;
-  const note = logForm.note.value.trim() || undefined;
+  const k = logState.kind;
+  if (k !== 'quick' && k !== 'out') return;
+  const name = logForm.qname.value.trim();
+  if (!name) { logForm.qname.focus(); return; }
   const num = v => (v === '' || v == null || !isFinite(+v) || +v < 0) ? null : Math.round(+v);
-  if (k === 'cooked' || k === 'leftovers') {
-    const r = recipes[logState.recipeId];
-    if (!r) { alert('Pick the recipe first (or choose ⚡ Something quick).'); return; }
-    if (k === 'cooked') {
-      const entry = { by: me, date: day, ts: keyDate(day).getTime() };
-      const min = num(logForm.lmin.value);
-      if (min > 0 && min <= 1440) entry.min = min;
-      if (note) entry.note = note;
-      await store.update('recipes', logState.recipeId, { cooked: [...(r.cooked || []), entry] });
-    } else {
-      await store.add('meals', { kind: 'leftovers', date: day, recipeId: logState.recipeId, note: note || null });
-    }
-  } else {
-    const name = logForm.qname.value.trim();
-    if (!name) { logForm.qname.focus(); return; }
-    const preset = Cook.quickMatch(name, k === 'out');
-    await store.add('meals', { kind: k, date: day, name, emoji: logForm.qname.dataset.emoji || preset?.emoji || KINDS[k].emoji,
-      protein: num(logForm.qprotein.value), fiber: num(logForm.qfiber.value), kr: num(logForm.qkr.value), note: note || null });
-  }
-  logDlg.close();
+  const preset = Cook.quickMatch(name, k === 'out');
+  logNow({ kind: k, name, emoji: logForm.qname.dataset.emoji || preset?.emoji || KINDS[k].emoji,
+    protein: num(logForm.qprotein.value) ?? preset?.protein ?? null, fiber: num(logForm.qfiber.value) ?? preset?.fiber ?? null,
+    kr: num(logForm.qkr.value) ?? preset?.kr ?? null });
 });
 $('#logBtn').onclick = () => openLog();
+
+/* ───────── a little message at the bottom, with Undo ───────── */
+let toastTimer = null;
+function toast(text, undo) {
+  const t = $('#toast');
+  t.querySelector('span').textContent = text;
+  const b = t.querySelector('button');
+  b.hidden = !undo;
+  b.onclick = () => { if (undo) undo(); t.hidden = true; };
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 7000);
+}
+
+/* ───────── a gentle reminder when a dinner isn't logged ───────── */
+function nudge() {
+  const y = yesterdayKey(), t = todayKey();
+  let day = '';
+  if (!hasDinner(y) && allDinners().length) day = y;               // only once you've started logging
+  else if (new Date().getHours() >= 17 && !hasDinner(t)) day = t;
+  let dismissed = '';
+  try { dismissed = localStorage.getItem('cookbook:nudge') || ''; } catch (e) { /* private window */ }
+  if (!day || dismissed === day) return '';
+  return `<div class="nudge"><span>🍽️ ${day === t ? 'Tonight’s' : 'Last night’s'} dinner isn’t logged yet.</span>
+    <button class="btn sm" data-nudge="${day}">Log it</button><button class="del" data-nudge-x="${day}" aria-label="Not now" title="Not now">✕</button></div>`;
+}
+function wireNudge(box) {
+  box.querySelectorAll('[data-nudge]').forEach(b => b.onclick = () => openLog({ date: b.dataset.nudge }));
+  box.querySelectorAll('[data-nudge-x]').forEach(b => b.onclick = () => {
+    try { localStorage.setItem('cookbook:nudge', b.dataset.nudgeX); } catch (e) { /* private window */ }
+    b.closest('.nudge').remove();
+  });
+}
 
 /* ───────── the calendar ───────── */
 function showCalendar(month) {
@@ -1332,6 +1499,9 @@ function route() {
   $('#tabCal').classList.toggle('on', !!cal);
   $('#tabIns').classList.toggle('on', !!ins);
   if (!r && wake) setWake(false);
+  // The "not logged yet" reminder, on the bookshelf and the dinner log.
+  $('#nudgeSlot').innerHTML = (!r && !b && !ins && loaded) ? nudge() : '';
+  wireNudge($('#nudgeSlot'));
   if (r) showRecipe(decodeURIComponent(r[1]));
   else if (b) showBook(decodeURIComponent(b[1]));
   else if (cal) showCalendar(cal[1]);
@@ -1345,7 +1515,10 @@ window.addEventListener('hashchange', () => {
 });
 
 /* ───────── adding a recipe ───────── */
-function say(text, bad) { const m = $('#addMsg'); m.textContent = text; m.className = 'msg' + (bad ? ' bad' : ''); }
+function say(text, bad) {
+  const m = $('#addMsg'); m.textContent = text; m.className = 'msg' + (bad ? ' bad' : '');
+  if (text) $('#addCard').classList.add('open');
+}
 // The paste is just a link? (one "word" that looks like a web address)
 function onlyLink(text) {
   const t = text.trim();
@@ -1405,6 +1578,13 @@ async function addFromPaste() {
   openEditor(draft, null, note, bad);
 }
 $('#addBtn').onclick = addFromPaste;
+// Open the add card when you tap into it; fold it away again if you leave it empty.
+$('#paste').addEventListener('focus', () => { $('#addCard').classList.add('open'); $('#paste').rows = 4; });
+$('#paste').addEventListener('blur', () => setTimeout(() => {
+  if (!$('#paste').value.trim() && !$('#addCard').contains(document.activeElement) && !$('#addMsg').textContent) {
+    $('#addCard').classList.remove('open'); $('#paste').rows = 1;
+  }
+}, 250));
 $('#paste').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addFromPaste(); });
 // A pasted link goes straight in, no button needed.
 $('#paste').addEventListener('paste', () => setTimeout(() => { if (onlyLink($('#paste').value)) addFromPaste(); }, 0));
@@ -1466,7 +1646,7 @@ function openEditor(r, id, note, bad) {
   tagBoxes();
   showEstimate();
   ed.showModal();
-  ed.scrollTop = 0;
+  $('#edBody').scrollTop = 0;
   if (!r.title) form.title.focus();
 }
 

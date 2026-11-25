@@ -356,22 +356,22 @@
   /* ───────── page chrome: menu bar + sign-in card (self-contained styles) ───────── */
   const CSS = `
     .fam-bar{position:relative;z-index:200;display:flex;align-items:center;gap:10px;
-      padding:7px 14px;background:#3f5e44;color:#fff;font:700 .88rem 'Nunito',system-ui,sans-serif;}
+      padding:4px 10px;background:#3f5e44;color:#fff;font:700 .88rem 'Nunito',system-ui,sans-serif;}
     .fam-bar a{color:#fff;text-decoration:none;}
-    .fam-home{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;transition:.15s;}
+    .fam-home{display:flex;align-items:center;gap:6px;padding:9px 10px;border-radius:999px;transition:.15s;}
     .fam-home:hover{background:rgba(255,255,255,.14);}
     .fam-sp{flex:1;}
     .fam-user{opacity:.9;font-weight:700;}
     .fam-user button{border:none;background:none;color:#fff;font:inherit;text-decoration:underline;cursor:pointer;opacity:.8;}
     .fam-menu{position:relative;}
     .fam-menu>button{border:none;background:rgba(255,255,255,.14);color:#fff;font:inherit;
-      padding:5px 12px;border-radius:999px;cursor:pointer;}
+      padding:10px 14px;border-radius:999px;cursor:pointer;}
     .fam-menu>button:hover{background:rgba(255,255,255,.24);}
     .fam-list{display:none;position:absolute;right:0;top:calc(100% + 6px);min-width:220px;max-width:80vw;
       background:#fffdf7;border:1px solid #e9e2d2;border-radius:14px;padding:6px;
       box-shadow:0 14px 40px rgba(80,90,60,.22);}
     .fam-menu.open .fam-list{display:block;}
-    .fam-list a{display:flex;align-items:center;gap:9px;color:#3c4138;padding:9px 10px;border-radius:10px;}
+    .fam-list a{display:flex;align-items:center;gap:9px;color:#3c4138;padding:12px 10px;border-radius:10px;}
     .fam-list a:hover{background:#eef6ea;}
     .fam-list a.cur{background:#7fa874;color:#fff;}
     .fam-list a.fam-arch{color:#6f7468;font-weight:600;border-top:1px dashed #e9e2d2;border-radius:0 0 10px 10px;margin-top:4px;}
