@@ -73,8 +73,9 @@ code readable and commented for a non-expert.
   sideways and twisting moves (how a pose is written is explained in the file).
   Shared in `family_items` (tool `trx`: `workouts` the family built, `log` of finished workouts). The
   timer beeps, can speak (browser speech), and keeps the screen awake; the draft being built is per device.
-- `tools/cookbook/`: the family recipe collection, drawn as a bookshelf (pages by `#`: shelf, `#b=cat:val`
-  one book of recipe spines between bookends, `#r=id` a recipe, `#cal=YYYY-MM` cooking calendar).
+- `tools/cookbook/`: the family recipe collection, drawn as a bookshelf of books lying flat in piles of up
+  to 4 so titles read normally (`piles()`; pages by `#`: shelf, `#b=cat:val` one book's recipes as piles,
+  `#r=id` a recipe, `#cal=YYYY-MM` the meal log calendar).
   Paste a link or a whole recipe. Links go to the `recipes` edge function (`supabase/functions/recipes/`,
   verify_jwt ON, checks the guest list): it tries the site, then the r.jina.ai reader, then the Wayback
   Machine (many sites block cloud servers), reads schema.org Recipe JSON-LD, or sends back the page text.
@@ -96,8 +97,12 @@ code readable and commented for a non-expert.
   dinner in collection `settings`, id `targets`) and holds presets for quick/takeaway dinners (`Cook.QUICK/OUT`).
   Shared in `family_items` (tool `cookbook`, collection `recipes`: also `favs` per person and
   `cooked: [{by, date, ts, min}]`, which feeds the calendar, the stats and the time learning; collection
-  `meals`: every other dinner, `{kind: leftovers|quick|out, date, recipeId?, name, protein, fiber, kr}`).
-  The 🍽️ Log dinner box, `#cal` dinner log and `#ins` insights all read `allDinners()` (both together).
+  `meals`: every other meal, `{kind: leftovers|quick|out, date, recipeId?, name, protein, fiber, kr}`).
+  Breakfast and lunch are logged too: `slot: 'breakfast'|'lunch'` (no slot = dinner) and `who` (the one person
+  who ate it; none = everyone) on `meals` items and on `cooked` entries. `allMeals()` has every meal (the `#cal`
+  log, with All/Breakfast/Lunch/Dinner chips); `allDinners()` is dinners only (insights, goals, nudge, plan).
+  The 🍽️ Log a meal box starts on the meal it's time for and suggests leftovers first for breakfast/lunch;
+  presets are `Cook.BREAKFAST/LUNCH/OUT_DAY` in `nutrition.js`. `#ins` adds a Breakfast & lunch card.
   Planning: `#plan` (week Mon–Sun) stores dinners in collection `plan` `{date, kind: recipe|leftovers|quick|out,
   recipeId?, name?}`; ✨ fill picks by protein/fibre goals, variety and leftovers rate. `#shop` builds the shopping
   list from the plan with `shopping.js` (`Cook.shoppingList`: amounts combined, grouped by aisle, cupboard items

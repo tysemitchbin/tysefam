@@ -10,7 +10,7 @@
 
      Pages (the part of the address after #):
        (nothing)          the bookshelf: one book per category (pick what the shelf is arranged by)
-       #b=cuisine:italian one book opened: its recipes stand on a shelf as little books between bookends
+       #b=cuisine:italian one book opened: its recipes lie on a shelf as little books, in piles of up to 4
                           (also #b=all, #b=fav, #b=recent)
        #r=<id>            one recipe, with "when we make it" stats
        #cal=2026-11       the cooking calendar: what we made each day
@@ -31,8 +31,12 @@
                    tags: ['Vegetarian', …], favs: { Mitch: true },
                    cooked: [{ by, date: '2026-11-24', ts, min }]   (every time we made it; min = how long
                    it really took, if logged), ts, by }
-     meals → dinners that aren't "we cooked a recipe" (see allDinners): { kind: 'leftovers' | 'quick' | 'out',
-             date, recipeId (leftovers), name, emoji, protein, fiber, kr (per person; quick/out), note, by, ts }
+     meals → meals that aren't "we cooked a recipe" (see allMeals): { kind: 'leftovers' | 'quick' | 'out',
+             date, recipeId (leftovers), name, emoji, protein, fiber, kr (per person; quick/out), note, by, ts,
+             slot: 'breakfast' | 'lunch' (no slot = dinner), who: the person who ate it (breakfast/lunch;
+             no who = everyone) }
+             A recipe's `cooked` entries can carry the same slot/who when it was made for breakfast or lunch.
+             Dinners are what the insights, goals and the plan count; breakfasts and lunches are extra.
      settings → 'targets': { protein, fiber }   our goals per dinner per person (📊 Insights)
      A recipe can also have proteinG / fiberG (per serving) typed in; otherwise nutrition.js estimates them.
      Times: what the recipe says is kept, but what we SHOW is realistic: your own logged times for
@@ -77,9 +81,9 @@ textarea.field{width:100%;resize:vertical;line-height:1.4;}
 .sortsel{border:2px solid var(--line);background:#fff;border-radius:12px;padding:8px 10px;font-size:.9rem;font-weight:700;color:var(--forest);}
 
 /* ───── the bookcase ─────
-   Every book stands in a .slot exactly one shelf tall, so the rows of books line up
-   with the wooden boards drawn by the background. */
-.bookcase{--row:210px;--board:16px;display:flex;flex-wrap:wrap;align-items:flex-end;padding:0 10px;margin-bottom:18px;
+   The books lie flat, a few to a pile (.stack), so their titles read normally. Every pile is exactly
+   one shelf tall, so the rows of piles line up with the wooden boards drawn by the background. */
+.bookcase{--row:214px;--board:16px;display:flex;flex-wrap:wrap;align-items:flex-end;padding:0 8px;margin-bottom:18px;
   border:10px solid #8a5a35;border-top-width:14px;border-radius:12px;
   background:
     repeating-linear-gradient(to bottom, transparent 0 calc(var(--row) - var(--board)),
@@ -87,33 +91,26 @@ textarea.field{width:100%;resize:vertical;line-height:1.4;}
     linear-gradient(90deg, rgba(0,0,0,.06), transparent 6%, transparent 94%, rgba(0,0,0,.06)),
     #f0dfc0;
   box-shadow:inset 0 8px 16px rgba(60,35,15,.18), var(--shadow);}
-.slot{height:var(--row);display:flex;align-items:flex-end;padding-bottom:var(--board);}
+.stack{height:var(--row);display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding-bottom:var(--board);margin:0 5px;}
 .shelf-empty{height:var(--row);padding:24px 10px var(--board);display:flex;align-items:center;justify-content:center;width:100%;
   color:#7a5a3a;font-weight:700;text-align:center;}
 
-.book{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;
-  width:var(--w);height:var(--h);margin:0 1px;padding:8px 3px 7px;border-radius:4px 4px 2px 2px;
-  background:linear-gradient(90deg, rgba(0,0,0,.22), rgba(255,255,255,.16) 14%, rgba(255,255,255,0) 38%, rgba(0,0,0,.08) 86%, rgba(0,0,0,.28)), var(--c);
-  color:#fdf6e3;text-decoration:none;box-shadow:1px 0 2px rgba(0,0,0,.3);transition:transform .15s;}
-.book:hover,.book:focus-visible{transform:translateY(-10px);outline:none;}
-.book::before,.book::after{content:"";position:absolute;left:0;right:0;height:3px;background:rgba(255,231,160,.6);}
-.book::before{top:34px;} .book::after{bottom:30px;}
-.b-top{font-size:1.15rem;line-height:1;height:22px;}
-.b-title{writing-mode:vertical-rl;flex:1;min-height:0;overflow:hidden;font-family:'Fredoka',sans-serif;font-weight:600;
-  font-size:.86rem;line-height:1.12;text-align:center;padding:8px 0 6px;text-shadow:0 1px 1px rgba(0,0,0,.3);}
-.b-n{font-size:.68rem;font-weight:800;background:rgba(255,253,247,.92);color:var(--ink);border-radius:999px;padding:1px 6px;min-width:20px;text-align:center;}
+/* One book lying on its side: --w long, --h thick, --c its colour, --x how far it sticks out of the pile. */
+.book{position:relative;display:flex;align-items:center;gap:6px;flex:none;
+  width:var(--w);max-width:calc(50vw - 46px);height:var(--h);padding:2px 9px 2px 10px;border-radius:3px 7px 7px 3px;
+  background:linear-gradient(180deg, rgba(255,255,255,.2), rgba(255,255,255,0) 30%, rgba(0,0,0,.06) 70%, rgba(0,0,0,.3)), var(--c);
+  color:#fdf6e3;text-decoration:none;box-shadow:0 1px 2px rgba(0,0,0,.35);transform:translateX(var(--x,0px));transition:transform .15s;}
+.book:hover,.book:focus-visible{transform:translateX(calc(var(--x,0px) + 10px));outline:none;}
+/* gold bands near both ends of the spine */
+.book::before,.book::after{content:"";position:absolute;top:0;bottom:0;width:3px;background:rgba(255,231,160,.6);}
+.book::before{left:4px;} .book::after{right:4px;}
+.b-top{font-size:1.05rem;line-height:1;flex:none;}
+.b-title{flex:1;min-width:0;font-family:'Fredoka',sans-serif;font-weight:600;font-size:.88rem;line-height:1.08;text-align:left;
+  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;text-shadow:0 1px 1px rgba(0,0,0,.3);}
+.b-n{flex:none;font-size:.68rem;font-weight:800;background:rgba(255,253,247,.92);color:var(--ink);border-radius:999px;padding:1px 6px;min-width:20px;text-align:center;}
 .book.special::before,.book.special::after{background:#e9c46a;}
-.book.rbook .b-title{font-size:.78rem;}
+.book.rbook .b-title{font-size:.8rem;}
 .book.rbook .b-n{background:transparent;color:#fdf6e3;padding:0;font-size:.72rem;}
-/* a book leaning on the last one, just for looks */
-.slot.lean .book{transform:rotate(7deg);transform-origin:bottom left;margin-left:2px;margin-right:22px;}
-.slot.lean .book:hover{transform:rotate(7deg) translateY(-10px);}
-
-/* bookends at both ends of an opened book's shelf */
-.bookend{width:44px;height:118px;margin:0 3px;display:flex;align-items:flex-start;justify-content:center;padding-top:14px;
-  font-size:1.3rem;background:linear-gradient(180deg,#7a4f2e,#5a3820);box-shadow:inset 0 2px 0 rgba(255,255,255,.15),0 2px 4px rgba(0,0,0,.3);}
-.bookend.left{border-radius:44px 4px 0 0;}
-.bookend.right{border-radius:4px 44px 0 0;}
 
 .bookhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
 .bookhead h2{margin:0;color:var(--forest);font-size:1.4rem;}
@@ -147,6 +144,15 @@ a.fact:hover{filter:brightness(.95);}
 .kind{border:2px solid var(--line);background:#fff;border-radius:14px;padding:8px 4px;font-size:1.4rem;display:flex;flex-direction:column;align-items:center;gap:2px;}
 .kind span{font-size:.78rem;font-weight:800;color:var(--forest);}
 .kind.on{border-color:var(--meadow);background:#eef6ea;}
+/* breakfast / lunch / dinner switch at the top of the log box */
+.mealslots{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;}
+.mealslot{border:2px solid var(--line);background:#fff;border-radius:14px;padding:6px 4px;font-size:1.2rem;display:flex;align-items:center;justify-content:center;gap:6px;}
+.mealslot span{font-size:.88rem;font-weight:800;color:var(--forest);}
+.mealslot.on{border-color:var(--meadow);background:var(--meadow);}
+.mealslot.on span{color:#fff;}
+#logWho{margin-bottom:8px;}
+#logWho .lbl{font-weight:800;font-size:.82rem;color:var(--ink-soft);}
+.slotpill{display:inline-block;font-size:.74rem;font-weight:800;padding:1px 7px;border-radius:999px;background:#eef3f8;color:#3f6e8c;white-space:nowrap;}
 .pickList{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto;margin-top:6px;}
 .pick{border:2px solid var(--line);background:#fff;border-radius:12px;padding:8px 10px;text-align:left;font-weight:700;color:var(--ink);display:flex;gap:6px;align-items:center;}
 .pick .mini{margin-left:auto;}
@@ -163,6 +169,7 @@ a.fact:hover{filter:brightness(.95);}
 .cr-chips .who-pill{margin-left:auto;}
 .kindbar{display:flex;height:30px;border-radius:999px;overflow:hidden;margin:4px 0 8px;font-size:.8rem;font-weight:800;}
 .kindbar div{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;color:#fff;}
+.ce.ce-day{background:#e3eef7;color:#35566b;}
 .k-cooked{background:#7fa874;} .k-leftovers{background:#d9b43f;} .k-quick{background:#e89b6f;} .k-out{background:#8ec6d4;}
 .wkchart{position:relative;display:flex;align-items:flex-end;gap:4px;height:100px;margin:6px 0 2px;border-bottom:1px solid var(--line);}
 .wk{flex:1;height:100%;display:flex;align-items:flex-end;}
@@ -196,7 +203,7 @@ a.fact:hover{filter:brightness(.95);}
   .taglist label{padding:8px 12px;border:2px solid var(--line);border-radius:999px;}
   .taglist input{width:20px;height:20px;}
   input,select,textarea,.sortsel,.goalrow input,.logrow input{font-size:16px;}
-  .book:hover{transform:none;}
+  .book:hover{transform:translateX(var(--x,0px));}
 }
 .calhead h2 small{display:block;font-size:.8rem;color:var(--ink-soft);font-family:'Nunito',sans-serif;font-weight:700;}
 .planweek{display:flex;flex-direction:column;}
@@ -327,7 +334,7 @@ dialog .field{width:100%;}
     <span class="emoji">📖</span><h1>Cookbook</h1>
     <span style="flex:1"></span>
     <span id="sync" class="badge local">…</span>
-    <button class="btn" id="logBtn">🍽️ Log dinner</button>
+    <button class="btn" id="logBtn">🍽️ Log a meal</button>
   </div>
   <nav class="tabs">
     <a class="tab" id="tabShelf" href="#"><span>📚</span>Recipes</a>
@@ -426,6 +433,14 @@ dialog .field{width:100%;}
   <form id="logForm">
     <div class="dlg-body" id="logBody">
       <h3 id="logTitle" tabindex="-1" autofocus>🍽️ What was dinner tonight?</h3>
+      <!-- Which meal: breakfast, lunch or dinner -->
+      <div class="mealslots">
+        <button type="button" class="mealslot" data-slot="breakfast">☀️<span>Breakfast</span></button>
+        <button type="button" class="mealslot" data-slot="lunch">🥪<span>Lunch</span></button>
+        <button type="button" class="mealslot" data-slot="dinner">🍽️<span>Dinner</span></button>
+      </div>
+      <!-- Breakfast and lunch are often just one person's (filled in by drawLog) -->
+      <div class="daychips" id="logWho" hidden></div>
       <div class="daychips">
         <button type="button" class="chipbtn" data-when="0">Tonight</button>
         <button type="button" class="chipbtn" data-when="1">Last night</button>
@@ -630,35 +645,50 @@ const sortOptions = sel => [['new', 'Newest first'], ['az', 'A to Z'], ['quick',
   .map(([v, l]) => `<option value="${v}"${sel === v ? ' selected' : ''}>${l}</option>`).join('');
 
 /* ───────── books ───────── */
-// A category book on the main shelf. key is what goes in the address: 'cuisine:italian', 'all', 'fav'…
-// Colours go round the list 5 at a time, so every colour gets used and books side by side never match.
+/* Books lie flat in piles of up to 4 (so the titles read normally), piles side by side on the shelf.
+   categoryBook / recipeBook give { w, make(w) }: w = how long the book would like to be, and make()
+   draws it at a length. Within a pile the lengths are handed out shortest on top, so it looks like a
+   pile you could really build, while the books keep their order (top to bottom, pile by pile). */
+// Colours go round the list 5 at a time, so every colour gets used and books next to each other never match.
 const spine = i => SPINES[(i * 5) % SPINES.length];
+// How far a book sticks out of its pile (a few px left or right, the same every time).
+const nudgeX = key => (hash(key) % 13) - 6;
+// A category book on the main shelf. key is what goes in the address: 'cuisine:italian', 'all', 'fav'…
 function categoryBook(key, emoji, label, count, special, i) {
-  const h = 150 + hash(key) % 34, w = 50 + Math.min(count, 14) * 3;
+  const h = 40 + Math.min(count, 12) * 0.6 + hash(key) % 4;            // more recipes, thicker book
   const c = special ? '#2f4a35' : spine(i);
-  return `<div class="slot"><a class="book${special ? ' special' : ''}" href="#b=${encodeURIComponent(key)}"
-      style="--h:${h}px;--w:${w}px;--c:${c}" aria-label="${esc(label)}, ${count} recipe${count === 1 ? '' : 's'}" title="${esc(label)}">
-    <span class="b-top">${emoji}</span><span class="b-title">${esc(label)}</span><span class="b-n">${count}</span></a></div>`;
+  return { w: 132 + hash(key) % 30, make: w => `<a class="book${special ? ' special' : ''}" href="#b=${encodeURIComponent(key)}"
+      style="--h:${Math.round(h)}px;--w:${w}px;--c:${c};--x:${nudgeX(key)}px" aria-label="${esc(label)}, ${count} recipe${count === 1 ? '' : 's'}" title="${esc(label)}">
+    <span class="b-top">${emoji}</span><span class="b-title">${esc(label)}</span><span class="b-n">${count}</span></a>` };
 }
-// A recipe standing on the shelf of an opened book.
+// A recipe lying in a pile on the shelf of an opened book.
 function recipeBook(id, r, i) {
-  const h = 152 + hash(id) % 30, w = 42 + Math.min((r.ingredients || []).length, 16) * 1.2;
+  const h = 38 + Math.min((r.ingredients || []).length, 16) * 0.5 + hash(id) % 4;   // more ingredients, thicker book
   const c = spine(i + 3);
   const prot = Cook.find('protein', r.protein), meal = Cook.find('meal', r.meal);
   const emoji = (r.protein && !['none', 'veg'].includes(r.protein) ? prot?.emoji : meal?.emoji) || '🍽️';
   const fav = (r.favs || {})[Family.me()];
-  return `<div class="slot"><a class="book rbook" href="#r=${encodeURIComponent(id)}" style="--h:${h}px;--w:${Math.round(w)}px;--c:${c}"
+  return { w: 140 + hash(id) % 26, make: w => `<a class="book rbook" href="#r=${encodeURIComponent(id)}" style="--h:${Math.round(h)}px;--w:${w}px;--c:${c};--x:${nudgeX(id)}px"
       title="${esc(r.title)}" aria-label="${esc(r.title)}">
     <span class="b-top">${emoji}</span><span class="b-title">${esc(r.title)}</span>
-    <span class="b-n">${fav ? '❤️' : ''}${shortMin(timeOf(r))}</span></a></div>`;
+    <span class="b-n">${fav ? '❤️' : ''}${shortMin(timeOf(r))}</span></a>` };
+}
+// Put books into piles: as few piles as possible with at most `per` books each, shared out evenly (5 books → 3 + 2).
+function piles(books, per = 4) {
+  const out = [];
+  let i = 0;
+  const count = Math.ceil(books.length / per);
+  for (let p = 0; p < count; p++) {
+    const group = books.slice(i, i + Math.ceil((books.length - i) / (count - p)));
+    i += group.length;
+    const lengths = group.map(b => b.w).sort((a, b) => a - b);
+    out.push(`<div class="stack">${group.map((b, k) => b.make(lengths[k])).join('')}</div>`);
+  }
+  return out.join('');
 }
 function shelfOfRecipes(list, endEmoji, emptyText) {
   if (!list.length) return `<div class="bookcase small"><div class="shelf-empty">${emptyText}</div></div>`;
-  return `<div class="bookcase small">
-    <div class="slot"><div class="bookend left" aria-hidden="true">${endEmoji}</div></div>
-    ${list.map(([id, r], i) => recipeBook(id, r, i)).join('')}
-    <div class="slot"><div class="bookend right" aria-hidden="true">${endEmoji}</div></div>
-  </div>`;
+  return `<div class="bookcase small">${piles(list.map(([id, r], i) => recipeBook(id, r, i)))}</div>`;
 }
 
 // What's in a book: [[id, recipe], …] for an address key like 'cuisine:italian'.
@@ -727,9 +757,7 @@ function showShelf() {
     const none = all.filter(([, r]) => !valueOf(r, F.shelf)).length;
     if (none) books.push(categoryBook(F.shelf + ':_none', '📦', 'Not sorted', none, false, books.length));
   }
-  // The last book leans over a little, like on a real shelf.
-  if (books.length > 3) books[books.length - 1] = books[books.length - 1].replace('class="slot"', 'class="slot lean"');
-  box.innerHTML = `<div class="bookcase">${books.join('')}</div>`;
+  box.innerHTML = `<div class="bookcase">${piles(books)}</div>`;
 }
 $('#q').value = F.q;
 $('#q').oninput = e => { F.q = e.target.value; saveView(); showShelf(); };
@@ -764,9 +792,13 @@ function showBook(key) {
 /* ───────── "when we make it" ───────── */
 function cookStats(r, id) {
   const days = (r.cooked || []).map(c => ({ day: cookedDay(c), by: c.by || '?' })).sort((a, b) => a.day.localeCompare(b.day));
-  // Leftovers: how many extra dinners this recipe gives.
-  const lo = Object.values(meals).filter(m => m.kind === 'leftovers' && m.recipeId === id).length;
-  const loLine = lo ? `<p class="statline">🥡 Leftovers: <b>${lo}</b> dinner${lo === 1 ? '' : 's'} from ${days.length || '?'} cook${days.length === 1 ? '' : 's'}${days.length ? `, so about <b>${fmtPer(lo / days.length)}</b> each time we make it` : ''}.</p>`
+  // Leftovers: how many extra meals this recipe gives (dinners, lunches, even breakfasts).
+  const loMeals = Object.values(meals).filter(m => m.kind === 'leftovers' && m.recipeId === id);
+  const lo = loMeals.length;
+  const loBy = SLOT_ORDER.map(sl => [sl, loMeals.filter(m => slotOf(m) === sl).length]).filter(x => x[1]);
+  const loSplit = loBy.length > 1 || (loBy[0] && loBy[0][0] !== 'dinner')
+    ? ` (${loBy.map(([sl, n]) => `${n} ${sl}${n === 1 ? '' : sl === 'lunch' ? 'es' : 's'}`).join(', ')})` : '';
+  const loLine = lo ? `<p class="statline">🥡 Leftovers: <b>${lo}</b> meal${lo === 1 ? '' : 's'}${loSplit} from ${days.length || '?'} cook${days.length === 1 ? '' : 's'}${days.length ? `, so about <b>${fmtPer(lo / days.length)}</b> each time we make it` : ''}.</p>`
     : days.length ? '<p class="statline">🥡 No leftovers logged yet. Tap <b>🥡 We ate leftovers</b> when you have them.</p>' : '';
   if (!days.length) return loLine + `<p class="statline">Not made yet. Tap <b>✅ We made this</b> above when you do, and this fills up.</p>`;
   const n = days.length, first = days[0].day, last = days[n - 1].day;
@@ -1021,7 +1053,8 @@ function showRecipe(id) {
   box.querySelector('#rvFav').onclick = () => store.update('recipes', id, { favs: Object.assign({}, r.favs, { [me]: !(r.favs || {})[me] }) });
   box.querySelector('#rvCooked').onclick = () => { logOpen = !logOpen; showRecipe(id); };
   box.querySelector('#rvPlan').onclick = () => openDayPicker(id);
-  box.querySelector('#rvLeft').onclick = () => { logState.day = todayKey(); logNow({ kind: 'leftovers', recipeId: id, name: r.title, emoji: '🥡' }); };
+  // Leftovers can be breakfast, lunch or dinner, so this opens the log box with this recipe first.
+  box.querySelector('#rvLeft').onclick = () => openLog({ recipeId: id });
   if (logOpen) {
     box.querySelector('#logCancel').onclick = () => { logOpen = false; showRecipe(id); };
     box.querySelector('#logSave').onclick = () => {
@@ -1073,14 +1106,25 @@ async function setWake(on) {
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && wake && wake.released) { wake = null; setWake(true); } });
 
-/* ───────── the dinner diary: every dinner, recipe or not ─────────
-   Two places hold dinners:
+/* ───────── the meal diary: every meal, recipe or not ─────────
+   Two places hold meals:
      • a recipe's `cooked` list: "we made this recipe" (it also teaches the time estimate)
-     • the `meals` collection: { kind, date, recipeId?, name?, emoji?, protein?, fiber?, kr?, note?, by, ts }
-         kind 'leftovers' = leftovers of a recipe (recipeId)
-              'quick'     = an easy non-recipe dinner (hot dogs, frozen pizza…)
-              'out'       = eating out / takeaway
-   allDinners() puts them together for the calendar and the insights. */
+     • the `meals` collection: { kind, date, recipeId?, name?, emoji?, protein?, fiber?, kr?, note?, slot?, who?, by, ts }
+         kind 'leftovers' = leftovers of a recipe (recipeId), or of something else (name, e.g. "Leftover pizza")
+              'quick'     = an easy non-recipe meal (hot dogs, frozen pizza, matpakke…)
+              'out'       = eating out / takeaway / canteen
+         slot 'breakfast' | 'lunch'; no slot means dinner (everything logged before breakfast/lunch existed)
+         who  the one person who ate it (breakfast/lunch); no who = everyone
+   allMeals() puts them all together (the calendar); allDinners() is just the dinners (insights,
+   goals, the "not logged yet" reminder and the plan all think in dinners). */
+const SLOTS = {
+  breakfast: { emoji: '☀️', label: 'Breakfast' },
+  lunch: { emoji: '🥪', label: 'Lunch' },
+  dinner: { emoji: '🍽️', label: 'Dinner' },
+};
+const SLOT_ORDER = ['breakfast', 'lunch', 'dinner'];
+const slotOf = x => (x && (x.slot === 'breakfast' || x.slot === 'lunch')) ? x.slot : 'dinner';
+const PEOPLE = (window.SITE && SITE.people) || [];
 const KINDS = {
   cooked: { emoji: '🍳', label: 'Cooked a recipe' },
   leftovers: { emoji: '🥡', label: 'Leftovers' },
@@ -1092,17 +1136,23 @@ function recipeEmoji(r) {
   const p = Cook.find('protein', r.protein);
   return (r.protein && !['none', 'veg'].includes(r.protein) ? p?.emoji : Cook.find('meal', r.meal)?.emoji) || '🍽️';
 }
-function allDinners() {
+function allMeals() {
   const out = [];
   for (const [id, r] of Object.entries(recipes)) {
-    (r.cooked || []).forEach((c, k) => out.push({ kind: 'cooked', day: cookedDay(c), id, r, k, by: c.by || '?', min: c.min, note: c.note }));
+    (r.cooked || []).forEach((c, k) => out.push({ kind: 'cooked', day: cookedDay(c), id, r, k, by: c.by || '?', min: c.min, note: c.note,
+      slot: slotOf(c), who: c.who || '' }));
   }
   for (const [mid, m] of Object.entries(meals)) {
     if (!m || !/^\d{4}-\d\d-\d\d$/.test(m.date || '')) continue;
-    out.push({ kind: m.kind, day: m.date, mid, m, id: m.recipeId, r: m.recipeId ? recipes[m.recipeId] : null, by: m.by || '?', note: m.note });
+    out.push({ kind: m.kind, day: m.date, mid, m, id: m.recipeId, r: m.recipeId ? recipes[m.recipeId] : null, by: m.by || '?', note: m.note,
+      slot: slotOf(m), who: m.who || '' });
   }
-  return out.sort((a, b) => a.day.localeCompare(b.day) || (a.kind === 'cooked' ? -1 : 1));
+  // By day, then breakfast → lunch → dinner, recipes first.
+  return out.sort((a, b) => a.day.localeCompare(b.day) || SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot) || (a.kind === 'cooked' ? -1 : b.kind === 'cooked' ? 1 : 0));
 }
+const allDinners = () => allMeals().filter(e => e.slot === 'dinner');
+// "Ellie" for a lunch only Ellie ate, "" for a family meal.
+const whoText = e => e.slot !== 'dinner' && e.who ? e.who : '';
 // What one dinner was: name, picture and (per person) protein, fibre and cost, where we know them.
 function dinnerInfo(e) {
   if (e.kind === 'cooked' || (e.kind === 'leftovers' && e.r)) {
@@ -1113,57 +1163,89 @@ function dinnerInfo(e) {
       kr: kr ? Math.round(kr / serves) : null, link: '#r=' + encodeURIComponent(e.id) };
   }
   const m = e.m || {};
-  return { name: m.name || (e.kind === 'leftovers' ? 'Leftovers' : KINDS[e.kind]?.label || 'Dinner'), emoji: m.emoji || KINDS[e.kind]?.emoji || '🍽️',
+  return { name: m.name || (e.kind === 'leftovers' ? 'Leftovers' : KINDS[e.kind]?.label || SLOTS[e.slot || 'dinner'].label), emoji: m.emoji || KINDS[e.kind]?.emoji || '🍽️',
     protein: m.protein ?? null, fiber: m.fiber ?? null, kr: m.kr ?? null, link: '' };
 }
 // How a number compares with our goal: 'great' (goal reached), 'ok' (two thirds of the way), 'low'.
 const rate = (v, goal) => v == null ? '' : v >= goal ? 'great' : v >= goal * 0.66 ? 'ok' : 'low';
 const nutChip = (v, kind) => v == null ? '' :
   `<span class="nut nut-${rate(v, targets[kind])}">${kind === 'protein' ? '💪' : '🌾'} ${v} g</span>`;
-// Remove one logged dinner (from the recipe's list, or the meals collection).
+// Remove one logged meal (from the recipe's list, or the meals collection).
 function removeDinner(e) {
   if (e.kind === 'cooked') store.update('recipes', e.id, { cooked: (e.r.cooked || []).filter((_, k) => k !== e.k) });
   else store.remove('meals', e.mid);
 }
 
-/* ───────── the "Log a dinner" box ─────────
+/* ───────── the "Log a meal" box ─────────
    Made to be quick: open it, tap one suggestion, done (2 taps), with an Undo bar in case of a slip.
-     • Tonight / Last night / Other day at the top (no fiddly date picker unless you want one)
-     • "Tap to log" suggestions: leftovers of what was cooked the last few days, your usual quick
-       dinners, your most-made recipes
-     • or "Something else": pick the kind, then tap a recipe or a quick dinner (also one tap), or type
-       your own quick dinner and press Save. */
+     • Breakfast / Lunch / Dinner at the very top. It starts on the meal it's time for
+       (breakfast before 10:30, lunch until 16:00, then dinner).
+     • Breakfast and lunch ask "who": often it's just one of us (Ellie with leftovers for lunch).
+       It starts on whoever is using this device.
+     • Today / Yesterday (or Tonight / Last night for dinner), or another day
+     • "Tap to log" suggestions: for dinner, what was planned, leftovers of the last few days, your
+       usual quick dinners, your most-made recipes. For breakfast/lunch, leftovers first (recipes made
+       the last few days, and takeaway from the last two nights), then what that person usually has.
+     • or "Something else": pick the kind, then tap a recipe or a quick one (also one tap), or type
+       your own and press Save. */
 const logDlg = $('#logDlg'), logForm = $('#logForm');
-const logState = { kind: '', day: todayKey() };
+const logState = { kind: '', day: todayKey(), slot: 'dinner', who: '', dayPicked: false, recipeId: '' };
 const yesterdayKey = () => dayKey(new Date(Date.now() - 864e5));
 const hasDinner = day => allDinners().some(e => e.day === day);
-// Which day to log for when the box opens: last night if it's still morning and last night is missing.
-const defaultDay = () => (new Date().getHours() < 14 && !hasDinner(yesterdayKey()) ? yesterdayKey() : todayKey());
+// Which day to log for when the box opens: for dinner, last night if it's still morning and last night is missing.
+const defaultDay = slot => (slot === 'dinner' && new Date().getHours() < 14 && !hasDinner(yesterdayKey()) ? yesterdayKey() : todayKey());
+// Which meal it's time for right now.
+function slotNow() {
+  const h = new Date().getHours() + new Date().getMinutes() / 60;
+  return h < 10.5 ? 'breakfast' : h < 16 ? 'lunch' : 'dinner';
+}
+// Who's using this device (if they're one of the family), else '' = everyone.
+const meIfFamily = () => PEOPLE.includes(Family.me()) ? Family.me() : '';
 
-function openLog({ date, kind } = {}) {
+// openLog({ date, kind, slot, recipeId }): all optional. recipeId puts that recipe's leftovers first.
+function openLog({ date, kind, slot, recipeId } = {}) {
   logForm.reset();
-  logState.day = date || defaultDay();
+  // A past day from the calendar or the reminder is most likely a dinner.
+  logState.slot = slot || (date && date !== todayKey() ? 'dinner' : slotNow());
+  logState.day = date || defaultDay(logState.slot);
+  logState.dayPicked = !!date;
   logState.kind = kind || '';
+  logState.who = meIfFamily();
+  logState.recipeId = recipeId || '';
   $('#logSearch').value = '';
   drawLog();
   logDlg.showModal();
   $('#logBody').scrollTop = 0;
 }
-function dayWord(day) {
-  return day === todayKey() ? 'tonight' : day === yesterdayKey() ? 'last night' : fmtDay(day);
+// "tonight" / "last night" for dinner, "today" / "yesterday" for the others, else the date.
+function dayWord(day, slot = 'dinner') {
+  const din = slot === 'dinner';
+  return day === todayKey() ? (din ? 'tonight' : 'today') : day === yesterdayKey() ? (din ? 'last night' : 'yesterday') : fmtDay(day);
 }
 function drawLog() {
-  const k = logState.kind, day = logState.day;
+  const k = logState.kind, day = logState.day, slot = logState.slot;
+  // Breakfast / lunch / dinner
+  logForm.querySelectorAll('[data-slot]').forEach(b => b.classList.toggle('on', b.dataset.slot === slot));
+  // Who ate it (breakfast and lunch only)
+  const whoBox = $('#logWho');
+  whoBox.hidden = slot === 'dinner' || !PEOPLE.length;
+  whoBox.innerHTML = '<span class="lbl">Who?</span>' + [...PEOPLE, ''].map(p =>
+    `<button type="button" class="chipbtn${logState.who === p ? ' on' : ''}" data-who="${esc(p)}">${p ? esc(p) : '👨‍👩‍👧 Everyone'}</button>`).join('');
+  whoBox.querySelectorAll('[data-who]').forEach(b => b.onclick = () => { logState.who = b.dataset.who; drawLog(); });
   // The day buttons
   const which = day === todayKey() ? '0' : day === yesterdayKey() ? '1' : 'other';
   logForm.querySelectorAll('[data-when]').forEach(b => b.classList.toggle('on', b.dataset.when === which));
+  logForm.querySelector('[data-when="0"]').textContent = slot === 'dinner' ? 'Tonight' : 'Today';
+  logForm.querySelector('[data-when="1"]').textContent = slot === 'dinner' ? 'Last night' : 'Yesterday';
   logForm.date.hidden = which !== 'other';
   logForm.date.value = day;
   logForm.date.max = todayKey();
-  $('#logTitle').textContent = `🍽️ What was dinner ${dayWord(day)}?`;
+  $('#logTitle').textContent = `${SLOTS[slot].emoji} What was ${slot} ${dayWord(day, slot)}?`;
   // The suggestions, the kinds and each kind's box
   drawSuggest();
   logForm.querySelectorAll('[data-kind]').forEach(b => b.classList.toggle('on', b.dataset.kind === k));
+  logForm.querySelector('[data-kind="quick"] span').textContent = slot === 'dinner' ? 'Something quick' : 'Something simple';
+  logForm.querySelector('[data-kind="out"] span').textContent = slot === 'dinner' ? 'Ate out / takeaway' : 'Ate out / canteen';
   $('#logRecipeBox').hidden = !(k === 'cooked' || k === 'leftovers');
   $('#logQuickBox').hidden = !(k === 'quick' || k === 'out');
   $('#logSave').hidden = !(k === 'quick' || k === 'out');
@@ -1174,37 +1256,55 @@ function drawLog() {
   drawLogDay();
 }
 
-// "Tap to log": the few dinners it most likely was.
-function suggestions(day) {
+// "Tap to log": the few meals it most likely was.
+function suggestions(day, slot) {
   const out = [], seen = new Set();
   const add = t => { const key = t.kind + ':' + (t.recipeId || t.name.toLowerCase()); if (!seen.has(key) && out.length < 6) { seen.add(key); out.push(t); } };
-  // 0. What was planned for that day comes first.
+  // From a recipe's "We ate leftovers" button: that recipe first.
+  if (logState.recipeId && recipes[logState.recipeId]) add({ kind: 'leftovers', recipeId: logState.recipeId, emoji: '🥡', name: recipes[logState.recipeId].title, sub: 'Leftovers' });
+  // Leftovers of anything cooked in the 4 days before
+  const leftovers = () => Object.entries(recipes).map(([id, r]) => [id, r, (r.cooked || []).map(cookedDay).filter(x => x < day && daysBetween(x, day) <= 4).sort().pop()])
+    .filter(x => x[2]).sort((a, b) => b[2].localeCompare(a[2]))
+    .forEach(([id, r, last]) => add({ kind: 'leftovers', recipeId: id, emoji: '🥡', name: r.title, sub: `Leftovers · made ${fmtDay(last)}` }));
+
+  if (slot !== 'dinner') {
+    leftovers();
+    // Leftovers of a takeaway or quick dinner from the last two nights ("Leftover pizza").
+    allDinners().filter(e => (e.kind === 'out' || e.kind === 'quick') && e.day < day && daysBetween(e.day, day) <= 2).reverse().forEach(e => {
+      const n = dinnerInfo(e).name;
+      add({ kind: 'leftovers', name: 'Leftover ' + n.charAt(0).toLowerCase() + n.slice(1), emoji: '🥡', sub: `From ${dayWord(e.day)}` });
+    });
+    // What this person usually has for this meal, then the everyday ones.
+    pastQuick('quick', slot, logState.who).slice(0, 3).forEach(q => add({ kind: 'quick', name: q.name, emoji: q.emoji || '⚡', protein: q.protein, fiber: q.fiber, kr: q.kr, sub: 'You often have it' }));
+    pastQuick('out', slot, logState.who).slice(0, 1).forEach(q => add({ kind: 'out', name: q.name, emoji: q.emoji || '🍔', protein: q.protein, fiber: q.fiber, kr: q.kr, sub: 'Ate out' }));
+    (slot === 'breakfast' ? Cook.BREAKFAST : Cook.LUNCH).forEach(t => add(Object.assign({ kind: 'quick', sub: SLOTS[slot].label }, t)));
+    return out;
+  }
+  // Dinner: what was planned for that day comes first.
   plansOn(day).forEach(([, p]) => {
     const pi = planInfo(p);
     if (p.kind === 'recipe' && pi.r) add({ kind: 'cooked', recipeId: p.recipeId, emoji: pi.emoji, name: pi.name, sub: '🗓️ Planned' });
     else if (p.kind === 'leftovers' && pi.r) add({ kind: 'leftovers', recipeId: p.recipeId, emoji: '🥡', name: pi.name, sub: '🗓️ Planned leftovers' });
     else if (p.kind === 'quick' || p.kind === 'out') add(Object.assign({ kind: p.kind, name: pi.name, emoji: pi.emoji, sub: '🗓️ Planned' }, Cook.quickMatch(pi.name, p.kind === 'out') || {}, { name: pi.name }));
   });
-  // 1. Leftovers of anything cooked in the 4 days before
-  Object.entries(recipes).map(([id, r]) => [id, r, (r.cooked || []).map(cookedDay).filter(x => x < day && daysBetween(x, day) <= 4).sort().pop()])
-    .filter(x => x[2]).sort((a, b) => b[2].localeCompare(a[2]))
-    .forEach(([id, r, last]) => add({ kind: 'leftovers', recipeId: id, emoji: '🥡', name: r.title, sub: `Leftovers · made ${fmtDay(last)}` }));
-  // 2. Quick dinners you've had before (most often first), and Friday taco
-  pastQuick('quick').slice(0, 2).forEach(q => add({ kind: 'quick', name: q.name, emoji: q.emoji || '⚡', protein: q.protein, fiber: q.fiber, kr: q.kr, sub: 'Quick dinner' }));
+  leftovers();
+  // Quick dinners you've had before (most often first), and Friday taco
+  pastQuick('quick', 'dinner').slice(0, 2).forEach(q => add({ kind: 'quick', name: q.name, emoji: q.emoji || '⚡', protein: q.protein, fiber: q.fiber, kr: q.kr, sub: 'Quick dinner' }));
   if (keyDate(day).getDay() === 5) { const t = Cook.quickMatch('Taco'); add(Object.assign({ kind: 'quick', sub: 'Fredagstaco' }, t)); }
-  // 3. Recipes you make most (favourites count double), not made in the last 3 days
+  // Recipes you make most (favourites count double), not made in the last 3 days
   const me = Family.me();
   Object.entries(recipes)
+    .filter(([, r]) => dinnerish(r))
     .filter(([, r]) => !lastCooked(r) || daysBetween(lastCooked(r), day) > 3 || lastCooked(r) > day)
     .map(([id, r]) => [id, r, (r.cooked || []).length + ((r.favs || {})[me] ? 2 : 0)])
     .filter(x => x[2] > 0).sort((a, b) => b[2] - a[2]).slice(0, 3)
     .forEach(([id, r]) => add({ kind: 'cooked', recipeId: id, emoji: recipeEmoji(r), name: r.title, sub: 'Cooked it' }));
-  // 4. Fill up with the everyday quick ones
+  // Fill up with the everyday quick ones
   for (const name of ['Frozen pizza', 'Hot dogs', 'Taco']) { const t = Cook.quickMatch(name); add(Object.assign({ kind: 'quick', sub: 'Quick dinner' }, t)); }
   return out;
 }
 function drawSuggest() {
-  const list = suggestions(logState.day);
+  const list = suggestions(logState.day, logState.slot);
   $('#logSuggest').innerHTML = `<div class="sub" style="margin-top:0">Tap to log</div><div class="tiles">${list.map((t, i) => `
     <button type="button" class="tile" data-tile="${i}"><span class="te">${t.emoji}</span><span class="tn">${esc(t.name)}</span><span class="ts">${esc(t.sub)}</span></button>`).join('')}</div>`;
   $('#logSuggest').querySelectorAll('[data-tile]').forEach(b => b.onclick = () => logNow(list[+b.dataset.tile]));
@@ -1212,26 +1312,33 @@ function drawSuggest() {
 
 // Log it straight away, close the box, and offer Undo.
 async function logNow(t) {
-  const day = logState.day, me = Family.me();
-  const same = allDinners().find(e => e.day === day && e.kind === t.kind && (t.recipeId ? e.id === t.recipeId : (e.m?.name || '').toLowerCase() === (t.name || '').toLowerCase()));
-  if (same && !confirm(`${t.name} is already logged for ${dayWord(day)}. Log it again?`)) return;
+  const day = logState.day, slot = logState.slot, me = Family.me();
+  const who = slot === 'dinner' ? '' : logState.who;
+  const same = allMeals().find(e => e.day === day && e.slot === slot && (e.who || '') === who && e.kind === t.kind
+    && (t.recipeId ? e.id === t.recipeId : (e.m?.name || '').toLowerCase() === (t.name || '').toLowerCase()));
+  const whose = who ? `${who}’s ${slot}` : slot;
+  if (same && !confirm(`${t.name} is already logged as ${whose} ${dayWord(day, slot)}. Log it again?`)) return;
+  // Breakfast/lunch remember which meal and who; dinner stays as it always was (no slot).
+  const extra = slot === 'dinner' ? {} : Object.assign({ slot }, who ? { who } : {});
   let undo;
   if (t.kind === 'cooked') {
     const r = recipes[t.recipeId];
-    const entry = { by: me, date: day, ts: Date.now() };
+    const entry = Object.assign({ by: me, date: day, ts: Date.now() }, extra);
     const min = Math.round(+logForm.lmin.value);
     if (min > 0 && min <= 1440) entry.min = min;
     await store.update('recipes', t.recipeId, { cooked: [...(r.cooked || []), entry] });
     undo = () => { const now = recipes[t.recipeId]; if (now) store.update('recipes', t.recipeId, { cooked: (now.cooked || []).filter(c => c.ts !== entry.ts) }); };
   } else {
-    const meal = t.kind === 'leftovers' ? { kind: 'leftovers', date: day, recipeId: t.recipeId }
+    const meal = t.kind === 'leftovers'
+      ? (t.recipeId ? { kind: 'leftovers', date: day, recipeId: t.recipeId } : { kind: 'leftovers', date: day, name: t.name, emoji: '🥡' })
       : { kind: t.kind, date: day, name: t.name, emoji: t.emoji || KINDS[t.kind].emoji, protein: t.protein ?? null, fiber: t.fiber ?? null, kr: t.kr ?? null };
-    const id = await store.add('meals', meal);
+    const id = await store.add('meals', Object.assign(meal, extra));
     undo = () => store.remove('meals', id);
   }
   logDlg.close();
   const short = t.name.length > 34 ? t.name.slice(0, 32).replace(/\s+\S*$/, '') + '…' : t.name;
-  toast(`✓ ${t.kind === 'leftovers' ? '🥡 ' : ''}${short} · ${dayWord(day)}`, undo);
+  const when = slot === 'dinner' ? dayWord(day, slot) : `${who ? who + '’s ' : ''}${slot} ${dayWord(day, slot)}`;
+  toast(`✓ ${t.kind === 'leftovers' ? '🥡 ' : ''}${short} · ${when}`, undo);
 }
 
 // The list of recipes to pick from: recently made first, filtered by the search box. One tap logs.
@@ -1243,35 +1350,42 @@ function drawPick() {
   $('#logPick').innerHTML = list.length ? list.map(([id, r]) => `
     <button type="button" class="pick" data-pick="${esc(id)}">
       <span>${recipeEmoji(r)} ${esc(r.title)}</span>${lastCooked(r) ? `<span class="mini">made ${esc(fmtDay(lastCooked(r)))}</span>` : ''}</button>`).join('')
-    : `<div class="empty">No recipes ${q ? 'match' : 'yet'}. For a dinner without a recipe, pick ⚡ Something quick.</div>`;
+    : `<div class="empty">No recipes ${q ? 'match' : 'yet'}. For a meal without a recipe, pick ⚡ ${logState.slot === 'dinner' ? 'Something quick' : 'Something simple'}.</div>`;
   $('#logPick').querySelectorAll('[data-pick]').forEach(b => b.onclick = () => {
     const r = recipes[b.dataset.pick];
     logNow({ kind: logState.kind, recipeId: b.dataset.pick, name: r.title, emoji: recipeEmoji(r) });
   });
 }
-// Quick dinners: the ready-made list plus anything you've logged before (most used first).
-function pastQuick(kind) {
+// Quick meals logged before for this meal (most used first). With `who`, that person's own come first.
+function pastQuick(kind, slot = 'dinner', who) {
   const seen = {};
-  Object.values(meals).filter(m => m.kind === kind && m.name).sort((a, b) => (a.ts || 0) - (b.ts || 0)).forEach(m => {
+  Object.values(meals).filter(m => m.kind === kind && m.name && slotOf(m) === slot).sort((a, b) => (a.ts || 0) - (b.ts || 0)).forEach(m => {
     const key = m.name.trim().toLowerCase();
-    seen[key] = Object.assign(seen[key] || { n: 0 }, { name: m.name.trim(), emoji: m.emoji, protein: m.protein, fiber: m.fiber, kr: m.kr });
+    seen[key] = Object.assign(seen[key] || { n: 0, mine: 0 }, { name: m.name.trim(), emoji: m.emoji, protein: m.protein, fiber: m.fiber, kr: m.kr });
     seen[key].n++;
+    if (who && m.who === who) seen[key].mine++;
   });
-  return Object.values(seen).sort((a, b) => b.n - a.n);
+  return Object.values(seen).sort((a, b) => b.mine - a.mine || b.n - a.n);
 }
-function quickChoices(kind) {
-  const mine = pastQuick(kind);
-  const presets = (kind === 'out' ? Cook.OUT : Cook.QUICK).filter(p => !mine.some(m => m.name.toLowerCase() === p.name.toLowerCase()));
+// The ready-made list for this kind and meal.
+function presetsFor(kind, slot) {
+  if (kind === 'out') return slot === 'dinner' ? Cook.OUT : [...Cook.OUT_DAY, ...Cook.OUT];
+  return slot === 'breakfast' ? Cook.BREAKFAST : slot === 'lunch' ? Cook.LUNCH : Cook.QUICK;
+}
+function quickChoices(kind, slot) {
+  const mine = pastQuick(kind, slot, logState.who);
+  const presets = presetsFor(kind, slot).filter(p => !mine.some(m => m.name.toLowerCase() === p.name.toLowerCase()));
   return [...mine, ...presets];
 }
 function drawQuickChips() {
-  const kind = logState.kind;
-  const choices = quickChoices(kind);
+  const kind = logState.kind, slot = logState.slot;
+  const choices = quickChoices(kind, slot);
   $('#quickChips').innerHTML = choices.slice(0, 14).map((c, i) =>
     `<button type="button" class="chipbtn" data-q="${i}">${c.emoji || KINDS[kind].emoji} ${esc(c.name)}</button>`).join('');
   $('#quickChips').querySelectorAll('[data-q]').forEach(b => b.onclick = () => logNow(Object.assign({ kind }, choices[+b.dataset.q])));
   $('#quickNames').innerHTML = choices.map(c => `<option value="${esc(c.name)}">`).join('');
-  logForm.qname.placeholder = kind === 'out' ? 'Something else? e.g. the pizza place' : 'Something else? e.g. egg fried rice';
+  logForm.qname.placeholder = kind === 'out' ? (slot === 'dinner' ? 'Something else? e.g. the pizza place' : 'Something else? e.g. the canteen')
+    : slot === 'breakfast' ? 'Something else? e.g. boiled egg and toast' : slot === 'lunch' ? 'Something else? e.g. leftover soup' : 'Something else? e.g. egg fried rice';
 }
 function fillQuick(c) {
   if (!c) return;
@@ -1283,24 +1397,29 @@ function fillQuick(c) {
 // Typing a name we know fills in its numbers.
 logForm.qname.addEventListener('change', () => {
   const t = logForm.qname.value.trim();
-  fillQuick(pastQuick(logState.kind).find(m => m.name.toLowerCase() === t.toLowerCase()) || Cook.quickMatch(t, logState.kind === 'out'));
+  fillQuick(pastQuick(logState.kind, logState.slot).find(m => m.name.toLowerCase() === t.toLowerCase()) || Cook.quickMatch(t, logState.kind === 'out', logState.slot));
 });
-// What's already logged on the chosen day (with ✕ to take one away).
+// Everything already logged on the chosen day, every meal (with ✕ to take one away).
 function drawLogDay() {
   const day = logState.day;
-  const list = allDinners().filter(e => e.day === day);
-  $('#logDay').innerHTML = list.length ? `<div class="sub">Already logged for ${esc(dayWord(day))}</div>` + list.map((e, i) => {
+  const list = allMeals().filter(e => e.day === day);
+  $('#logDay').innerHTML = list.length ? `<div class="sub">Already logged for ${esc(day === todayKey() ? 'today' : dayWord(day, 'lunch'))}</div>` + list.map((e, i) => {
     const d = dinnerInfo(e);
-    return `<div class="histrow"><span style="flex:1">${d.emoji} ${esc(d.name)} <span class="mini">${esc(KINDS[e.kind]?.label || '')}</span></span>
-      <span class="who-pill">${esc(e.by)}</span><button type="button" class="del" data-undo="${i}" title="Remove" aria-label="Remove">✕</button></div>`;
+    return `<div class="histrow"><span style="flex:1"><span class="slotpill">${SLOTS[e.slot].emoji} ${SLOTS[e.slot].label}</span> ${d.emoji} ${esc(d.name)} <span class="mini">${esc(KINDS[e.kind]?.label || '')}</span></span>
+      <span class="who-pill">${esc(whoText(e) || e.by)}</span><button type="button" class="del" data-undo="${i}" title="Remove" aria-label="Remove">✕</button></div>`;
   }).join('') : '';
   $('#logDay').querySelectorAll('[data-undo]').forEach(b => b.onclick = () => {
     const e = list[+b.dataset.undo];
-    if (!confirm(`Remove “${dinnerInfo(e).name}” from ${dayWord(day)}?`)) return;
+    if (!confirm(`Remove “${dinnerInfo(e).name}” (${e.slot}) from ${dayWord(day, e.slot)}?`)) return;
     removeDinner(e);
     setTimeout(drawLogDay, 300);
   });
 }
+logForm.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => {
+  logState.slot = b.dataset.slot;
+  if (!logState.dayPicked) logState.day = defaultDay(logState.slot);
+  drawLog();
+});
 logForm.querySelectorAll('[data-when]').forEach(b => b.onclick = () => {
   if (b.dataset.when === 'other') {
     logForm.date.hidden = false;
@@ -1309,9 +1428,10 @@ logForm.querySelectorAll('[data-when]').forEach(b => b.onclick = () => {
     return;
   }
   logState.day = b.dataset.when === '0' ? todayKey() : yesterdayKey();
+  logState.dayPicked = true;
   drawLog();
 });
-logForm.date.addEventListener('change', () => { if (/^\d{4}-\d\d-\d\d$/.test(logForm.date.value)) { logState.day = logForm.date.value; drawLog(); } });
+logForm.date.addEventListener('change', () => { if (/^\d{4}-\d\d-\d\d$/.test(logForm.date.value)) { logState.day = logForm.date.value; logState.dayPicked = true; drawLog(); } });
 logForm.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => {
   logState.kind = logState.kind === b.dataset.kind ? '' : b.dataset.kind;
   drawLog();
@@ -1321,7 +1441,7 @@ logForm.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => {
 $('#logSearch').addEventListener('input', drawPick);
 $('#logClose').onclick = () => logDlg.close();
 logDlg.addEventListener('close', () => route());
-// Save is only for a quick dinner or eating out that you typed yourself.
+// Save is only for a quick meal or eating out that you typed yourself.
 logForm.addEventListener('submit', ev => {
   ev.preventDefault();
   const k = logState.kind;
@@ -1329,7 +1449,7 @@ logForm.addEventListener('submit', ev => {
   const name = logForm.qname.value.trim();
   if (!name) { logForm.qname.focus(); return; }
   const num = v => (v === '' || v == null || !isFinite(+v) || +v < 0) ? null : Math.round(+v);
-  const preset = Cook.quickMatch(name, k === 'out');
+  const preset = Cook.quickMatch(name, k === 'out', logState.slot);
   logNow({ kind: k, name, emoji: logForm.qname.dataset.emoji || preset?.emoji || KINDS[k].emoji,
     protein: num(logForm.qprotein.value) ?? preset?.protein ?? null, fiber: num(logForm.qfiber.value) ?? preset?.fiber ?? null,
     kr: num(logForm.qkr.value) ?? preset?.kr ?? null });
@@ -1364,7 +1484,7 @@ function nudge() {
     <button class="btn sm" data-nudge="${day}">Log it</button><button class="del" data-nudge-x="${day}" aria-label="Not now" title="Not now">✕</button></div>`;
 }
 function wireNudge(box) {
-  box.querySelectorAll('[data-nudge]').forEach(b => b.onclick = () => openLog({ date: b.dataset.nudge }));
+  box.querySelectorAll('[data-nudge]').forEach(b => b.onclick = () => openLog({ date: b.dataset.nudge, slot: 'dinner' }));
   box.querySelectorAll('[data-nudge-x]').forEach(b => b.onclick = () => {
     try { localStorage.setItem('cookbook:nudge', b.dataset.nudgeX); } catch (e) { /* private window */ }
     b.closest('.nudge').remove();
@@ -1401,7 +1521,8 @@ const dinnerish = r => !['dessert', 'baking', 'drink', 'breakfast', 'snack'].inc
 function leftoverRate(id) {
   const cooks = (recipes[id]?.cooked || []).length;
   if (!cooks) return null;
-  return Object.values(meals).filter(m => m.kind === 'leftovers' && m.recipeId === id).length / cooks;
+  // Only leftover DINNERS count here (the plan is about dinners; leftovers taken for lunch don't make a dinner).
+  return Object.values(meals).filter(m => m.kind === 'leftovers' && m.recipeId === id && slotOf(m) === 'dinner').length / cooks;
 }
 
 function showPlan(week) {
@@ -1678,8 +1799,12 @@ function showShop(range) {
   };
 }
 
-/* ───────── the calendar ───────── */
+/* ───────── the calendar ─────────
+   Shows every meal, or just one kind of meal (the chips at the top; remembered on this device). */
+let calSlot = 'all';
+try { calSlot = localStorage.getItem('cookbook:calSlot') || 'all'; } catch (e) { /* private window */ }
 function showCalendar(month) {
+  if (calSlot !== 'all' && !SLOTS[calSlot]) calSlot = 'all';
   const box = $('#calView');
   const now = new Date();
   let [y, m] = (month || '').split('-').map(Number);
@@ -1687,7 +1812,11 @@ function showCalendar(month) {
   const prefix = `${y}-${pad(m)}`;
   const prev = m === 1 ? `${y - 1}-12` : `${y}-${pad(m - 1)}`;
   const next = m === 12 ? `${y + 1}-01` : `${y}-${pad(m + 1)}`;
-  const entries = allDinners().filter(e => e.day.startsWith(prefix));
+  const monthAll = allMeals().filter(e => e.day.startsWith(prefix));
+  const entries = calSlot === 'all' ? monthAll : monthAll.filter(e => e.slot === calSlot);
+  const dinnersOnly = calSlot === 'dinner';
+  const noun = calSlot === 'all' ? 'meal' : calSlot;
+  const plural = n => `${noun}${n === 1 ? '' : noun === 'lunch' ? 'es' : 's'}`;
   const byDay = {};
   entries.forEach(e => (byDay[e.day] = byDay[e.day] || []).push(e));
 
@@ -1702,16 +1831,22 @@ function showCalendar(month) {
     const list = byDay[key] || [];
     const future = key > todayKey();
     cells.push(`<div class="day${list.length ? ' has' : ''}${key === todayKey() ? ' today' : ''}${future ? ' future' : ''}" ${future ? '' : `data-day="${key}"`}><span class="d">${d}</span>
-      ${list.slice(0, 3).map(e => { const di = dinnerInfo(e); return `<span class="ce" title="${esc(di.name)} (${esc(e.by)})">${di.emoji} <span class="t">${esc(di.name)}</span></span>`; }).join('')}
+      ${list.slice(0, 3).map(e => { const di = dinnerInfo(e); return `<span class="ce${e.slot !== 'dinner' && calSlot === 'all' ? ' ce-day' : ''}" title="${esc(SLOTS[e.slot].label)}: ${esc(di.name)} (${esc(whoText(e) || e.by)})">${di.emoji} <span class="t">${esc(di.name)}</span></span>`; }).join('')}
       ${list.length > 3 ? `<span class="more">+${list.length - 3}</span>` : ''}</div>`);
   }
 
-  const known = entries.map(dinnerInfo);
+  // Protein/fibre averages are compared with the DINNER goals, so they're only shown for dinners.
+  const known = dinnersOnly ? entries.map(dinnerInfo) : [];
   const withP = known.filter(d => d.protein != null), withF = known.filter(d => d.fiber != null);
   const avg = (list, key) => list.length ? Math.round(list.reduce((s, d) => s + d[key], 0) / list.length) : null;
   const kinds = Object.keys(KINDS).map(k => [k, entries.filter(e => e.kind === k).length]).filter(([, n]) => n);
+  const slotsHere = SLOT_ORDER.map(sl => [sl, monthAll.filter(e => e.slot === sl).length]);
 
   box.innerHTML = `
+    <div class="partbar">
+      <button class="chipbtn${calSlot === 'all' ? ' on' : ''}" data-calslot="all">All</button>
+      ${SLOT_ORDER.map(sl => `<button class="chipbtn${calSlot === sl ? ' on' : ''}" data-calslot="${sl}">${SLOTS[sl].emoji} ${SLOTS[sl].label}</button>`).join('')}
+    </div>
     <div class="card">
       <div class="calhead">
         <a class="btn ghost sm" href="#cal=${prev}" aria-label="Previous month">‹</a>
@@ -1722,23 +1857,30 @@ function showCalendar(month) {
         ${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div class="wd">${d}</div>`).join('')}
         ${cells.join('')}
       </div>
-      <p class="hint" style="margin:10px 0 0">Tap a day to log its dinner. ${Object.entries(KINDS).map(([, v]) => `${v.emoji} ${v.label}`).join(' · ')}</p>
+      <p class="hint" style="margin:10px 0 0">Tap a day to log a meal. ${Object.entries(KINDS).map(([, v]) => `${v.emoji} ${v.label}`).join(' · ')}${calSlot === 'all' ? ' · <span class="ce ce-day" style="display:inline">blue</span> = breakfast or lunch' : ''}</p>
     </div>
     <div class="card">
-      <h3>📊 ${MONTH_NAMES[m - 1]} at the dinner table</h3>
+      <h3>📊 ${MONTH_NAMES[m - 1]}: ${calSlot === 'all' ? 'every meal' : SLOTS[calSlot].label.toLowerCase()}</h3>
       ${entries.length ? `
         <div class="stats">
-          <div class="stat"><b>${entries.length}</b><span>dinners logged</span></div>
+          <div class="stat"><b>${entries.length}</b><span>${plural(entries.length)} logged</span></div>
+          ${calSlot === 'all' ? slotsHere.filter(([, n]) => n).map(([sl, n]) => `<div class="stat"><b>${SLOTS[sl].emoji} ${n}</b><span>${sl}${n === 1 ? '' : sl === 'lunch' ? 'es' : 's'}</span></div>`).join('') : ''}
           ${kinds.map(([k, n]) => `<div class="stat"><b>${KINDS[k].emoji} ${n}</b><span>${esc(KINDS[k].label.toLowerCase())}</span></div>`).join('')}
           ${withP.length ? `<div class="stat"><b>${nutChip(avg(withP, 'protein'), 'protein')}</b><span>protein per dinner, on average</span></div>` : ''}
           ${withF.length ? `<div class="stat"><b>${nutChip(avg(withF, 'fiber'), 'fiber')}</b><span>fibre per dinner, on average</span></div>` : ''}
         </div>
         ${entries.slice().reverse().map(e => { const di = dinnerInfo(e); return dinnerRow(di,
-          `${nutChip(di.protein, 'protein')}${nutChip(di.fiber, 'fiber')}<span class="mini">${esc(KINDS[e.kind]?.label || '')}</span><span class="who-pill">${esc(e.by)}</span>`,
+          `${calSlot === 'all' || e.slot !== 'dinner' ? `<span class="slotpill">${SLOTS[e.slot].emoji} ${SLOTS[e.slot].label}</span>` : ''}${e.slot === 'dinner' ? nutChip(di.protein, 'protein') + nutChip(di.fiber, 'fiber') : ''}<span class="mini">${esc(KINDS[e.kind]?.label || '')}</span><span class="who-pill">${esc(whoText(e) || e.by)}</span>`,
           `${WEEKDAYS[keyDate(e.day).getDay()].slice(0, 3)} ${keyDate(e.day).getDate()} ${MONTHS[m - 1]}`); }).join('')}`
-        : `<div class="empty"><span class="big">🗓️</span>Nothing logged in ${MONTH_NAMES[m - 1]} yet. Tap <b>🍽️ Log dinner</b> or a day above.</div>`}
+        : `<div class="empty"><span class="big">🗓️</span>No ${plural(2)} logged in ${MONTH_NAMES[m - 1]} yet. Tap <b>🍽️ Log a meal</b> or a day above.</div>`}
     </div>`;
-  box.querySelectorAll('[data-day]').forEach(c => c.onclick = () => openLog({ date: c.dataset.day }));
+  // Tapping a day logs the kind of meal being shown (for "All meals": dinner on a past day, else what it's time for).
+  box.querySelectorAll('[data-day]').forEach(c => c.onclick = () => openLog({ date: c.dataset.day, slot: calSlot === 'all' ? undefined : calSlot }));
+  box.querySelectorAll('[data-calslot]').forEach(b => b.onclick = () => {
+    calSlot = b.dataset.calslot;
+    try { localStorage.setItem('cookbook:calSlot', calSlot); } catch (e) { /* private window */ }
+    showCalendar(month);
+  });
 }
 
 /* ───────── insights: what our dinners add up to ───────── */
@@ -1759,7 +1901,8 @@ function showInsights(period) {
     Colours: <span class="nut nut-great">reached</span> <span class="nut nut-ok">nearly</span> <span class="nut nut-low">low</span></p></div>`;
   if (!list.length) {
     box.innerHTML = head + `<div class="card"><div class="empty"><span class="big">📊</span>No dinners logged in this time yet.
-      Tap <b>🍽️ Log dinner</b> after each dinner (recipe, leftovers or something quick) and this page fills up.</div></div>` + goals;
+      Tap <b>🍽️ Log a meal</b> after each dinner (recipe, leftovers or something quick) and this page fills up.</div></div>`
+      + breakfastLunchCard(allMeals().filter(e => e.slot !== 'dinner' && e.day >= start && e.day <= todayKey())) + goals;
     wireGoals(); return;
   }
   const info = list.map(e => Object.assign({ e }, dinnerInfo(e)));
@@ -1792,8 +1935,9 @@ function showInsights(period) {
   // Leftovers: for each recipe, leftover dinners per time it was cooked (all time, for a fair number).
   const leftoverStats = Object.entries(recipes).map(([id, r]) => {
     const cooks = (r.cooked || []).length;
-    const lo = Object.values(meals).filter(m => m.kind === 'leftovers' && m.recipeId === id).length;
-    return { id, r, cooks, lo, per: cooks ? lo / cooks : 0 };
+    const los = Object.values(meals).filter(m => m.kind === 'leftovers' && m.recipeId === id);
+    const lo = los.length, loDay = los.filter(m => slotOf(m) !== 'dinner').length;
+    return { id, r, cooks, lo, loDay, per: cooks ? lo / cooks : 0 };
   }).filter(x => x.cooks && x.lo).sort((a, b) => b.per - a.per || b.lo - a.lo);
   // Most eaten in the period, and favourites we haven't had for a while.
   const counts = {};
@@ -1802,6 +1946,9 @@ function showInsights(period) {
   const missed = Object.entries(recipes).filter(([, r]) => (r.cooked || []).length >= 2 && daysBetween(lastCooked(r), todayKey()) > 42)
     .sort((a, b) => b[1].cooked.length - a[1].cooked.length).slice(0, 4);
   const costed = info.filter(d => d.kr != null);
+  // Breakfasts and lunches in the same period (not part of the dinner numbers above).
+  const dayMeals = allMeals().filter(e => e.slot !== 'dinner' && e.day >= start && e.day <= todayKey());
+  const dayLeft = dayMeals.filter(e => e.kind === 'leftovers');
 
   // A few things worth saying, in plain words.
   const tips = [];
@@ -1813,6 +1960,7 @@ function showInsights(period) {
   const qp = avg(byKind.quick, 'protein'), hp = avg(homeMade, 'protein'), qf = avg(byKind.quick, 'fiber'), hf = avg(homeMade, 'fiber');
   if (byKind.quick.length >= 2 && qp != null && hp != null) tips.push(`⚡ Quick dinners average ${qp} g protein and ${qf ?? '?'} g fibre, against ${hp} g and ${hf ?? '?'} g for home-cooked ones.`);
   if (byKind.leftovers.length) tips.push(`🥡 Leftovers covered ${byKind.leftovers.length} dinner${byKind.leftovers.length === 1 ? '' : 's'}: that's ${byKind.leftovers.length} night${byKind.leftovers.length === 1 ? '' : 's'} off cooking.`);
+  if (dayLeft.length) tips.push(`🥪 Leftovers also became ${dayLeft.length} breakfast${dayLeft.length === 1 ? '' : 's'} or lunch${dayLeft.length === 1 ? '' : 'es'}.`);
   if (days >= 7 && loggedDays < days * 0.7) tips.push(`📝 ${loggedDays} of ${days} days have a dinner logged. The more you log, the truer these numbers get.`);
   if (missed.length) tips.push(`🕰️ Not had for a while: ${missed.map(([id, r]) => `<a href="#r=${encodeURIComponent(id)}">${esc(r.title)}</a>`).join(', ')}.`);
   if (avgP != null && avgF != null && avgP >= targets.protein && avgF >= targets.fiber) tips.unshift('🎉 On average you reach both goals. Nice work!');
@@ -1844,22 +1992,45 @@ function showInsights(period) {
     </div>
     <div class="card">
       <h3>🥡 Leftovers</h3>
-      ${leftoverStats.length ? `<p class="statline">Leftover dinners per time a recipe is cooked (all time):</p>
+      ${leftoverStats.length ? `<p class="statline">Leftover meals (dinners and lunches) per time a recipe is cooked (all time):</p>
         ${leftoverStats.slice(0, 6).map(x => dinnerRow({ emoji: recipeEmoji(x.r), name: x.r.title, link: '#r=' + encodeURIComponent(x.id) },
-          `<b>${fmtPer(x.per)}</b><span class="mini">${x.lo} leftover dinner${x.lo === 1 ? '' : 's'} from ${x.cooks} cook${x.cooks === 1 ? '' : 's'}</span>`)).join('')}`
+          `<b>${fmtPer(x.per)}</b><span class="mini">${x.lo} leftover meal${x.lo === 1 ? '' : 's'}${x.loDay ? ` (${x.loDay} breakfast/lunch)` : ''} from ${x.cooks} cook${x.cooks === 1 ? '' : 's'}</span>`)).join('')}`
         : '<p class="hint" style="margin:0">Log 🥡 Leftovers when you eat them, and you’ll see which recipes keep giving.</p>'}
     </div>
     <div class="card">
       <h3>⭐ Most eaten</h3>
       ${most.map(({ d, n }) => dinnerRow(d, `<b>${n}×</b>`)).join('')}
-    </div>` + goals;
+    </div>
+    ${breakfastLunchCard(dayMeals)}` + goals;
   wireGoals();
+}
+// Breakfasts and lunches in the insights period: how many, whose, how many were leftovers, the usual ones.
+function breakfastLunchCard(list) {
+  if (!list.length) return `<div class="card"><h3>☀️ Breakfast &amp; 🥪 lunch</h3>
+    <p class="hint" style="margin:0">Tap <b>🍽️ Log a meal</b> and pick ☀️ Breakfast or 🥪 Lunch to log those too (great for leftovers).</p></div>`;
+  const plural = (n, sl) => `${n} ${sl}${n === 1 ? '' : sl === 'lunch' ? 'es' : 's'}`;
+  const rows = SLOT_ORDER.filter(sl => sl !== 'dinner').map(sl => {
+    const these = list.filter(e => e.slot === sl);
+    if (!these.length) return '';
+    const left = these.filter(e => e.kind === 'leftovers').length;
+    // Whose (a meal for "everyone" counts for the family)
+    const whose = {};
+    these.forEach(e => { const w = e.who || 'Everyone'; whose[w] = (whose[w] || 0) + 1; });
+    // The usual ones
+    const counts = {};
+    these.forEach(e => { const d = dinnerInfo(e); counts[d.name] = counts[d.name] || { d, n: 0 }; counts[d.name].n++; });
+    const usual = Object.values(counts).sort((a, b) => b.n - a.n).slice(0, 3);
+    return `<div class="sub">${SLOTS[sl].emoji} ${plural(these.length, sl)}</div>
+      <p class="statline">${Object.entries(whose).map(([w, n]) => `${esc(w)}: <b>${n}</b>`).join(' · ')}${left ? ` · 🥡 <b>${left}</b> from leftovers (${Math.round(100 * left / these.length)}%)` : ''}</p>
+      ${usual.map(({ d, n }) => dinnerRow(d, `<b>${n}×</b>`)).join('')}`;
+  }).join('');
+  return `<div class="card"><h3>☀️ Breakfast &amp; 🥪 lunch</h3>${rows}</div>`;
 }
 // One row in a list of dinners: the name on top, the little badges underneath (fits a phone).
 const dinnerRow = (d, chips, dt) => `<div class="calrow">${dt ? `<span class="dt">${dt}</span>` : ''}<div class="cr">
   <div class="cr-name">${d.link ? `<a href="${d.link}">${d.emoji} ${esc(d.name)}</a>` : `<span>${d.emoji} ${esc(d.name)}</span>`}</div>
   ${chips ? `<div class="cr-chips">${chips}</div>` : ''}</div></div>`;
-const fmtPer = x => `+${Math.round(x * 10) / 10} dinner${x >= 1.05 || x < 0.95 ? 's' : ''}`;
+const fmtPer = x => `+${Math.round(x * 10) / 10} meal${x >= 1.05 || x < 0.95 ? 's' : ''}`;
 function wireGoals() {
   const b = $('#goalSave');
   if (!b) return;

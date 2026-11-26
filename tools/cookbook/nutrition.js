@@ -9,6 +9,9 @@
    Cook.QUICK  ready-made numbers for quick, non-recipe dinners (hot dogs, frozen pizza…),
                per person, plus a rough price.
    Cook.quickMatch('frozen pizza') → that preset, or null.
+   Cook.BREAKFAST / Cook.LUNCH  the same for breakfasts and lunches (brødskiver, matpakke, grøt…),
+               and Cook.OUT_DAY for eating out at breakfast/lunch (canteen, café).
+   Cook.quickMatch('matpakke', false, 'lunch') looks in the lunch list first, then the dinner one.
 
    The numbers are typical values (Matvaretabellen / USDA), good enough to compare dinners, not
    lab-exact. If you know a recipe's real numbers, type them in its edit box.
@@ -229,16 +232,54 @@
     ['Thai / Indian takeaway', '🍛', 30, 6, 200, /thai|indian|curry|indisk/i],
     ['Chinese takeaway', '🥡', 28, 4, 180, /chinese|kinesisk|wok/i],
   ];
+  /* Breakfasts and lunches, the same columns (per person). */
+  const BREAKFAST = [
+    ['Brødskiver with pålegg', '🍞', 18, 6, 15, /brødskive|skiver|pålegg|open sandwich|grovbrød/i],
+    ['Havregrøt (oatmeal)', '🥣', 12, 6, 8, /havregrøt|oat|porridge|grøt/i],
+    ['Yoghurt and muesli', '🥣', 15, 6, 15, /yog|muesli|granola/i],
+    ['Skyr with berries', '🫐', 20, 3, 20, /skyr|kvarg|cottage/i],
+    ['Eggs and toast', '🍳', 20, 3, 15, /eggs?\b|omelet|scrambled|eggerøre|speilegg/i],
+    ['Cereal and milk', '🥛', 10, 3, 10, /cereal|corn ?flakes|cheerios|frokostblanding/i],
+    ['Knekkebrød with pålegg', '🧀', 14, 7, 12, /knekkebrød|crispbread|wasa|ryvita/i],
+    ['Smoothie', '🥤', 8, 5, 20, /smoothie/i],
+    ['Pancakes', '🥞', 15, 2, 20, /pancake|pannekake|lapper|sveler/i],
+  ];
+  const LUNCH = [
+    ['Matpakke (packed sandwiches)', '🥪', 18, 6, 20, /matpakke|packed/i],
+    ['Sandwiches / toast', '🥪', 18, 5, 20, /sandwich|toast|smørbrød|brødskive/i],
+    ['Knekkebrød with pålegg', '🧀', 14, 7, 12, /knekkebrød|crispbread|wasa|ryvita/i],
+    ['Soup', '🥣', 10, 4, 25, /soup|suppe/i],
+    ['Salad', '🥗', 15, 5, 40, /salad|salat/i],
+    ['Wraps', '🌯', 25, 5, 40, /wrap/i],
+    ['Omelette', '🍳', 22, 1, 15, /omelet|eggerøre|scrambled|eggs?\b/i],
+    ['Yoghurt and muesli', '🥣', 15, 6, 15, /yog|muesli|granola/i],
+    ['Instant noodles', '🍜', 9, 2, 10, /instant|nudler|noodle|mr\.? ?lee/i],
+  ];
+  // Eating out at breakfast or lunch (the dinner list above is offered after these).
+  const OUT_DAY = [
+    ['Canteen (kantine)', '🍽️', 25, 5, 80, /kantine|canteen|cafeteria/i],
+    ['Café / bakery', '☕', 15, 3, 120, /caf[eé]|bakery|bakeri|baguette|bolle|kanelsnurr/i],
+  ];
   const toObj = ([name, emoji, protein, fiber, kr]) => ({ name, emoji, protein, fiber, kr });
-  const quickMatch = (text, out) => {
+  // slot: 'breakfast' | 'lunch' | 'dinner' (or nothing = dinner). That meal's own list is searched first.
+  const quickMatch = (text, out, slot) => {
     const t = String(text || '').trim();
     if (!t) return null;
-    const hit = (out ? OUT : QUICK).find(q => q[0].toLowerCase() === t.toLowerCase()) || (out ? OUT : QUICK).find(q => q[5].test(t));
-    return hit ? toObj(hit) : null;
+    const day = slot === 'breakfast' || slot === 'lunch';
+    const lists = out ? (day ? [OUT_DAY, OUT] : [OUT])
+      : slot === 'breakfast' ? [BREAKFAST, QUICK] : slot === 'lunch' ? [LUNCH, QUICK] : [QUICK];
+    for (const list of lists) {
+      const hit = list.find(q => q[0].toLowerCase() === t.toLowerCase()) || list.find(q => q[5].test(t));
+      if (hit) return toObj(hit);
+    }
+    return null;
   };
 
   window.Cook.nutrition = nutrition;
   window.Cook.QUICK = QUICK.map(toObj);
   window.Cook.OUT = OUT.map(toObj);
+  window.Cook.BREAKFAST = BREAKFAST.map(toObj);
+  window.Cook.LUNCH = LUNCH.map(toObj);
+  window.Cook.OUT_DAY = OUT_DAY.map(toObj);
   window.Cook.quickMatch = quickMatch;
 })();
