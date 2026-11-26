@@ -497,11 +497,13 @@
       if ((m = l.match(/(?:prep(?:aration)?(?:\s*time)?|forberedelse(?:stid)?|forb\.?\s*tid)\s*:\s*([^|·;,]+)/i))) { r.prepMin = parseDuration(m[1]); facts.push(i); }
       if ((m = l.match(/(?:cook(?:ing)?\s*time|bake\s*time|baking\s*time|steketid|koketid|cook|bake)\s*:\s*([^|·;,]+)/i))) { r.cookMin = parseDuration(m[1]); facts.push(i); }
       if ((m = l.match(/(?:^|[|·,;]\s*)(?:total(?:\s*time)?|total tid|tid|tidsbruk|ready in|klar på|time)\s*:\s*([^|·;,]+)/i)) && parseDuration(m[1])) { r.totalMin = parseDuration(m[1]); facts.push(i); }
-      if ((m = l.match(/(?:difficulty|vanskelighetsgrad|nivå|level)\s*:?\s*(\w+)/i))) {
+      // Whole words only, and only when a real difficulty word follows: otherwise an ingredient like
+      // "flour (spooned and leveled)" was mistaken for a "Level:" line and dropped.
+      if ((m = l.match(/\b(?:difficulty|vanskelighetsgrad|nivå|level)\b\s*:?\s*([\wæøå]+)/i))) {
         const w = m[1].toLowerCase();
-        r.difficultyWord = /easy|enkel|lett|simple/.test(w) ? 'easy' : /medium|middels|moderate|intermediate/.test(w) ? 'medium'
+        const d = /easy|enkel|lett|simple/.test(w) ? 'easy' : /medium|middels|moderate|intermediate/.test(w) ? 'medium'
           : /hard|avansert|krevende|difficult|advanced|vanskelig/.test(w) ? 'hard' : undefined;
-        facts.push(i);
+        if (d) { r.difficultyWord = d; facts.push(i); }
       }
     });
 
