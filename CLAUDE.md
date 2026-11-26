@@ -73,9 +73,12 @@ code readable and commented for a non-expert.
   sideways and twisting moves (how a pose is written is explained in the file).
   Shared in `family_items` (tool `trx`: `workouts` the family built, `log` of finished workouts). The
   timer beeps, can speak (browser speech), and keeps the screen awake; the draft being built is per device.
-- `tools/cookbook/`: the family recipe collection, drawn as a bookshelf of standing books all leaning
-  30° to the left like dominoes (`leanBook()`/`leanRows()`; pages by `#`: shelf, `#b=cat:val` one book's recipes,
-  `#r=id` a recipe, `#cal=YYYY-MM` the meal log calendar).
+- `tools/cookbook/`: the family recipe collection, drawn as ONE big open cookbook (`showShelf`): top sticky-tabs =
+  how it's sorted (`F.shelf`), side tabs = the sections to drill into (they change as you go deeper:
+  `bookPage()` splits by the top tab, then `BOOK_ORDER`), ribbons = favourites / made lately / high protein /
+  high fibre, and the page is a contents list (name …… time). Pages by `#`: contents, `#b=meal:dinner/protein:chicken`
+  a page further in (steps joined by `/`, each one `bookContents()` understands), `#r=id` a recipe (shown on a
+  page of the book with the last page's side tabs, slim on phones), `#cal=YYYY-MM` the meal log calendar.
   Paste a link or a whole recipe. Links go to the `recipes` edge function (`supabase/functions/recipes/`,
   verify_jwt ON, checks the guest list): it tries the site, then the r.jina.ai reader, then the Wayback
   Machine (many sites block cloud servers), reads schema.org Recipe JSON-LD, or sends back the page text.

@@ -9,9 +9,9 @@
      COOKBOOK: the family's recipe collection, shown as a bookshelf.
 
      Pages (the part of the address after #):
-       (nothing)          the bookshelf: one book per category (pick what the shelf is arranged by)
-       #b=cuisine:italian one book opened: its recipes stand on a shelf as little books, leaning 30°
-                          (also #b=all, #b=fav, #b=recent)
+       (nothing)          the big cookbook's contents page (tabs on top: how it's sorted)
+       #b=meal:dinner/protein:chicken   a page further in (side tabs: the sections to go into;
+                          also #b=fav, #b=recent, #b=hp, #b=hf, #b=tag:Quick)
        #r=<id>            one recipe, with "when we make it" stats
        #cal=2026-11       the cooking calendar: what we made each day
 
@@ -43,7 +43,7 @@
      that recipe, or else our estimate (timing.js) adjusted by how your logged cooks compare with it.
      A line ending in ":" in ingredients or steps ("The sauce:") starts a PART of the dish; the recipe
      page has a button per part (the meat, the sauce, the rice) showing just its ingredients and steps.
-     How the shelf is arranged, search and ticked-off ingredients stay on this device only.
+     How the book is sorted, search and ticked-off ingredients stay on this device only.
 ═════════════════════════════════════════════════════════════════ -->
 
 <link rel="stylesheet" href="../../shared/family.css">
@@ -70,8 +70,6 @@ textarea.field{width:100%;resize:vertical;line-height:1.4;}
 @media(max-width:480px){.page-head #sync{display:none;}.page-head h1{font-size:1.45rem;}}
 
 /* "arrange the shelf by" chips */
-.arrange{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin:0 0 12px;scrollbar-width:thin;}
-.arrange .lbl{font-weight:800;color:var(--ink-soft);font-size:.85rem;align-self:center;white-space:nowrap;}
 .chipbtn{border:2px solid var(--line);background:#fff;color:var(--forest);border-radius:999px;padding:6px 12px;font-weight:800;font-size:.85rem;white-space:nowrap;}
 .chipbtn.on{background:var(--meadow);border-color:var(--meadow);color:#fff;}
 .chipbtn.pink.on{background:var(--blossom-deep);border-color:var(--blossom-deep);}
@@ -80,51 +78,77 @@ textarea.field{width:100%;resize:vertical;line-height:1.4;}
 .searchrow input:focus{border-color:var(--meadow);}
 .sortsel{border:2px solid var(--line);background:#fff;border-radius:12px;padding:8px 10px;font-size:.9rem;font-weight:700;color:var(--forest);}
 
-/* ───── the bookcase ─────
-   The books stand up and all lean about 30° to the left, like dominoes: the first book in each row
-   rests its top against the side of the bookcase, every other book rests on the one before it.
-   Every book stands in a .slot exactly one shelf tall, so the rows line up with the wooden boards
-   drawn by the background. A slot is as wide as its leaning book's footprint on the board (set in
-   leanBook below), and leanRows() moves the first book of each row away from the side so its top
-   just touches it. */
-.bookcase{--row:232px;--board:16px;display:flex;flex-wrap:wrap;align-items:flex-end;padding:0 10px;margin-bottom:18px;overflow:hidden;
-  border:10px solid #8a5a35;border-top-width:14px;border-radius:12px;
-  background:
-    repeating-linear-gradient(to bottom, transparent 0 calc(var(--row) - var(--board)),
-      #b07b4c calc(var(--row) - var(--board)), #94633c calc(var(--row) - 5px), #6e4528 calc(var(--row) - 5px) var(--row)),
-    linear-gradient(90deg, rgba(0,0,0,.06), transparent 6%, transparent 94%, rgba(0,0,0,.06)),
-    #f0dfc0;
-  box-shadow:inset 0 8px 16px rgba(60,35,15,.18), var(--shadow);}
-.slot{height:var(--row);display:flex;align-items:flex-end;padding-bottom:var(--board);flex:none;}
-.shelf-empty{height:var(--row);padding:24px 10px var(--board);display:flex;align-items:center;justify-content:center;width:100%;
-  color:#7a5a3a;font-weight:700;text-align:center;}
-
-/* One standing book: --w thick, --h tall, --c its colour. It tips over its bottom-left corner. */
-.book{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;
-  width:var(--w);height:var(--h);padding:8px 3px 7px;border-radius:4px 4px 2px 2px;
-  background:linear-gradient(90deg, rgba(0,0,0,.22), rgba(255,255,255,.16) 14%, rgba(255,255,255,0) 38%, rgba(0,0,0,.08) 86%, rgba(0,0,0,.28)), var(--c);
-  color:#fdf6e3;text-decoration:none;box-shadow:1px 0 2px rgba(0,0,0,.3);
-  transform-origin:bottom left;transform:rotate(-30deg);transition:transform .15s;}
-/* pointing at a book slides it a little way up out of the row */
-.book:hover,.book:focus-visible{transform:rotate(-30deg) translateY(-10px);outline:none;}
-.book::before,.book::after{content:"";position:absolute;left:0;right:0;height:3px;background:rgba(255,231,160,.6);}
-.book::before{top:34px;} .book::after{bottom:30px;}
-.b-top{font-size:1.15rem;line-height:1;height:22px;}
-.b-title{writing-mode:vertical-rl;flex:1;min-height:0;overflow:hidden;font-family:'Nunito',sans-serif;font-weight:800;
-  font-size:1rem;line-height:1.05;letter-spacing:.01em;text-align:center;}
-/* The title sits on a cream paper label in dark ink (easier to read than light text on a coloured spine). */
-.b-label{position:relative;z-index:1;flex:1;min-height:0;width:calc(100% - 6px);display:flex;justify-content:center;padding:7px 2px;
-  background:#fbf3df;color:#2e2a24;border-radius:3px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);}
-.b-n{font-size:.68rem;font-weight:800;background:rgba(255,253,247,.92);color:var(--ink);border-radius:999px;padding:1px 6px;min-width:20px;text-align:center;}
-.book.special::before,.book.special::after{background:#e9c46a;}
-.book.rbook .b-title{font-size:.95rem;}
-/* longer titles get slightly smaller letters so they still fit in two lines */
-.book .b-title.long{font-size:.84rem;} .book .b-title.longer{font-size:.74rem;}
-.book.rbook .b-n{background:transparent;color:#fdf6e3;padding:0;font-size:.72rem;}
-
-.bookhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
-.bookhead h2{margin:0;color:var(--forest);font-size:1.4rem;}
-.bookhead .n{color:var(--ink-soft);font-weight:800;font-size:.9rem;}
+/* ───── the big cookbook ─────
+   One big open book. TOP tabs (.bk-ttab) = how it's sorted; SIDE tabs (.bk-stab) = the sections to
+   jump to (they change as you go deeper); ribbons (.bk-ribbon) = favourites, made lately, high
+   protein / fibre. The page reads like a cookbook's contents: name …… time.
+   Tabs look like the sticky index tabs you put on a real cookbook: pastel paper, dark ink. */
+.bk-top{display:flex;gap:4px;padding:0 14px;position:relative;z-index:1;margin-bottom:-4px;align-items:flex-end;
+  overflow-x:auto;scrollbar-width:none;}
+.bk-top::-webkit-scrollbar{display:none;}
+.bk-ttab{--c:#ffe27a;flex:none;padding:6px 10px 9px;border:none;border-radius:9px 9px 0 0;background:var(--c);color:#2e2a24;
+  font-weight:800;font-size:.82rem;white-space:nowrap;opacity:.78;box-shadow:inset 0 -6px 6px -6px rgba(0,0,0,.25);}
+.bk-ttab.on{opacity:1;padding-bottom:13px;box-shadow:0 -2px 3px rgba(0,0,0,.12);}
+.bk-row{display:flex;align-items:flex-start;}
+.bigbook{flex:1;min-width:0;position:relative;z-index:2;border-radius:10px;padding:9px;background:#3f5e44;
+  box-shadow:0 10px 24px rgba(40,30,10,.25);}
+.bk-pages{background:#fffaf0;border-radius:4px;min-height:360px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06);}
+.bk-page{padding:16px 18px 20px;}
+/* side tabs: stuck to the book's right edge, and they stay in view while the page scrolls */
+.bk-side{position:sticky;top:10px;align-self:flex-start;flex:none;width:82px;margin:22px 0 0 -4px;display:flex;flex-direction:column;gap:4px;
+  max-height:calc(100vh - 20px);overflow-y:auto;scrollbar-width:none;padding-bottom:4px;}
+.bk-side::-webkit-scrollbar{display:none;}
+.bk-stab{--c:#ffe27a;display:flex;flex-direction:column;gap:1px;text-align:left;border:none;padding:7px 6px 7px 11px;border-radius:0 9px 9px 0;
+  background:var(--c);color:#2e2a24;font-weight:800;font-size:.76rem;line-height:1.12;text-decoration:none;
+  box-shadow:inset 6px 0 6px -6px rgba(0,0,0,.3);}
+.bk-stab:hover{filter:brightness(1.04);transform:translateX(2px);}
+.bk-stab .n{font-size:.68rem;font-weight:700;color:#5d5244;}
+.bk-stab.back{--c:#e9dfcc;}
+.bk-stab .em{display:none;}   /* the picture on its own: only shown on slim tabs */
+/* on a recipe page the tabs are slim on a phone (just the picture), so the recipe keeps its room */
+@media(max-width:700px){
+  .bk-side.slim{width:42px;}
+  .bk-side.slim .bk-stab{align-items:center;padding:8px 4px 8px 8px;font-size:1rem;}
+  .bk-side.slim .bk-stab .l,.bk-side.slim .bk-stab .n{display:none;}
+  .bk-side.slim .bk-stab .em{display:inline;}
+}
+@media(min-width:701px){
+  .bk-side{width:132px;}
+  .bk-stab{flex-direction:row;justify-content:space-between;align-items:center;gap:6px;font-size:.86rem;padding:8px 10px 8px 13px;}
+}
+.bk-crumbs{font-size:.8rem;font-weight:800;color:var(--ink-soft);margin-bottom:2px;}
+.bk-crumbs a{color:var(--meadow-deep);text-decoration:none;}
+.bk-title{font-family:'Fredoka',sans-serif;font-weight:600;color:#3f2f20;font-size:1.45rem;margin:0;line-height:1.15;}
+.bk-sub{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.85rem;color:#7a6650;font-style:italic;margin:4px 0 8px;}
+.bk-sub select{font-style:normal;border:1.5px solid #e4d6b8;background:#fffaf0;border-radius:8px;padding:3px 6px;font-weight:700;color:#5d4a33;font-size:.8rem;}
+.bk-sub .pick{border:none;background:none;font-size:1.1rem;padding:2px 4px;}
+.bk-ribbons{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px;}
+.bk-ribbon{--c:#b33a3a;position:relative;color:#fff;font-weight:800;font-size:.8rem;text-decoration:none;
+  padding:6px 18px 6px 10px;background:var(--c);clip-path:polygon(0 0,100% 0,calc(100% - 8px) 50%,100% 100%,0 100%);}
+.bk-ribbon b{font-weight:800;opacity:.85;margin-left:3px;}
+.bk-sec{font-family:'Fredoka',sans-serif;font-weight:600;color:#7a4f2e;font-size:1.02rem;margin:14px 0 2px;
+  border-bottom:2px solid #eadcc0;padding-bottom:2px;break-after:avoid;}
+.bk-sec a{color:inherit;text-decoration:none;}
+.bk-sec .n{font-family:'Nunito',sans-serif;font-size:.75rem;font-weight:700;color:#a8957a;margin-left:4px;}
+/* one contents line: picture, name, ❤️, dotted line, time */
+.bk-line{display:flex;align-items:baseline;gap:6px;padding:6px 0;color:#2e2a24;text-decoration:none;font-size:1rem;break-inside:avoid;}
+.bk-line:hover .t{text-decoration:underline;text-decoration-color:#cdbb98;}
+.bk-line .e{flex:none;}
+.bk-line .t{font-weight:700;}
+.bk-line .fav{flex:none;font-size:.78rem;}
+.bk-line .dots{flex:1;min-width:14px;border-bottom:2px dotted #cdbb98;transform:translateY(-4px);}
+.bk-line .m{flex:none;color:#7a6650;font-weight:700;font-size:.84rem;}
+.bk-empty{padding:40px 10px;text-align:center;color:#7a5a3a;font-weight:700;}
+.bk-pnum{text-align:center;color:#a8957a;font-size:.75rem;margin-top:12px;font-style:italic;}
+/* a wide screen opens the book flat: the contents run over two pages, with the spine in the middle */
+@media(min-width:760px){
+  .bk-pages.spread{background:linear-gradient(90deg,#fffaf0 0,#fffaf0 48%,#ecdfc4 50%,#fffaf0 52%,#fffaf0 100%);}
+  .bk-pages.spread .bk-page{column-count:2;column-gap:56px;padding:18px 24px 22px;}
+  .bk-pages.spread .bk-head{break-inside:avoid;}
+}
+/* a recipe inside the book: its cards sit on the page */
+.bk-page.rv{padding:12px;}
+@media(max-width:520px){.bk-page.rv{padding:8px 6px;} .bigbook{padding:6px;} .bk-page{padding:14px 12px 18px;}}
 
 /* one recipe */
 .rv-top{display:flex;gap:8px;align-items:center;margin-bottom:12px;}
@@ -213,7 +237,6 @@ a.fact:hover{filter:brightness(.95);}
   .taglist label{padding:8px 12px;border:2px solid var(--line);border-radius:999px;}
   .taglist input{width:20px;height:20px;}
   input,select,textarea,.sortsel,.goalrow input,.logrow input{font-size:16px;}
-  .book:hover{transform:rotate(-30deg);}
 }
 .calhead h2 small{display:block;font-size:.8rem;color:var(--ink-soft);font-family:'Nunito',sans-serif;font-weight:700;}
 .planweek{display:flex;flex-direction:column;}
@@ -355,7 +378,7 @@ dialog .field{width:100%;}
   </nav>
   <div id="nudgeSlot"></div>
 
-  <!-- ───── the bookshelf ───── -->
+  <!-- ───── the big cookbook (filled in by showShelf) ───── -->
   <section id="shelfView">
     <div class="card addcard" id="addCard">
       <textarea id="paste" class="field" rows="1" placeholder="➕ Add a recipe: paste a link or text"></textarea>
@@ -370,12 +393,8 @@ dialog .field{width:100%;}
       <input id="q" placeholder="🔍 Search recipes or ingredients" autocomplete="off">
       <button class="btn sky" id="surprise" title="Pick a random recipe">🎲</button>
     </div>
-    <div class="arrange" id="arrange"></div>
     <div id="shelf"></div>
   </section>
-
-  <!-- ───── one book opened (filled in by showBook) ───── -->
-  <section id="bookView" hidden></section>
 
   <!-- ───── one recipe (filled in by showRecipe) ───── -->
   <section id="recipeView" hidden></section>
@@ -536,12 +555,9 @@ const $ = s => document.querySelector(s);
 const esc = Family.esc;
 const CATS = Cook.CATS;
 const CAT_KEYS = ['meal', 'protein', 'cuisine', 'time', 'difficulty', 'cost'];
-// The ways the shelf can be arranged (each one fills the shelf with different books).
+// The ways the book can be sorted (the tabs along its top).
 const ARRANGE = [['meal', '🍽️ Meal'], ['protein', '🥩 Protein'], ['cuisine', '🌍 Cuisine'], ['time', '⏱️ Time'],
   ['difficulty', '📶 Difficulty'], ['cost', '💰 Cost'], ['tag', '🏷️ Labels']];
-// Spine colours: old cloth-bound book colours that work with cream text.
-const SPINES = ['#a4493d', '#3f6e8c', '#4f7a4f', '#b5832f', '#7d4f86', '#3e7a74', '#9a5a32', '#56609e',
-  '#8e3f57', '#5f7a35', '#b46a4c', '#35566b', '#8a6d2f', '#6a4a7a'];
 
 let recipes = {};        // id → recipe, kept up to date live
 let loaded = false;
@@ -635,7 +651,7 @@ const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 const lastCooked = r => (r.cooked || []).map(cookedDay).sort().pop() || '';
 
 /* ───────── settings remembered on this device ───────── */
-const F = Object.assign({ q: '', shelf: 'meal', sort: 'new' },
+const F = Object.assign({ q: '', shelf: 'meal', sort: 'az' },
   (() => { try { return JSON.parse(localStorage.getItem('cookbook:view')) || {}; } catch (e) { return {}; } })());
 const saveView = () => { try { localStorage.setItem('cookbook:view', JSON.stringify(F)); } catch (e) { /* private window */ } };
 
@@ -654,62 +670,34 @@ const SORTS = {
 const sortOptions = sel => [['new', 'Newest first'], ['az', 'A to Z'], ['quick', 'Quickest first'], ['cooked', 'Made most often'], ['recent', 'Made most recently']]
   .map(([v, l]) => `<option value="${v}"${sel === v ? ' selected' : ''}>${l}</option>`).join('');
 
-/* ───────── books ───────── */
-/* Books stand up and lean 30° to the left (see the bookcase styles). */
-const LEAN = 30 * Math.PI / 180;
-// Colours go round the list 5 at a time, so every colour gets used and books side by side never match.
-const spine = i => SPINES[(i * 5) % SPINES.length];
-// The slot around one leaning book. A book w thick, leaning by LEAN, takes up w ÷ cos(LEAN) of the board
-// (that's exactly where the next book's bottom corner has to go for it to rest on this one).
-// data-h is used by leanRows to keep the first book of a row clear of the bookcase's side.
-// Longer titles get smaller letters ('long' / 'longer' in the styles) so they fit in two lines on the label.
-const titleSize = t => (t.length > 26 ? ' longer' : t.length > 15 ? ' long' : '');
-const leanBook = (w, h, inner) =>
-  `<div class="slot" data-h="${h}" style="width:${Math.round(w / Math.cos(LEAN) * 10) / 10}px">${inner}</div>`;
-// A category book on the main shelf. key is what goes in the address: 'cuisine:italian', 'all', 'fav'…
-function categoryBook(key, emoji, label, count, special, i) {
-  const h = 158 + hash(key) % 26, w = 56 + Math.min(count, 14) * 2;
-  const c = special ? '#2f4a35' : spine(i);
-  return leanBook(w, h, `<a class="book${special ? ' special' : ''}" href="#b=${encodeURIComponent(key)}"
-      style="--h:${h}px;--w:${w}px;--c:${c}" aria-label="${esc(label)}, ${count} recipe${count === 1 ? '' : 's'}" title="${esc(label)}">
-    <span class="b-top">${emoji}</span><span class="b-label"><span class="b-title${titleSize(label)}">${esc(label)}</span></span><span class="b-n">${count}</span></a>`);
-}
-// A recipe on the shelf of an opened book.
-function recipeBook(id, r, i) {
-  const h = 160 + hash(id) % 26, w = Math.round(54 + Math.min((r.ingredients || []).length, 16) * 0.8);
-  const c = spine(i + 3);
-  const prot = Cook.find('protein', r.protein), meal = Cook.find('meal', r.meal);
-  const emoji = (r.protein && !['none', 'veg'].includes(r.protein) ? prot?.emoji : meal?.emoji) || '🍽️';
-  const fav = (r.favs || {})[Family.me()];
-  return leanBook(w, h, `<a class="book rbook" href="#r=${encodeURIComponent(id)}" style="--h:${h}px;--w:${w}px;--c:${c}"
-      title="${esc(r.title)}" aria-label="${esc(r.title)}">
-    <span class="b-top">${emoji}</span><span class="b-label"><span class="b-title${titleSize(r.title || '')}">${esc(r.title)}</span></span>
-    <span class="b-n">${fav ? '❤️' : ''}${shortMin(timeOf(r))}</span></a>`);
-}
-function shelfOfRecipes(list, endEmoji, emptyText) {
-  if (!list.length) return `<div class="bookcase small"><div class="shelf-empty">${emptyText}</div></div>`;
-  return `<div class="bookcase small">${list.map(([id, r], i) => recipeBook(id, r, i)).join('')}</div>`;
-}
-/* The first book on each row of shelf leans its top against the side of the bookcase, so it needs
-   room to its left: h × sin(LEAN). Which book starts a row depends on the screen width, so this
-   looks at where the books ended up (and runs again when the window changes size). */
-function leanRows(root) {
-  (root || document).querySelectorAll('.bookcase').forEach(bc => {
-    const slots = [...bc.querySelectorAll(':scope > .slot')];
-    slots.forEach(sl => { sl.style.marginLeft = ''; });
-    let top = null;
-    slots.forEach(sl => {
-      if (sl.offsetTop !== top) {          // a new row starts with this book
-        sl.style.marginLeft = Math.round(+sl.dataset.h * Math.sin(LEAN)) + 'px';
-        top = sl.offsetTop;                 // (moving it can push it down a row, so read it again)
-      }
-    });
-  });
-}
-let leanTimer = null;
-window.addEventListener('resize', () => { clearTimeout(leanTimer); leanTimer = setTimeout(() => leanRows(), 150); });
+/* ───────── the big cookbook ─────────
+   The recipes are one big open book (it replaced the bookshelf):
+     • TOP tabs  = how the book is sorted (Meal, Protein, Cuisine, Time, Difficulty, Cost, Labels).
+     • SIDE tabs = the sections you can jump to. Tap one to go in, and the tabs change to the next way
+                   of splitting what's left (Dinner → Chicken / Beef / Fish… → Indian / Thai…).
+                   "↩" at the top goes back up a level. They stay in view while you scroll.
+     • RIBBONS   = the special bookmarks on the contents page: my favourites, made lately, high protein,
+                   high fibre.
+     • The page  = a contents page: picture, recipe name …… time, under a heading per section.
+   Where you are is in the address, so the phone's back button works:
+     #b=meal:dinner/protein:chicken   each step is something bookContents() understands
+                                      ('cuisine:italian', 'tag:Quick', 'fav', 'recent', 'hp', 'hf').
+   How it splits: by the top tab first, then BOOK_ORDER, skipping ways already used and ways that
+   wouldn't split anything (every recipe in the same group). Four recipes or fewer: just the list. */
+const BOOK_ORDER = ['meal', 'protein', 'cuisine', 'time', 'difficulty', 'cost'];
+// Sticky-note colours for the tabs (dark writing on all of them).
+const TAB_COLORS = ['#ffe27a', '#ffb3c7', '#b9e4a5', '#a9d4f5', '#ffc58f', '#d4b8f0', '#9ee0d6', '#f5c6a5'];
+const TOP_COLORS = { meal: '#ffe27a', protein: '#ffb3c7', cuisine: '#a9d4f5', time: '#b9e4a5', difficulty: '#ffc58f', cost: '#d4b8f0', tag: '#9ee0d6' };
+// The ribbons: [address step, emoji, words, colour]
+const RIBBONS = [['fav', '❤️', 'My favourites', '#b33a3a'], ['recent', '🕘', 'Made lately', '#3f6e8c'],
+  ['hp', '💪', 'High protein', '#9a5a32'], ['hf', '🌾', 'High fibre', '#5f7a35']];
 
-// What's in a book: [[id, recipe], …] for an address key like 'cuisine:italian'.
+// The address part after #b= → the steps; and back again.
+const segsOf = text => String(text || '').split('/').filter(Boolean)
+  .map(x => { try { return decodeURIComponent(x); } catch (e) { return x; } }).filter(x => x !== 'all');
+const hashOf = segs => segs.length ? '#b=' + segs.map(encodeURIComponent).join('/') : '#';
+
+// What's in one step: [[id, recipe], …] for an address step like 'cuisine:italian'.
 function bookContents(key) {
   const all = Object.entries(recipes);
   const me = Family.me();
@@ -717,7 +705,7 @@ function bookContents(key) {
   if (key === 'fav') return { emoji: '❤️', label: `${me}’s favourites`, list: all.filter(([, r]) => (r.favs || {})[me]) };
   if (key === 'hp') return { emoji: '💪', label: `High protein (${targets.protein} g+)`, list: all.filter(([, r]) => perServing(r).protein >= targets.protein) };
   if (key === 'hf') return { emoji: '🌾', label: `High fibre (${targets.fiber} g+)`, list: all.filter(([, r]) => perServing(r).fiber >= targets.fiber) };
-  if (key === 'recent') return { emoji: '🕘', label: 'Made lately', list: all.filter(([, r]) => (r.cooked || []).length), sort: 'recent' };
+  if (key === 'recent') return { emoji: '🕘', label: 'Made lately', list: all.filter(([, r]) => (r.cooked || []).length) };
   const [cat, ...rest] = key.split(':');
   const val = rest.join(':');
   if (cat === 'tag') return { emoji: '🏷️', label: val, list: all.filter(([, r]) => (r.tags || []).includes(val)) };
@@ -727,87 +715,151 @@ function bookContents(key) {
   return c ? { emoji: c.emoji, label: c.label, list: all.filter(([, r]) => valueOf(r, cat) === val) } : null;
 }
 
-/* ───────── the main bookshelf ───────── */
-function showShelf() {
-  $('#arrange').innerHTML = '<span class="lbl">Arrange by</span>' + ARRANGE.map(([k, l]) =>
-    `<button class="chipbtn${F.shelf === k ? ' on' : ''}" data-k="${k}">${l}</button>`).join('');
-  $('#arrange').querySelectorAll('button').forEach(b => b.onclick = () => { F.shelf = b.dataset.k; saveView(); showShelf(); });
+// The groups one way of sorting makes of a list: [{ key, emoji, label, list }], only groups with recipes.
+// (A recipe with several labels is in several label groups.)
+function groupsFor(cat, list) {
+  const items = cat === 'tag' ? allTags().map(t => [t, '🏷️', t]) : CATS[cat].items;
+  const has = (r, id) => cat === 'tag' ? (r.tags || []).includes(id) : valueOf(r, cat) === id;
+  const out = items.map(([id, emoji, label]) => ({ key: cat + ':' + id, emoji, label, list: list.filter(([, r]) => has(r, id)) }))
+    .filter(g => g.list.length);
+  if (cat !== 'tag') {
+    const none = list.filter(([, r]) => !valueOf(r, cat));
+    if (none.length) out.push({ key: cat + ':_none', emoji: '📦', label: 'Not sorted', list: none });
+  }
+  return out;
+}
 
+// Everything about one page of the book: its steps, the recipes on it, and how they're split up.
+function bookPage(segs) {
+  let list = Object.entries(recipes);
+  const steps = [];
+  for (const key of segs) {
+    const b = bookContents(key);
+    if (!b) return null;
+    const ids = new Set(b.list.map(([id]) => id));
+    list = list.filter(([id]) => ids.has(id));
+    steps.push({ key, emoji: b.emoji, label: b.label });
+  }
+  const sort = segs.includes('recent') ? 'recent' : F.sort;
+  list.sort(SORTS[sort] || SORTS.az);
+  const used = segs.map(k => k.split(':')[0]);
+  let next = null, groups = [];
+  if (list.length > 4) {
+    for (const cat of [...new Set([F.shelf, ...BOOK_ORDER])].filter(c => !used.includes(c))) {
+      const g = groupsFor(cat, list);
+      if (g.length > 1) { next = cat; groups = g; break; }
+    }
+  }
+  return { segs, steps, list, next, groups, sort };
+}
+
+// The side tabs: "↩ back" first (if there is a way back), then one tab per section.
+// slim = on a phone, just the pictures (used on a recipe page).
+function sideTabs(p, back, slim) {
+  const tabs = [];
+  if (back) tabs.push(back.button
+    ? `<button type="button" class="bk-stab back" id="${back.button}" title="${esc(back.label)}"><span class="em">↩</span><span class="l">↩ ${esc(back.label)}</span></button>`
+    : `<a class="bk-stab back" href="${back.href}" title="${esc(back.label)}" aria-label="Back to ${esc(back.label)}"><span class="em">↩</span><span class="l">↩ ${esc(back.label)}</span></a>`);
+  (p ? p.groups : []).forEach((g, i) => tabs.push(`<a class="bk-stab" style="--c:${TAB_COLORS[i % TAB_COLORS.length]}" href="${hashOf([...p.segs, g.key])}"
+      title="${esc(g.label)}" aria-label="${esc(g.label)}, ${g.list.length} recipe${g.list.length === 1 ? '' : 's'}">
+      <span class="em">${g.emoji}</span><span class="l">${g.emoji} ${esc(g.label)}</span><span class="n">${g.list.length}</span></a>`));
+  return `<nav class="bk-side${slim ? ' slim' : ''}" aria-label="Sections">${tabs.join('')}</nav>`;
+}
+// Where "↩" goes from a page: one step up (or the contents).
+const backOf = p => !p.segs.length ? null
+  : { href: hashOf(p.segs.slice(0, -1)), label: p.segs.length > 1 ? p.steps[p.steps.length - 2].label : 'Contents' };
+
+// One contents line: picture, name, ❤️ if it's my favourite, dotted line, time. Tap = open the recipe.
+function bookLine([id, r]) {
+  const fav = (r.favs || {})[Family.me()];
+  return `<a class="bk-line" href="#r=${encodeURIComponent(id)}"><span class="e">${recipeEmoji(r)}</span><span class="t">${esc(r.title || 'Untitled')}</span>${fav ? '<span class="fav">❤️</span>' : ''}<span class="dots"></span><span class="m">${esc(shortMin(timeOf(r)))}</span></a>`;
+}
+
+let pageList = [];       // the recipes on the page showing now (🎲 picks from these)
+let pageSegs = '';       // which page that is (so clearing the search goes back to it)
+
+/* ───────── draw the book ───────── */
+function showShelf(segText) {
+  pageSegs = segText ?? pageSegs;
   const box = $('#shelf');
   const all = Object.entries(recipes);
-  if (!loaded) { box.innerHTML = `<div class="bookcase"><div class="shelf-empty">Dusting off the shelves…</div></div>`; return; }
+  const top = `<div class="bk-top">${ARRANGE.map(([k, l]) =>
+    `<button type="button" class="bk-ttab${F.shelf === k ? ' on' : ''}" style="--c:${TOP_COLORS[k]}" data-k="${k}" aria-pressed="${F.shelf === k}">${l}</button>`).join('')}</div>`;
+  const frame = (page, side, spread) => `${top}<div class="bk-row"><div class="bigbook"><div class="bk-pages${spread ? ' spread' : ''}">
+    <div class="bk-page">${page}</div></div></div>${side || '<div class="bk-side"></div>'}</div>`;
+  const wireTop = () => {
+    // Keep the chosen top tab in view (on a phone the tabs scroll sideways).
+    const on = box.querySelector('.bk-ttab.on'), row = box.querySelector('.bk-top');
+    if (on && row) row.scrollLeft = Math.max(0, on.offsetLeft - 24);
+    box.querySelectorAll('[data-k]').forEach(b => b.onclick = () => {
+    // A new way of sorting starts again from the contents page.
+    F.shelf = b.dataset.k; saveView();
+    if (location.hash.length > 1) location.hash = ''; else showShelf('');
+  }); };
+
+  if (!loaded) { box.innerHTML = frame('<div class="bk-empty">Opening the book…</div>'); pageList = []; return; }
   if (!all.length) {
-    box.innerHTML = `<div class="bookcase"><div class="shelf-empty">🍳 The shelf is empty. Paste a link or a recipe above to put the first book on it.</div></div>`;
-    return;
+    box.innerHTML = frame('<div class="bk-empty">🍳 The book is empty. Paste a link or a recipe above to write the first page.</div>');
+    pageList = []; wireTop(); return;
   }
 
-  // Searching: the matching recipes stand on their own shelf.
+  // Searching: the matching recipes, A to Z.
   if (F.q.trim()) {
     const list = all.filter(([, r]) => searchMatch(r, F.q)).sort(SORTS.az);
-    box.innerHTML = `<div class="bookhead"><span class="n">🔍 ${list.length} recipe${list.length === 1 ? '' : 's'} match “${esc(F.q.trim())}”</span>
-      <button class="linkbtn" id="clearQ">Clear search</button></div>` +
-      shelfOfRecipes(list, '🔍', 'Nothing matches. Try another word.');
-    leanRows(box);
-    $('#clearQ').onclick = () => { F.q = ''; $('#q').value = ''; saveView(); showShelf(); };
+    pageList = list;
+    box.innerHTML = frame(`<div class="bk-head"><div class="bk-crumbs">🔍 Search</div>
+        <h2 class="bk-title">“${esc(F.q.trim())}”</h2><div class="bk-sub">${list.length} recipe${list.length === 1 ? '' : 's'} match</div></div>
+      ${list.map(bookLine).join('') || '<div class="bk-empty">Nothing matches. Try another word.</div>'}`,
+      sideTabs(null, { button: 'bkClear', label: 'Clear search' }), list.length > 8);
+    wireTop();
+    $('#bkClear').onclick = () => { F.q = ''; $('#q').value = ''; saveView(); showShelf(); };
     return;
   }
 
-  const me = Family.me();
-  const books = [categoryBook('all', '📚', 'All recipes', all.length, true)];
-  const favs = all.filter(([, r]) => (r.favs || {})[me]).length;
-  if (favs) books.push(categoryBook('fav', '❤️', 'My favourites', favs, true));
-  const hp = all.filter(([, r]) => perServing(r).protein >= targets.protein).length;
-  if (hp) books.push(categoryBook('hp', '💪', 'High protein', hp, true));
-  const hf = all.filter(([, r]) => perServing(r).fiber >= targets.fiber).length;
-  if (hf) books.push(categoryBook('hf', '🌾', 'High fibre', hf, true));
-  const made = all.filter(([, r]) => (r.cooked || []).length).length;
-  if (made) books.push(categoryBook('recent', '🕘', 'Made lately', made, true));
-
-  if (F.shelf === 'tag') {
-    allTags().forEach(t => {
-      const n = all.filter(([, r]) => (r.tags || []).includes(t)).length;
-      if (n) books.push(categoryBook('tag:' + t, '🏷️', t, n, false, books.length));
-    });
-  } else {
-    CATS[F.shelf].items.forEach(([id, emoji, label]) => {
-      const n = all.filter(([, r]) => valueOf(r, F.shelf) === id).length;
-      if (n) books.push(categoryBook(F.shelf + ':' + id, emoji, label, n, false, books.length));
-    });
-    const none = all.filter(([, r]) => !valueOf(r, F.shelf)).length;
-    if (none) books.push(categoryBook(F.shelf + ':_none', '📦', 'Not sorted', none, false, books.length));
+  const p = bookPage(segsOf(pageSegs));
+  if (!p) {
+    box.innerHTML = frame(`<div class="bk-empty">🤷 That page isn’t in the book. <a href="#">Back to the contents</a></div>`);
+    pageList = []; wireTop(); return;
   }
-  box.innerHTML = `<div class="bookcase">${books.join('')}</div>`;
-  leanRows(box);
+  pageList = p.list;
+  const last = p.steps[p.steps.length - 1];
+  const crumbs = ['<a href="#">Contents</a>', ...p.steps.map((st, i) => i < p.steps.length - 1
+    ? `<a href="${hashOf(p.segs.slice(0, i + 1))}">${esc(st.label)}</a>` : esc(st.label))].join(' › ');
+  const title = last ? `${last.emoji} ${p.steps.map(st => esc(st.label)).join(' · ')}` : '📚 All our recipes';
+  const by = p.next ? ` · by ${esc(ARRANGE.find(a => a[0] === p.next)[1].replace(/^\S+\s/, '').toLowerCase())}` : '';
+  const ribbons = p.segs.length ? '' : `<div class="bk-ribbons">${RIBBONS.map(([k, e, l, c]) => {
+    const n = bookContents(k).list.length;
+    return n ? `<a class="bk-ribbon" style="--c:${c}" href="#b=${k}">${e} ${l}<b>${n}</b></a>` : '';
+  }).join('')}</div>`;
+  const body = p.next
+    ? p.groups.map(g => `<div class="bk-sec"><a href="${hashOf([...p.segs, g.key])}">${g.emoji} ${esc(g.label)}</a><span class="n">${g.list.length}</span></div>${g.list.map(bookLine).join('')}`).join('')
+    : p.list.map(bookLine).join('') || '<div class="bk-empty">No recipes on this page yet.</div>';
+  box.innerHTML = frame(`<div class="bk-head">
+      <div class="bk-crumbs">${crumbs}</div>
+      <h2 class="bk-title">${title}</h2>
+      <div class="bk-sub">${p.list.length} recipe${p.list.length === 1 ? '' : 's'}${by}
+        <select id="bookSort" aria-label="Order">${sortOptions(p.sort)}</select>
+        <button type="button" class="pick" id="bookPick" title="Pick a random recipe from this page" aria-label="Pick a random recipe">🎲</button></div>
+      ${ribbons}</div>
+    ${body}`, sideTabs(p, backOf(p)), p.list.length > 8);
+  wireTop();
+  $('#bookSort').onchange = e => { F.sort = e.target.value; saveView(); showShelf(); };
+  $('#bookPick').onclick = () => $('#surprise').onclick();
 }
 $('#q').value = F.q;
 $('#q').oninput = e => { F.q = e.target.value; saveView(); showShelf(); };
+// 🎲 picks a random recipe from the page you're on (or from them all).
 $('#surprise').onclick = () => {
-  const ids = Object.keys(recipes);
+  const ids = pageList.length ? pageList.map(([id]) => id) : Object.keys(recipes);
   if (ids.length) location.hash = 'r=' + encodeURIComponent(ids[Math.floor(Math.random() * ids.length)]);
 };
 
-/* ───────── one book opened ───────── */
-function showBook(key) {
-  const box = $('#bookView');
-  const b = bookContents(key);
-  if (!b) { box.innerHTML = `<div class="empty"><span class="big">🤷</span>That book isn’t on the shelf. <a href="#">Back to the bookshelf</a></div>`; return; }
-  const sort = b.sort && F.sort === 'new' ? b.sort : F.sort;
-  const list = b.list.slice().sort(SORTS[sort] || SORTS.new);
-  box.innerHTML = `
-    <div class="rv-top"><a class="btn ghost sm" href="#">← Bookshelf</a></div>
-    <div class="bookhead">
-      <h2>${b.emoji} ${esc(b.label)}</h2><span class="n">${list.length} recipe${list.length === 1 ? '' : 's'}</span>
-      <span style="flex:1"></span>
-      <select class="sortsel" id="bookSort" aria-label="Order">${sortOptions(sort)}</select>
-      <button class="btn sky sm" id="bookPick" title="Pick a random recipe from this book">🎲 Surprise me</button>
-    </div>
-    ${shelfOfRecipes(list, b.emoji, 'No recipes in this book yet.')}
-    <p class="hint" style="margin:0">Tap a book to open the recipe.</p>`;
-  leanRows(box);
-  box.querySelector('#bookSort').onchange = e => { F.sort = e.target.value; saveView(); showBook(key); };
-  box.querySelector('#bookPick').onclick = () => {
-    if (list.length) location.hash = 'r=' + encodeURIComponent(list[Math.floor(Math.random() * list.length)][0]);
-  };
+// A recipe opens as a page of the book, with the side tabs of the page you came from still there
+// (on a phone they're slim: just the pictures).
+function recipeInBook(inner) {
+  const p = bookPage(segsOf(pageSegs)) || bookPage([]);      // the last page of the book you looked at
+  const back = { href: hashOf(p.segs), label: p.steps.length ? p.steps[p.steps.length - 1].label : 'Contents' };
+  return { html: `<div class="bk-row"><div class="bigbook"><div class="bk-pages"><div class="bk-page rv">${inner}</div></div></div>${sideTabs(p, back, true)}</div>`, back };
 }
 
 /* ───────── "when we make it" ───────── */
@@ -964,7 +1016,7 @@ function showRecipe(id) {
   const r = recipes[id];
   const box = $('#recipeView');
   if (!r) {
-    box.innerHTML = loaded ? `<div class="empty"><span class="big">🤷</span>That recipe isn’t here (maybe it was deleted). <a href="#">Back to the bookshelf</a></div>`
+    box.innerHTML = loaded ? `<div class="empty"><span class="big">🤷</span>That recipe isn’t here (maybe it was deleted). <a href="#">Back to the contents</a></div>`
       : '<div class="empty">Opening the book…</div>';
     return;
   }
@@ -1012,9 +1064,9 @@ function showRecipe(id) {
   </div>` : '';
   const forPart = pick >= 0 ? `: ${esc(nameOf(ps[pick]))}` : '';
 
-  box.innerHTML = `
+  const page = recipeInBook(`
     <div class="rv-top">
-      <a class="btn ghost sm" href="#" id="rvBack">← Bookshelf</a>
+      <a class="btn ghost sm" href="#" id="rvBack">↩ Contents</a>
       <span style="flex:1"></span>
       <button class="btn ghost sm" id="rvEdit">✏️ Edit</button>
     </div>
@@ -1064,10 +1116,12 @@ function showRecipe(id) {
       </div>
     </div>
     ${r.notes ? `<div class="card"><h3>📝 Our notes</h3><div class="notes">${esc(r.notes)}</div></div>` : ''}
-    <div class="card"><h3>📊 When we make it</h3>${cookStats(r, id)}</div>`;
+    <div class="card"><h3>📊 When we make it</h3>${cookStats(r, id)}</div>`);
+  box.innerHTML = page.html;
 
-  // "← Bookshelf" goes back to the book you came from, if you came from one.
-  if (/^#b=/.test(cameFrom)) box.querySelector('#rvBack').href = cameFrom;
+  // "↩" goes back to the page of the book you came from.
+  box.querySelector('#rvBack').href = page.back.href;
+  box.querySelector('#rvBack').textContent = '↩ ' + page.back.label;
   box.querySelector('#rvEdit').onclick = () => openEditor(r, id);
   box.querySelectorAll('[data-part]').forEach(b => b.onclick = () => { partNow[id] = +b.dataset.part; showRecipe(id); });
   box.querySelectorAll('[data-tick]').forEach(el => el.onclick = () => { tk[el.dataset.tick] = !tk[el.dataset.tick]; showRecipe(id); });
@@ -2069,8 +2123,7 @@ function route() {
   const h = location.hash;
   const r = h.match(/^#r=(.+)$/), b = h.match(/^#b=(.+)$/), cal = h.match(/^#cal(?:=(\d{4}-\d\d))?$/), ins = h.match(/^#ins(?:=(\w+))?$/);
   const plan = h.match(/^#plan(?:=([\d-]+))?$/), shop = h.match(/^#shop(?:=([\w-]+))?$/);
-  $('#shelfView').hidden = !!(r || b || cal || ins || plan || shop);
-  $('#bookView').hidden = !b;
+  $('#shelfView').hidden = !!(r || cal || ins || plan || shop);
   $('#recipeView').hidden = !r;
   $('#calView').hidden = !cal;
   $('#insView').hidden = !ins;
@@ -2086,12 +2139,12 @@ function route() {
   $('#nudgeSlot').innerHTML = (!r && !b && !ins && !shop && loaded) ? nudge() : '';
   wireNudge($('#nudgeSlot'));
   if (r) showRecipe(decodeURIComponent(r[1]));
-  else if (b) showBook(decodeURIComponent(b[1]));
+  else if (b) showShelf(b[1]);
   else if (cal) showCalendar(cal[1]);
   else if (ins) showInsights(ins[1]);
   else if (plan) showPlan(plan[1]);
   else if (shop) showShop(shop[1]);
-  else showShelf();
+  else showShelf('');
 }
 window.addEventListener('hashchange', () => {
   if (location.hash !== lastHash) { cameFrom = lastHash; logOpen = false; window.scrollTo(0, 0); }
