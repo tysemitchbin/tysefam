@@ -104,13 +104,21 @@ textarea.field{width:100%;resize:vertical;line-height:1.4;}
 .bk-stab:hover{filter:brightness(1.04);transform:translateX(2px);}
 .bk-stab .n{font-size:.68rem;font-weight:700;color:#5d5244;}
 .bk-stab.back{--c:#e9dfcc;}
-.bk-stab .em{display:none;}   /* the picture on its own: only shown on slim tabs */
-/* on a recipe page the tabs are slim on a phone (just the picture), so the recipe keeps its room */
+/* On a phone:
+   • the ways to sort are ordinary buttons above the book (all of them fit, on two rows),
+   • a recipe opens full screen: no book frame and no side tabs (its ↩ button goes back). */
+.bk-toplbl{display:none;}
 @media(max-width:700px){
-  .bk-side.slim{width:42px;}
-  .bk-side.slim .bk-stab{align-items:center;padding:8px 4px 8px 8px;font-size:1rem;}
-  .bk-side.slim .bk-stab .l,.bk-side.slim .bk-stab .n{display:none;}
-  .bk-side.slim .bk-stab .em{display:inline;}
+  .bk-top{flex-wrap:wrap;overflow:visible;padding:0;margin:0 0 10px;gap:6px;align-items:center;}
+  .bk-toplbl{display:inline;font-weight:800;color:var(--ink-soft);font-size:.85rem;margin-right:2px;}
+  .bk-ttab,.bk-ttab.on{padding:6px 11px;border:2px solid var(--line);border-radius:999px;background:#fff;color:var(--forest);
+    opacity:1;box-shadow:none;font-size:.85rem;}
+  .bk-ttab.on{background:var(--meadow);border-color:var(--meadow);color:#fff;}
+  .bk-row.rv-row{display:block;}
+  .bk-row.rv-row .bk-side{display:none;}
+  .bk-row.rv-row .bigbook{padding:0;background:none;box-shadow:none;border-radius:0;}
+  .bk-row.rv-row .bk-pages{background:none;box-shadow:none;min-height:0;}
+  .bk-row.rv-row .bk-page.rv{padding:0;}
 }
 @media(min-width:701px){
   .bk-side{width:132px;}
@@ -754,16 +762,15 @@ function bookPage(segs) {
 }
 
 // The side tabs: "↩ back" first (if there is a way back), then one tab per section.
-// slim = on a phone, just the pictures (used on a recipe page).
-function sideTabs(p, back, slim) {
+function sideTabs(p, back) {
   const tabs = [];
   if (back) tabs.push(back.button
-    ? `<button type="button" class="bk-stab back" id="${back.button}" title="${esc(back.label)}"><span class="em">↩</span><span class="l">↩ ${esc(back.label)}</span></button>`
-    : `<a class="bk-stab back" href="${back.href}" title="${esc(back.label)}" aria-label="Back to ${esc(back.label)}"><span class="em">↩</span><span class="l">↩ ${esc(back.label)}</span></a>`);
+    ? `<button type="button" class="bk-stab back" id="${back.button}" title="${esc(back.label)}"><span class="l">↩ ${esc(back.label)}</span></button>`
+    : `<a class="bk-stab back" href="${back.href}" title="${esc(back.label)}" aria-label="Back to ${esc(back.label)}"><span class="l">↩ ${esc(back.label)}</span></a>`);
   (p ? p.groups : []).forEach((g, i) => tabs.push(`<a class="bk-stab" style="--c:${TAB_COLORS[i % TAB_COLORS.length]}" href="${hashOf([...p.segs, g.key])}"
       title="${esc(g.label)}" aria-label="${esc(g.label)}, ${g.list.length} recipe${g.list.length === 1 ? '' : 's'}">
-      <span class="em">${g.emoji}</span><span class="l">${g.emoji} ${esc(g.label)}</span><span class="n">${g.list.length}</span></a>`));
-  return `<nav class="bk-side${slim ? ' slim' : ''}" aria-label="Sections">${tabs.join('')}</nav>`;
+      <span class="l">${g.emoji} ${esc(g.label)}</span><span class="n">${g.list.length}</span></a>`));
+  return `<nav class="bk-side" aria-label="Sections">${tabs.join('')}</nav>`;
 }
 // Where "↩" goes from a page: one step up (or the contents).
 const backOf = p => !p.segs.length ? null
@@ -783,7 +790,7 @@ function showShelf(segText) {
   pageSegs = segText ?? pageSegs;
   const box = $('#shelf');
   const all = Object.entries(recipes);
-  const top = `<div class="bk-top">${ARRANGE.map(([k, l]) =>
+  const top = `<div class="bk-top"><span class="bk-toplbl">Sort by</span>${ARRANGE.map(([k, l]) =>
     `<button type="button" class="bk-ttab${F.shelf === k ? ' on' : ''}" style="--c:${TOP_COLORS[k]}" data-k="${k}" aria-pressed="${F.shelf === k}">${l}</button>`).join('')}</div>`;
   const frame = (page, side, spread) => `${top}<div class="bk-row"><div class="bigbook"><div class="bk-pages${spread ? ' spread' : ''}">
     <div class="bk-page">${page}</div></div></div>${side || '<div class="bk-side"></div>'}</div>`;
@@ -854,12 +861,12 @@ $('#surprise').onclick = () => {
   if (ids.length) location.hash = 'r=' + encodeURIComponent(ids[Math.floor(Math.random() * ids.length)]);
 };
 
-// A recipe opens as a page of the book, with the side tabs of the page you came from still there
-// (on a phone they're slim: just the pictures).
+// A recipe opens as a page of the book, with the side tabs of the page you came from still there.
+// On a phone it's full screen instead (see the styles: .rv-row).
 function recipeInBook(inner) {
   const p = bookPage(segsOf(pageSegs)) || bookPage([]);      // the last page of the book you looked at
   const back = { href: hashOf(p.segs), label: p.steps.length ? p.steps[p.steps.length - 1].label : 'Contents' };
-  return { html: `<div class="bk-row"><div class="bigbook"><div class="bk-pages"><div class="bk-page rv">${inner}</div></div></div>${sideTabs(p, back, true)}</div>`, back };
+  return { html: `<div class="bk-row rv-row"><div class="bigbook"><div class="bk-pages"><div class="bk-page rv">${inner}</div></div></div>${sideTabs(p, back)}</div>`, back };
 }
 
 /* ───────── "when we make it" ───────── */
