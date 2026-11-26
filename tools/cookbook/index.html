@@ -110,11 +110,16 @@ textarea.field{width:100%;resize:vertical;line-height:1.4;}
 .book::before,.book::after{content:"";position:absolute;left:0;right:0;height:3px;background:rgba(255,231,160,.6);}
 .book::before{top:34px;} .book::after{bottom:30px;}
 .b-top{font-size:1.15rem;line-height:1;height:22px;}
-.b-title{writing-mode:vertical-rl;flex:1;min-height:0;overflow:hidden;font-family:'Fredoka',sans-serif;font-weight:600;
-  font-size:.86rem;line-height:1.12;text-align:center;padding:8px 0 6px;text-shadow:0 1px 1px rgba(0,0,0,.3);}
+.b-title{writing-mode:vertical-rl;flex:1;min-height:0;overflow:hidden;font-family:'Nunito',sans-serif;font-weight:800;
+  font-size:1rem;line-height:1.05;letter-spacing:.01em;text-align:center;}
+/* The title sits on a cream paper label in dark ink (easier to read than light text on a coloured spine). */
+.b-label{position:relative;z-index:1;flex:1;min-height:0;width:calc(100% - 6px);display:flex;justify-content:center;padding:7px 2px;
+  background:#fbf3df;color:#2e2a24;border-radius:3px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);}
 .b-n{font-size:.68rem;font-weight:800;background:rgba(255,253,247,.92);color:var(--ink);border-radius:999px;padding:1px 6px;min-width:20px;text-align:center;}
 .book.special::before,.book.special::after{background:#e9c46a;}
-.book.rbook .b-title{font-size:.78rem;}
+.book.rbook .b-title{font-size:.95rem;}
+/* longer titles get slightly smaller letters so they still fit in two lines */
+.book .b-title.long{font-size:.84rem;} .book .b-title.longer{font-size:.74rem;}
 .book.rbook .b-n{background:transparent;color:#fdf6e3;padding:0;font-size:.72rem;}
 
 .bookhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
@@ -657,26 +662,28 @@ const spine = i => SPINES[(i * 5) % SPINES.length];
 // The slot around one leaning book. A book w thick, leaning by LEAN, takes up w ÷ cos(LEAN) of the board
 // (that's exactly where the next book's bottom corner has to go for it to rest on this one).
 // data-h is used by leanRows to keep the first book of a row clear of the bookcase's side.
+// Longer titles get smaller letters ('long' / 'longer' in the styles) so they fit in two lines on the label.
+const titleSize = t => (t.length > 26 ? ' longer' : t.length > 15 ? ' long' : '');
 const leanBook = (w, h, inner) =>
   `<div class="slot" data-h="${h}" style="width:${Math.round(w / Math.cos(LEAN) * 10) / 10}px">${inner}</div>`;
 // A category book on the main shelf. key is what goes in the address: 'cuisine:italian', 'all', 'fav'…
 function categoryBook(key, emoji, label, count, special, i) {
-  const h = 150 + hash(key) % 30, w = 50 + Math.min(count, 14) * 3;
+  const h = 158 + hash(key) % 26, w = 56 + Math.min(count, 14) * 2;
   const c = special ? '#2f4a35' : spine(i);
   return leanBook(w, h, `<a class="book${special ? ' special' : ''}" href="#b=${encodeURIComponent(key)}"
       style="--h:${h}px;--w:${w}px;--c:${c}" aria-label="${esc(label)}, ${count} recipe${count === 1 ? '' : 's'}" title="${esc(label)}">
-    <span class="b-top">${emoji}</span><span class="b-title">${esc(label)}</span><span class="b-n">${count}</span></a>`);
+    <span class="b-top">${emoji}</span><span class="b-label"><span class="b-title${titleSize(label)}">${esc(label)}</span></span><span class="b-n">${count}</span></a>`);
 }
 // A recipe on the shelf of an opened book.
 function recipeBook(id, r, i) {
-  const h = 152 + hash(id) % 28, w = Math.round(42 + Math.min((r.ingredients || []).length, 16) * 1.2);
+  const h = 160 + hash(id) % 26, w = Math.round(54 + Math.min((r.ingredients || []).length, 16) * 0.8);
   const c = spine(i + 3);
   const prot = Cook.find('protein', r.protein), meal = Cook.find('meal', r.meal);
   const emoji = (r.protein && !['none', 'veg'].includes(r.protein) ? prot?.emoji : meal?.emoji) || '🍽️';
   const fav = (r.favs || {})[Family.me()];
   return leanBook(w, h, `<a class="book rbook" href="#r=${encodeURIComponent(id)}" style="--h:${h}px;--w:${w}px;--c:${c}"
       title="${esc(r.title)}" aria-label="${esc(r.title)}">
-    <span class="b-top">${emoji}</span><span class="b-title">${esc(r.title)}</span>
+    <span class="b-top">${emoji}</span><span class="b-label"><span class="b-title${titleSize(r.title || '')}">${esc(r.title)}</span></span>
     <span class="b-n">${fav ? '❤️' : ''}${shortMin(timeOf(r))}</span></a>`);
 }
 function shelfOfRecipes(list, endEmoji, emptyText) {
