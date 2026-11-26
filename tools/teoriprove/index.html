@@ -10,7 +10,10 @@
 
        data.js     notes, road-sign pictures and all practice questions
                    (topics from Statens vegvesen's curriculum V851)
-       this file   the app: Plan, Les (read), Øv (practice),
+       lover/      the real law texts, word for word from lovdata.no, for the
+                   Lover (Laws) tab. oversikt.js lists them and their key §§;
+                   <id>.js are the texts (made by hent-lover.py, loaded only when opened)
+       this file   the app: Plan, Les (read), Lover (laws), Øv (practice),
                    Prøve (timed mock exam) and Kort (flashcards)
 
      Built from the same pattern as tools/statsborger/.
@@ -192,6 +195,44 @@ td.k{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:800;color:
   .qimg svg{width:96px;height:96px}
   .brand small{display:none}
 }
+/* laws (Lover tab) */
+.lawtop{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline}
+.lawmeta{font-size:.82rem;color:var(--ink-soft);margin-top:6px}
+.lawnote{background:var(--warn-soft);border-left:4px solid var(--warn);border-radius:8px;padding:10px 12px;font-size:.9rem;margin-top:14px}
+.keys{display:flex;flex-direction:column;margin-top:8px}
+.krow{display:grid;grid-template-columns:5.2em 1fr;gap:10px;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:9px 4px;cursor:pointer;width:100%}
+.krow:hover{background:var(--sunk)}
+.pn{font-weight:800;color:var(--road);white-space:nowrap;font-variant-numeric:tabular-nums}
+.lawsearch{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bgc);margin-top:6px}
+.lawh{font-size:1.05rem;margin:22px 0 4px}
+.lawh.l2{font-size:.95rem;color:var(--ink-soft)}
+details.par{border-bottom:1px solid var(--line);scroll-margin-top:130px;min-width:0}
+details.par>summary{cursor:pointer;list-style:none;display:grid;grid-template-columns:5.2em 1fr auto;gap:10px;padding:10px 4px;align-items:baseline}
+details.par>summary::-webkit-details-marker{display:none}
+details.par>summary:hover{background:var(--sunk)}
+details.par[open]>summary{background:var(--accent-soft)}
+details.par .rd{color:var(--ok);font-weight:800}
+details.par.read .pt{color:var(--ink-soft)}
+details.par.flash>summary{animation:flash 1.6s ease-out}
+@keyframes flash{from{background:#fde68a}to{background:var(--accent-soft)}}
+.lawtext{padding:4px 4px 16px;max-width:72ch;font-size:.97rem;overflow-wrap:anywhere}
+.lawtext p{margin:.55em 0}
+.lawtext .li{display:grid;grid-template-columns:2.2em minmax(0,1fr);gap:4px;margin:.3em 0}
+.lawtext .li.l2{margin-left:2.2em}.lawtext .li.l3{margin-left:4.4em}.lawtext .li.l4{margin-left:6.6em}
+.lawtext .ln{text-align:right;font-weight:700;color:var(--ink-soft)}
+.lawtext .tw{overflow-x:auto;margin:.6em 0}
+.lawtext table{font-size:.88rem;width:auto;min-width:100%}
+.lawtext td{border:1px solid var(--line)}
+.lawtext img{max-width:84px;height:auto;display:block;margin-bottom:4px}
+.lawtext .sg{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:start;padding:10px 0;border-bottom:1px solid var(--line)}
+.lawtext .sgi{display:flex;flex-wrap:wrap;gap:6px;max-width:min(180px,42vw)}
+.lawtext .sc{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.72rem;color:var(--ink-soft)}
+.lawtext .sc img{width:auto;height:auto;max-height:64px;max-width:170px;margin:0}
+.lawtext mark{background:#fde68a;border-radius:2px}
+.lawtext .sbtn{margin-top:10px}
+.lawref{background:none;border:0;padding:0;font:inherit;color:var(--accent);text-decoration:underline;cursor:pointer}
+.lawchips{margin-top:14px}
+@media (max-width:560px){.krow,details.par>summary{grid-template-columns:4.4em 1fr auto}.krow{grid-template-columns:4.4em 1fr}}
 .sbadge{font-size:.75rem;font-weight:800;padding:4px 10px;border-radius:999px;background:var(--sunk);color:var(--ink-soft);white-space:nowrap}
 .sbadge.ok{background:var(--accent-soft);color:var(--forest)}
 </style>
@@ -217,6 +258,7 @@ td.k{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:800;color:
 <script src="../../site.js"></script>
 <script src="../../shared/family.js"></script>
 <script src="data.js"></script>
+<script src="lover/oversikt.js"></script>
 <script>
 (function(){
 "use strict";
@@ -244,7 +286,7 @@ const L=["A","B","C","D"];
 const TOOL_ID="teoriprove";
 const store=Family.store(TOOL_ID);
 const KEY="teoriprove-v1";
-let S={stats:{},lang:"both",tab:"plan",exams:[],les:"fk",ovSel:["all"],kortCh:"all",days:{},exam:null,ts:0};
+let S={stats:{},lang:"both",tab:"plan",exams:[],les:"fk",ovSel:["all"],kortCh:"all",days:{},exam:null,ts:0,law:"tr",lawRead:{}};
 try{const raw=localStorage.getItem(KEY); if(raw) Object.assign(S,JSON.parse(raw));}catch(e){}
 // save(): settings and the exam in progress; this device only.
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -253,7 +295,7 @@ let meId=null, pushTimer=null;
 function saveProgress(){S.ts=Date.now();save();
   if(!meId) return;
   clearTimeout(pushTimer);
-  pushTimer=setTimeout(()=>store.set("progress",meId,{stats:S.stats,exams:S.exams,days:S.days,ts:S.ts}),1500);
+  pushTimer=setTimeout(()=>store.set("progress",meId,{stats:S.stats,exams:S.exams,days:S.days,lawRead:S.lawRead,ts:S.ts}),1500);
 }
 function syncBadge(){
   const b=$("#sync"); if(!store.mode) return;
@@ -266,7 +308,7 @@ store.ready.then(()=>{
   store.watch("progress",items=>{
     const mine=items[meId];
     if(mine&&(mine.ts||0)>(S.ts||0)){          // newer progress from another device
-      S.stats=mine.stats||{};S.exams=mine.exams||[];S.days=mine.days||{};S.ts=mine.ts;save();render();
+      S.stats=mine.stats||{};S.exams=mine.exams||[];S.days=mine.days||{};S.lawRead=mine.lawRead||{};S.ts=mine.ts;save();render();
     }else if((!mine||(mine.ts||0)<(S.ts||0))&&S.ts){   // this device is ahead: upload
       saveProgress();
     }
@@ -277,7 +319,7 @@ function status(id){const s=S.stats[id];if(!s)return "new";return s.l===1?"ok":"
 function mastery(list){let m=0;list.forEach(x=>{if(status(x.id)==="ok")m++});return m}
 
 /* ---------- top-level render ---------- */
-const TABS=[["plan","Plan","Plan"],["les","Les","Read"],["ov","Øv","Practise"],["prove","Prøve","Mock exam"],["kort","Kort","Cards"]];
+const TABS=[["plan","Plan","Plan"],["les","Les","Read"],["lov","Lover","Laws"],["ov","Øv","Practise"],["prove","Prøve","Mock exam"],["kort","Kort","Cards"]];
 const LANGS=[["nb","Norsk","NO"],["both","Norsk + English","NO + EN"],["en","English","EN"]];   // [setting, label, short label for phones]
 function render(){
   const html=document.documentElement;
@@ -288,6 +330,7 @@ function render(){
   syncBadge();
   $("#view").innerHTML=VIEWS[S.tab]();
   if(S.tab==="prove") tick();
+  if(S.tab==="lov") focusLaw();
 }
 
 /* ---------- PLAN ---------- */
@@ -355,7 +398,7 @@ function viewPlan(){
   h+='</section>';
   h+='<section class="scard"><div class="eyebrow">'+t("Huskeliste","Cheat sheet")+'</div><h3 style="font-size:1.3rem;margin:4px 0 12px">'+t("Tall som går igjen","Numbers worth knowing")+'</h3><div class="tbl-wrap"><table><thead><tr><th>'+t("Tall","Number")+'</th><th>'+t("Betyr","Means")+'</th></tr></thead><tbody>'+
     CHEAT.map(r=>'<tr><td class="k">'+r[0]+'</td><td>'+bi(r[1],r[2])+'</td></tr>').join("")+'</tbody></table></div></section>';
-  h+='<p class="foot">'+bi("Kilder: Statens vegvesens læreplan V851 (gyldig fra 1.2.2026) vegtrafikkloven (fulltekst, sist endret 1.7.2026) og trafikkreglene (fulltekst, sist endret 1.7.2022). Øvrige regler, som skiltforskriften, er sjekket mot Lovdata og vegvesen.no via søkemotor i oktober 2026, ikke lest i sin helhet. Laget for egen øving. Reglene kan endre seg, så sjekk alltid ","Sources: Statens vegvesen curriculum V851 (valid from 1 Feb 2026) the Road Traffic Act (full text, last amended 1 Jul 2026) and the traffic rules (full text, last amended 1 Jul 2022). Other rules, such as the sign regulations, were checked against Lovdata and vegvesen.no via search engine in October 2026, not read in full. Made for personal study. Rules can change, so always check ")+
+  h+='<p class="foot">'+bi("Kilder: Statens vegvesens læreplan V851 (gyldig fra 1.2.2026) vegtrafikkloven (fulltekst, sist endret 1.7.2026) og trafikkreglene (fulltekst, sist endret 1.7.2022). Øvrige regler, som skiltforskriften, er sjekket mot Lovdata og vegvesen.no via søkemotor i oktober 2026, ikke lest i sin helhet. Lovtekstene i fanen Lover er kopiert ordrett fra Lovdata. Laget for egen øving. Reglene kan endre seg, så sjekk alltid ","Sources: Statens vegvesen curriculum V851 (valid from 1 Feb 2026) the Road Traffic Act (full text, last amended 1 Jul 2026) and the traffic rules (full text, last amended 1 Jul 2022). Other rules, such as the sign regulations, were checked against Lovdata and vegvesen.no via search engine in October 2026, not read in full. The law texts in the Laws tab are copied word for word from Lovdata. Made for personal study. Rules can change, so always check ")+
     '<a href="https://www.vegvesen.no/" target="_blank" rel="noopener">vegvesen.no</a> '+t("og","and")+' <a href="https://lovdata.no/dokument/SF/forskrift/1986-03-21-747" target="_blank" rel="noopener">'+t("trafikkreglene på Lovdata","the traffic rules on Lovdata")+'</a>.</p>';
   return h;
 }
@@ -374,8 +417,11 @@ function viewLes(){
   const c=chById[S.les]||CH[0]; const n=NOTES[c.id];
   let h='<section>'+chipsSingle(c.id,"read",false)+'</section>';
   h+='<article class="scard notes"><div class="eyebrow">'+t("Modul ","Module ")+c.m+' · '+t(MOD[c.m][0],MOD[c.m][1])+'</div><h2 style="margin-top:6px">'+bi(c.nb,c.en)+'</h2><ul style="margin-top:8px">';
-  n.forEach(p=>{if(p[0][0]==="#") h+='<li class="h">'+bi(p[0].slice(1),p[1])+'</li>'; else h+='<li>'+bi(p[0],p[1])+'</li>'});
+  n.forEach(p=>{if(p[0][0]==="#") h+='<li class="h">'+bi(p[0].slice(1),p[1])+'</li>'; else h+='<li>'+bi(lawLinks(p[0]),lawLinks(p[1]))+'</li>'});
   h+='</ul>';
+  const refs=[];   // the law sections that belong to this chapter (from lover/oversikt.js)
+  LAWS.forEach(l=>l.key.forEach(k=>{if(k[1].includes(c.id)) refs.push('<button class="chip" data-act="lawgo" data-v="'+l.id+'|'+k[0]+'" title="'+Family.esc(t(k[2],k[3]))+'">'+t(l.nb,l.en)+' '+k[0]+'</button>')}));
+  if(refs.length) h+='<div class="lawchips"><div class="eyebrow" style="margin-bottom:6px">📜 '+t("I lovteksten","In the law text")+'</div><div class="chips">'+refs.join("")+'</div></div>';
   if(c.id==="sk"){   // the sign gallery
     h+='<h3 style="margin-top:22px;font-size:1.15rem">'+t("Skilt du må kunne","Signs you must know")+'</h3><div class="signs">'+
       SIGN_INFO.map(s=>'<div class="sgn">'+SIGN[s[0]]+'<div><b>'+bi(s[1],s[2])+'</b><div class="m">'+bi(s[3],s[4])+'</div></div></div>').join("")+'</div>';
@@ -417,7 +463,7 @@ function qCard(x,c,order,ans,feedback,meta){
   if(feedback&&ans!==null){
     const ok=ans===0;
     h+='<div class="verdict '+(ok?'ok':'no')+'"><div class="vh">'+(ok?t('Riktig!','Correct!'):t('Feil.','Wrong.')+' '+t('Riktig svar','Right answer')+':')+'</div>'+
-      (ok?'':bi(x.o[0][0],x.o[0][1]))+(x.xnb?'<div style="margin-top:6px">'+bi(x.xnb,x.xen)+'</div>':'')+'</div>';
+      (ok?'':bi(x.o[0][0],x.o[0][1]))+(x.xnb?'<div style="margin-top:6px">'+bi(lawLinks(x.xnb),lawLinks(x.xen))+'</div>':'')+'</div>';
     h+='<div class="row" style="justify-content:space-between"><button class="sbtn primary" data-act="next" id="nextbtn">'+t("Neste","Next")+' →</button><span class="muted" style="font-size:.8rem">'+t("Tastatur","Keyboard")+': <span class="kbd">1</span> <span class="kbd">2</span> <span class="kbd">3</span> '+t("og","and")+' <span class="kbd">Enter</span></span></div>';
   }
   h+='</div>';
@@ -530,7 +576,91 @@ function viewKort(){
   return h;
 }
 
-const VIEWS={plan:viewPlan,les:viewLes,ov:viewOv,prove:viewProve,kort:viewKort};
+/* ---------- LOVER (the real law texts) ----------
+   The list of laws and their key §§ is in lover/oversikt.js. Each text is in its own file,
+   lover/<id>.js, which is only downloaded the first time someone opens that law.
+   Ticking "Read" on a § is saved with the rest of your progress (S.lawRead). */
+const lawById={}; LAWS.forEach(l=>lawById[l.id]=l);
+window.LOV=window.LOV||{};
+const lawLoading={};
+let lawQ="";          // what's typed in the search box (not saved)
+let lawOpen=null;     // a § to open and scroll to once the text is on screen
+function loadLaw(id){
+  if(LOV[id]) return Promise.resolve();
+  if(!lawLoading[id]) lawLoading[id]=new Promise((ok,fail)=>{
+    const sc=document.createElement("script"); sc.src="lover/"+id+".js";
+    sc.onload=ok; sc.onerror=()=>{delete lawLoading[id];fail()};
+    document.head.appendChild(sc);
+  });
+  return lawLoading[id];
+}
+// "trafikkreglene § 7" / "Road Traffic Act § 22" in a note becomes a button that opens that §.
+const LAWNAMES={"trafikkreglene":"tr","traffic rules":"tr","vegtrafikkloven":"vtl","road traffic act":"vtl","skiltforskriften":"skilt","sign regulations":"skilt"};
+function lawLinks(s){
+  if(!s) return s;
+  return s.replace(/(trafikkreglene|traffic rules|vegtrafikkloven|road traffic act|skiltforskriften|sign regulations)(\s+)§\s?(\d+(?: [a-c](?![\wæøå]))?)/gi,
+    (m,name,sp,num)=>name+sp+'<button class="lawref" data-act="lawgo" data-v="'+LAWNAMES[name.toLowerCase()]+'|§ '+num+'">§ '+num+'</button>');
+}
+function readCount(id){return Object.keys(S.lawRead[id]||{}).length}
+function norDate(iso){const p=(iso||"").split("-");return p.length===3?(+p[2])+"."+(+p[1])+"."+p[0]:iso}
+function viewLov(){
+  const info=lawById[S.law]||LAWS[0], d=LOV[info.id];
+  let h='<section class="chips">'+LAWS.map(l=>{const r=readCount(l.id);
+    return '<button class="chip" data-act="law" data-v="'+l.id+'" aria-pressed="'+(l.id===info.id)+'">'+t(l.nb,l.en)+(r?'<span class="n">'+r+' ✓</span>':'')+'</button>'}).join("")+'</section>';
+  h+='<article class="scard"><div class="eyebrow">'+info.ref+(info.part?' · '+t("utdrag","extract"):'')+'</div><h2 style="margin-top:6px;font-size:1.6rem">'+bi(info.nb,info.en)+'</h2>'+
+    '<p style="margin:.5em 0 0">'+bi(info.x[0],info.x[1])+'</p>';
+  if(!d){
+    loadLaw(info.id).then(()=>{if(S.tab==="lov")render()}).catch(()=>{const el=$("#lawwait");if(el)el.textContent=t("Fikk ikke lastet lovteksten. Sjekk nettet og prøv igjen.","Couldn't load the law text. Check your connection and try again.")});
+    return h+'<p class="muted" id="lawwait" style="margin-top:16px">'+t("Laster lovteksten …","Loading the law text …")+'</p></article>';
+  }
+  const pars=d.parts.filter(p=>p[0]==="p"), r=readCount(d.id), pct=Math.round(r/pars.length*100);
+  h+='<div class="lawmeta">'+t("Sist endret","Last amended")+': '+Family.esc(d.endret||"?")+' · '+t("hentet fra Lovdata","copied from Lovdata")+' '+norDate(d.hentet)+
+    ' · <a href="'+d.url+'" target="_blank" rel="noopener">'+t("Les på Lovdata","Read on Lovdata")+' ↗</a></div>';
+  if(S.lang!=="nb") h+='<div class="lawnote">'+t("Lovteksten finnes bare på norsk.","The law text is only in Norwegian: it's the official wording, and the test uses the same words. The list below explains the most important sections in English.")+'</div>';
+  if(info.key.length){
+    h+='<h3 style="margin-top:20px;font-size:1.15rem">'+t("Viktigst for prøven","Most important for the test")+'</h3><div class="keys">'+
+      info.key.map(k=>'<button class="krow" data-act="lawgo" data-v="'+info.id+'|'+k[0]+'"><span class="pn">'+k[0]+'</span><span>'+bi(k[2],k[3])+'</span></button>').join("")+'</div>';
+  }
+  h+='<div class="row" style="justify-content:space-between;margin-top:22px"><h3 style="font-size:1.15rem">'+t("Hele teksten","The full text")+'</h3><span class="muted" id="lawprog" style="font-size:.85rem">'+t(r+' av '+pars.length+' § lest',r+' of '+pars.length+' § read')+'</span></div>'+
+    '<div class="bar" style="margin-top:6px"><i id="lawbar" style="width:'+pct+'%"></i></div>'+
+    '<input type="search" class="lawsearch" id="lawq" placeholder="'+t("Søk i teksten, f.eks. «gangfelt»","Search the text, e.g. «gangfelt» (crossing)")+'" value="'+Family.esc(lawQ)+'" aria-label="'+t("Søk i loven","Search the law")+'">'+
+    '<div id="lawlist">'+lawList(d)+'</div></article>';
+  return h;
+}
+// The list of §§ (closed; tap one to read it). While searching, only matching §§ show, opened, with the words marked.
+function lawList(d){
+  const q=lawQ.trim().toLowerCase(), read=S.lawRead[d.id]||{};
+  let h='', hits=0;
+  d.parts.forEach(p=>{
+    if(p[0]==="h"){ if(!q) h+='<h3 class="lawh l'+Math.min(p[1],2)+'">'+Family.esc(p[2])+'</h3>'; return; }
+    if(p[0]==="t"){ if(!q) h+='<div class="lawtext">'+p[1]+'</div>'; return; }
+    let body=p[3];
+    if(q){
+      const plain=(p[1]+" "+p[2]+" "+body.replace(/<[^>]+>/g," ")).toLowerCase();
+      if(!plain.includes(q)) return;
+      hits++; body=markWords(body,q);
+    }
+    const r=!!read[p[1]];
+    h+='<details class="par'+(r?' read':'')+'" data-pid="'+Family.esc(p[1])+'"'+(q?' open':'')+'><summary><span class="pn">'+Family.esc(p[1])+'</span><span class="pt">'+Family.esc(p[2])+'</span><span class="rd">'+(r?'✓':'')+'</span></summary>'+
+      '<div class="lawtext">'+body+readBtn(p[1],r)+'</div></details>';
+  });
+  if(q&&!hits) h='<p class="muted" style="margin-top:14px">'+t("Ingen treff.","No matches.")+'</p>';
+  return h;
+}
+function readBtn(pid,r){return '<button class="sbtn small'+(r?'':' primary')+'" data-act="lawread" data-v="'+Family.esc(pid)+'">'+(r?t("Merk som ulest","Mark as unread"):t("✓ Jeg har lest denne","✓ I've read this"))+'</button>'}
+function markWords(html,q){
+  if(q.length<2) return html;
+  const re=new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"gi");
+  return html.split(/(<[^>]+>)/).map(seg=>seg[0]==="<"?seg:seg.replace(re,m=>'<mark>'+m+'</mark>')).join("");
+}
+function focusLaw(){
+  if(!lawOpen||!LOV[S.law]) return;
+  const el=[...document.querySelectorAll("details.par")].find(x=>x.dataset.pid===lawOpen);
+  lawOpen=null; if(!el) return;
+  el.open=true; el.classList.add("flash"); el.scrollIntoView({block:"start"});
+}
+
+const VIEWS={plan:viewPlan,les:viewLes,lov:viewLov,ov:viewOv,prove:viewProve,kort:viewKort};
 
 /* ---------- actions (every button has data-act="name" and maybe data-v="value") ---------- */
 function go(tab){S.tab=tab;save();render();window.scrollTo(0,0)}
@@ -538,6 +668,18 @@ const ACT={
   lang(v){S.lang=v;save();render()},
   tab(v){go(v)},
   read(v){S.les=v;go("les")},
+  law(v){S.law=v;lawQ="";save();render()},
+  lawgo(v){const i=v.indexOf("|");S.law=v.slice(0,i);lawOpen=v.slice(i+1);lawQ="";S.tab="lov";save();window.scrollTo(0,0);render()},
+  lawread(v){
+    const m=S.lawRead[S.law]||(S.lawRead[S.law]={});
+    if(m[v]) delete m[v]; else m[v]=1;
+    saveProgress();
+    // update just this § on the page, so the open ones stay open
+    const el=[...document.querySelectorAll("details.par")].find(x=>x.dataset.pid===v), r=!!m[v];
+    if(el){el.classList.toggle("read",r);el.querySelector(".rd").textContent=r?"✓":"";el.querySelector("[data-act=lawread]").outerHTML=readBtn(v,r);if(r)el.open=false}
+    const d=LOV[S.law], n=d.parts.filter(p=>p[0]==="p").length, c=readCount(S.law);
+    $("#lawprog").textContent=t(c+' av '+n+' § lest',c+' of '+n+' § read'); $("#lawbar").style.width=Math.round(c/n*100)+"%";
+  },
   drill(v){S.ovSel=v.split(",");startDrill(S.ovSel,false);go("ov")},
   drillweak(){S.ovSel=["all"];startDrill(["all"],true);go("ov")},
   cards(v){S.kortCh=v;K=null;go("kort")},
@@ -576,6 +718,8 @@ const ACT={
   cardno(){const id=K.ids[K.i];record(id,false);K.ids.splice(Math.min(K.ids.length,K.i+6),0,id);K.i++;K.flip=false;render()},
   cardskip(){K.i++;K.flip=false;render()}
 };
+// Typing in the law search box redraws only the list, so the box keeps focus.
+document.addEventListener("input",e=>{if(e.target.id==="lawq"&&LOV[S.law]){lawQ=e.target.value;$("#lawlist").innerHTML=lawList(LOV[S.law])}});
 document.addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(!b||b.disabled)return;const f=ACT[b.dataset.act];if(f)f(b.dataset.v,b)});
 // Keyboard shortcuts: 1–3 pick an answer, Enter / → for next, ← back in the exam, Space flips a card.
 document.addEventListener("keydown",e=>{
@@ -597,6 +741,8 @@ document.addEventListener("keydown",e=>{
 if(S.exam&&S.exam.ids.some(id=>!qById[id])) S.exam=null;
 if(S.exam&&!S.exam.done&&remaining()<=0) finishExam();
 if(!chById[S.les]) S.les="fk";
+if(!lawById[S.law]) S.law="tr";
+if(!S.lawRead) S.lawRead={};
 render();
 })();
 </script>

@@ -48,7 +48,7 @@ window.SITE = {
       id: 'teoriprove',
       name: 'Teoriprøven',
       emoji: '🚗',
-      description: 'Study for the class B driving theory test: notes, road signs, practice questions, timed mock exams and flashcards.',
+      description: 'Study for the class B driving theory test: notes, road signs, the real traffic laws, practice questions, timed mock exams and flashcards.',
       color: 'peach'
     },
     {

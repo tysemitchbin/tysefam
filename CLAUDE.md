@@ -35,6 +35,13 @@ code readable and commented for a non-expert.
   (`supabase/functions/calendar/`, verify_jwt ON, checks the guest list) reads each calendar's secret
   iCal link from `calendar_feeds` (`supabase/calendar.sql`; RLS on, no policies) and expands repeats
   with ical.js in `calendar/ics.ts`. The links must never reach the browser.
+- `tools/teoriprove/`: study tool for the class B driving theory test (`data.js` = notes, sign pictures, questions).
+  The **Lover** (Laws) tab shows the real law texts word for word: `lover/<id>.js` (vegtrafikkloven, trafikkreglene,
+  skiltforskriften with Lovdata's sign pictures in `lover/skilt/`, bruksforskriften, parts of førerkort- and
+  trafikkopplæringsforskriften, tapsforskriften, prikkforskriften), loaded only when opened. They are made by
+  `lover/hent-lover.py` (Python + beautifulsoup4; needs lovdata.no in the environment's allowed hosts): run it again
+  when a law changes, never edit the .js by hand. `lover/oversikt.js` lists the laws and their key §§ (with short
+  nb/en notes and the chapters they belong to). "Read" ticks per § are saved with progress (`lawRead`).
 - `tools/norskprove/`: study tool for HK-dir's Norskprøven at B1–B2 (same pattern as `teoriprove`).
   `data.js` = grammar notes/questions, word cards, phrases; `oppgaver.js` = reading texts, listening
   clips, writing and speaking tasks (all written for the tool). Listening uses the browser's own
