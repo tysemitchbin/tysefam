@@ -73,8 +73,8 @@ code readable and commented for a non-expert.
   sideways and twisting moves (how a pose is written is explained in the file).
   Shared in `family_items` (tool `trx`: `workouts` the family built, `log` of finished workouts). The
   timer beeps, can speak (browser speech), and keeps the screen awake; the draft being built is per device.
-- `tools/cookbook/`: the family recipe collection, drawn as a bookshelf of books lying flat in piles of up
-  to 4 so titles read normally (`piles()`; pages by `#`: shelf, `#b=cat:val` one book's recipes as piles,
+- `tools/cookbook/`: the family recipe collection, drawn as a bookshelf of standing books all leaning
+  30° to the left like dominoes (`leanBook()`/`leanRows()`; pages by `#`: shelf, `#b=cat:val` one book's recipes,
   `#r=id` a recipe, `#cal=YYYY-MM` the meal log calendar).
   Paste a link or a whole recipe. Links go to the `recipes` edge function (`supabase/functions/recipes/`,
   verify_jwt ON, checks the guest list): it tries the site, then the r.jina.ai reader, then the Wayback
