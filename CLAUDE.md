@@ -93,14 +93,19 @@ code readable and commented for a non-expert.
   shown on the page, never saved; the edit box uses `parts(r, {noGuess: true})`). A method that arrives as one
   long paragraph is cut into sentence-steps (`splitBlob` in `guess.js`), and website chatter is dropped;
   the edge function reads ingredient groups from WP Recipe Maker / Tasty Recipes pages. `prices.js`
-  (`Cook.price`) costs a dish in kr from typical Norwegian prices; the Cost group is the kr band (under 100,
-  100–200 … over 500), or `priceNok` if someone typed the real cost. **Update its PRICES table now and then.**
+  (`Cook.price`) costs a dish in kr from typical Norwegian prices: fresh things that don't keep count as whole
+  packs (`buy` in the table, lines for the same thing added up first), cupboard things only what's used; a count
+  with a weight in brackets ("1 turkey (6 kg)") uses the weight; no amount on a meat/fish/side = a normal
+  portion per serving (`serve`); "X (optional)" with no amount isn't counted. Its `amountOf` is shared with
+  nutrition.js. The Cost group is the kr band (under 100, 100–200 … over 500), or `priceNok` if someone typed
+  the real cost. **Update its PRICES table now and then.**
   `timing.js` (`Cook.estimate`) works
   out a realistic time from the ingredients and steps (knife work, batches, water boiling, oven heating,
   caramelising…); the page shows the family's own logged times first, else that estimate × a "kitchen
   speed" learned from logged cooks vs estimates; the recipe's own times are only shown for comparison.
   `nutrition.js` (`Cook.nutrition`) estimates protein and fibre per serving (the family's priorities; goals per
-  dinner in collection `settings`, id `targets`) and holds presets for quick/takeaway dinners (`Cook.QUICK/OUT`).
+  dinner in collection `settings`, id `targets`) and calories (kcal, shown but not a goal; `kcal` on a recipe
+  if someone typed the real number) and holds presets for quick/takeaway dinners (`Cook.QUICK/OUT`).
   Shared in `family_items` (tool `cookbook`, collection `recipes`: also `favs` per person and
   `cooked: [{by, date, ts, min}]`, which feeds the calendar, the stats and the time learning; collection
   `meals`: every other meal, `{kind: leftovers|quick|out, date, recipeId?, name, protein, fiber, kr}`).

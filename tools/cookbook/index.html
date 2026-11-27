@@ -38,7 +38,7 @@
              A recipe's `cooked` entries can carry the same slot/who when it was made for breakfast or lunch.
              Dinners are what the insights, goals and the plan count; breakfasts and lunches are extra.
      settings → 'targets': { protein, fiber }   our goals per dinner per person (📊 Insights)
-     A recipe can also have proteinG / fiberG (per serving) typed in; otherwise nutrition.js estimates them.
+     A recipe can also have proteinG / fiberG / kcal (per serving) typed in; otherwise nutrition.js estimates them.
      Times: what the recipe says is kept, but what we SHOW is realistic: your own logged times for
      that recipe, or else our estimate (timing.js) adjusted by how your logged cooks compare with it.
      A line ending in ":" in ingredients or steps ("The sauce:") starts a PART of the dish; the recipe
@@ -179,6 +179,7 @@ a.fact:hover{filter:brightness(.95);}
 .tb-parts{display:flex;flex-direction:column;gap:3px;margin:8px 0;font-size:.88rem;}
 .tb-why{margin:4px 0 8px;padding-left:20px;font-size:.85rem;color:var(--ink);}
 .nut{display:inline-block;font-size:.8rem;font-weight:800;padding:2px 8px;border-radius:999px;margin-right:4px;white-space:nowrap;}
+.nut-kcal{background:#f1ece2;color:#6b5d4a;}
 .nut-great{background:#dcefd6;color:#3f7a3f;} .nut-ok{background:#fdf0c8;color:#8a6d10;} .nut-low{background:#fbdcd0;color:#a64b25;}
 .bar.nut-great{background:#7fa874;} .bar.nut-ok{background:#e0bd4d;} .bar.nut-low{background:#e8946c;}
 .kinds{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
@@ -444,6 +445,7 @@ dialog .field{width:100%;}
       <label>💪 Protein per serving, g (empty = our estimate)<input class="field" name="proteinG" type="number" min="0" max="300"></label>
       <label>🌾 Fibre per serving, g (empty = our estimate)<input class="field" name="fiberG" type="number" min="0" max="150"></label>
     </div>
+    <label>🔥 Calories per serving, kcal (empty = our estimate)<input class="field" name="kcal" type="number" min="0" max="5000"></label>
     <div>
       <div style="font-weight:800;font-size:.82rem;color:var(--ink-soft);margin-bottom:6px">Labels</div>
       <div class="taglist" id="edTags"></div>
@@ -590,12 +592,13 @@ const estimateOf = remember(r => Cook.estimate(r));
 const priceEstimate = remember(r => Cook.price(r));
 // What the whole dish costs: what someone typed in, otherwise our estimate from typical prices.
 const priceOf = r => r.priceNok || (priceEstimate(r) || {}).total || 0;
-// Protein and fibre per serving: what someone typed in, otherwise our estimate (nutrition.js).
+// Protein, fibre and calories per serving: what someone typed in, otherwise our estimate (nutrition.js).
 const nutritionEst = remember(r => Cook.nutrition(r));
 function perServing(r) {
   const e = nutritionEst(r);
   return { protein: r.proteinG ?? e?.perServing.protein ?? null, fiber: r.fiberG ?? e?.perServing.fiber ?? null,
-    est: e, own: r.proteinG != null || r.fiberG != null };
+    kcal: r.kcal ?? e?.perServing.kcal ?? null,
+    est: e, own: r.proteinG != null || r.fiberG != null || r.kcal != null };
 }
 const siteTime = r => r.totalMin || ((r.prepMin || 0) + (r.cookMin || 0)) || 0;
 const loggedMins = r => (r.cooked || []).filter(c => c.min > 0)
@@ -947,20 +950,20 @@ setInterval(() => {
   if (el && start) el.textContent = fmtMin(Math.max(1, Math.round((Date.now() - start) / 60000)));
 }, 20000);
 
-/* The protein & fibre box on a recipe (our two priorities, so it comes first). */
+/* The protein & fibre box on a recipe (our two priorities, so it comes first), with the calories. */
 function nutriBox(r) {
   const n = perServing(r), e = n.est;
   if (n.protein == null && n.fiber == null) return '';
   const lowFibre = n.fiber != null && n.fiber < targets.fiber;
   return `<div class="timebox">
-    <div class="tb-main">${nutChip(n.protein, 'protein')}protein ${nutChip(n.fiber, 'fiber')}fibre
+    <div class="tb-main">${nutChip(n.protein, 'protein')}protein ${nutChip(n.fiber, 'fiber')}fibre ${kcalChip(n.kcal)}
       <span class="tb-how">per serving${e && e.assumed && !n.own ? ' (if it serves 4)' : ''}${n.own ? ' · as you typed in' : ''}</span></div>
     <div class="tb-line">Our goals: ${targets.protein} g protein and ${targets.fiber} g fibre per dinner (change them on 📊 Insights).</div>
     ${lowFibre ? `<div class="tb-line">🌾 Fibre boost: a can of beans or lentils adds about ${Math.round(4 * 4 / (e?.serves || 4))} g per serving; a side salad or broccoli 2–3 g.</div>` : ''}
     ${e ? `<details><summary>Where it comes from</summary>
-      <div class="tb-parts">${e.lines.filter(x => x.protein >= 0.5 || x.fiber >= 0.5).sort((a, b) => (b.protein + b.fiber * 2) - (a.protein + a.fiber * 2)).slice(0, 10).map(x =>
-        `<span>${esc(x.line)} <b>${Math.round(x.protein)} g protein · ${Math.round(x.fiber * 10) / 10} g fibre</b></span>`).join('')}</div>
-      <div class="tb-note">For the whole dish: ${e.protein} g protein and ${e.fiber} g fibre, shared by ${e.serves}. Typical values for each ingredient; type the real numbers under ✏️ Edit if you know them.</div>
+      <div class="tb-parts">${e.lines.filter(x => x.protein >= 0.5 || x.fiber >= 0.5 || x.kcal >= 40).sort((a, b) => (b.protein + b.fiber * 2) - (a.protein + a.fiber * 2) || b.kcal - a.kcal).slice(0, 12).map(x =>
+        `<span>${esc(x.line)} <b>${Math.round(x.protein)} g protein · ${Math.round(x.fiber * 10) / 10} g fibre · ${x.kcal} kcal</b></span>`).join('')}</div>
+      <div class="tb-note">For the whole dish: ${e.protein} g protein, ${e.fiber} g fibre and ${e.kcal} kcal, shared by ${e.serves}. Typical values for each ingredient; type the real numbers under ✏️ Edit if you know them.</div>
     </details>` : ''}
   </div>`;
 }
@@ -976,9 +979,10 @@ function costBox(r) {
     ${own && est ? `<div class="tb-line">we’d have guessed ${est.total} kr</div>` : ''}
     ${est ? `<details><summary>What the price is made of</summary>
       <div class="tb-parts">${est.lines.slice().sort((a, b) => b.kr - a.kr).map(x =>
-        `<span>${esc(x.line)} <b>${x.kr} kr</b>${x.known ? '' : ' <span class="mini">rough guess</span>'}</span>`).join('')}</div>
-      <div class="tb-note">Typical Norwegian supermarket prices for what goes into the dish (half a tub of cream counts as half),
-        so the shopping bill can be a bit more. If you know what it really costs, type it in under ✏️ Edit.</div>
+        `<span>${esc(x.line)} <b>${x.kr} kr</b>${x.wholePack ? ' <span class="mini">whole pack</span>' : ''}${x.optional ? ' <span class="mini">optional, not counted</span>' : ''}${x.known ? '' : ' <span class="mini">rough guess</span>'}</span>`).join('')}</div>
+      <div class="tb-note">Typical Norwegian supermarket prices. Fresh things you have to buy whole (a pack of mince, a tub of
+        cottage cheese, a pot of herbs) count as whole packs; cupboard things (oil, spices, rice) count only what goes in.
+        If you know what it really costs, type it in under ✏️ Edit.</div>
     </details>` : ''}
   </div>`;
 }
@@ -1254,6 +1258,8 @@ function dinnerInfo(e) {
 const rate = (v, goal) => v == null ? '' : v >= goal ? 'great' : v >= goal * 0.66 ? 'ok' : 'low';
 const nutChip = (v, kind) => v == null ? '' :
   `<span class="nut nut-${rate(v, targets[kind])}">${kind === 'protein' ? '💪' : '🌾'} ${v} g</span>`;
+// Calories aren't a goal, so their chip is plain.
+const kcalChip = v => v == null ? '' : `<span class="nut nut-kcal">🔥 ${v} kcal</span>`;
 // Remove one logged meal (from the recipe's list, or the meals collection).
 function removeDinner(e) {
   if (e.kind === 'cooked') store.update('recipes', e.id, { cooked: (e.r.cooked || []).filter((_, k) => k !== e.k) });
@@ -1733,7 +1739,7 @@ function planIdeas(day) {
   const week = new Set(Object.values(plans).filter(p => p.date >= mondayOf(day) && p.date <= addDays(mondayOf(day), 6)).map(p => p.recipeId));
   Object.entries(recipes).filter(([id, r]) => dinnerish(r) && !week.has(id) && !(lastCooked(r) && daysBetween(lastCooked(r), day) < 10))
     .map(([id, r]) => [id, r, goalScore(r) + ((r.favs || {})[Family.me()] ? 1 : 0)]).sort((a, b) => b[2] - a[2]).slice(0, 4)
-    .forEach(([id, r]) => { const n = perServing(r); add({ kind: 'recipe', recipeId: id, emoji: recipeEmoji(r), name: r.title, sub: `💪 ${n.protein ?? '?'} g · 🌾 ${n.fiber ?? '?'} g` }); });
+    .forEach(([id, r]) => { const n = perServing(r); add({ kind: 'recipe', recipeId: id, emoji: recipeEmoji(r), name: r.title, sub: `💪 ${n.protein ?? '?'} g · 🌾 ${n.fiber ?? '?'} g${n.kcal ? ` · 🔥 ${n.kcal} kcal` : ''}` }); });
   pastQuick('quick').slice(0, 2).forEach(q => add({ kind: 'quick', name: q.name, emoji: q.emoji || '⚡', sub: 'Quick dinner' }));
   return out;
 }
@@ -2278,6 +2284,7 @@ function openEditor(r, id, note, bad) {
   form.priceNok.value = r.priceNok || '';
   form.proteinG.value = r.proteinG ?? '';
   form.fiberG.value = r.fiberG ?? '';
+  form.kcal.value = r.kcal ?? '';
   // One box per part. A part without a name can only come first, so later ones get a name.
   const all = Cook.parts(r, { noGuess: true });   // the recipe as written, not our guesses
   // An unnamed part that only has steps can stay unnamed if it holds all the steps.
@@ -2305,6 +2312,7 @@ function showEstimate() {
   const n = Cook.nutrition(r);
   form.proteinG.placeholder = n ? `About ${n.perServing.protein} g` : '';
   form.fiberG.placeholder = n ? `About ${n.perServing.fiber} g` : '';
+  form.kcal.placeholder = n ? `About ${n.perServing.kcal} kcal` : '';
   const e = Cook.estimate(r);
   $('#edEst').textContent = e ? `⏱️ Our own estimate: about ${fmtMin(round5(e.total * kitchenSpeed().factor))}${e.overnight ? ' plus overnight' : ''}. Recipe sites tend to say less; the times you log when you cook it will make this better.` : '';
 }
@@ -2390,6 +2398,7 @@ function readForm() {
     priceNok: Math.round(+form.priceNok.value) > 0 ? Math.round(+form.priceNok.value) : null,
     proteinG: form.proteinG.value === '' ? null : Math.max(0, Math.round(+form.proteinG.value)),
     fiberG: form.fiberG.value === '' ? null : Math.max(0, Math.round(+form.fiberG.value)),
+    kcal: form.kcal.value === '' ? null : Math.max(0, Math.round(+form.kcal.value)),
     description: form.description.value.trim(),
     notes: form.notes.value.trim(),
     meal: form.meal.value, protein: form.protein.value, cuisine: form.cuisine.value,
