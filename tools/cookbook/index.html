@@ -1829,9 +1829,10 @@ function buildShop(range) {
   }
   return { entries, aisles: Cook.shoppingList(items) };
 }
-// Is the "Probably at home" box open? Remembered, because ticking something redraws the list
-// and the box would otherwise snap shut after every tick.
+// Is the "Probably at home" box open? Remembered (on this device, also after the page reloads),
+// because ticking something redraws the list and the box would otherwise snap shut every time.
 let pantryOpen = false;
+try { pantryOpen = localStorage.getItem('cookbook:pantryOpen') === '1'; } catch (e) { /* private window */ }
 function showShop(range) {
   range = range || 'next';
   const box = $('#shopView');
@@ -1867,7 +1868,11 @@ function showShop(range) {
       ${pantry.items.map(it => row(it, 'pantry')).join('')}</details>` : ''}`;
 
   const pantryBox = box.querySelector('details.pantry');
-  if (pantryBox) pantryBox.addEventListener('toggle', () => { pantryOpen = pantryBox.open; });
+  if (pantryBox) pantryBox.addEventListener('toggle', () => {
+    if (!pantryBox.isConnected) return;     // an old copy of the list that was just replaced
+    pantryOpen = pantryBox.open;
+    try { localStorage.setItem('cookbook:pantryOpen', pantryOpen ? '1' : '0'); } catch (e) { /* private window */ }
+  });
   box.querySelectorAll('[data-tick-item]').forEach(b => b.onclick = () => {
     const id = shopId(b.dataset.tickItem);
     if (shopTicks[id]) store.remove('shop', id); else store.set('shop', id, { checked: true, by: Family.me(), ts: Date.now() });
