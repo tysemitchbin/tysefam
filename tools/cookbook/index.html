@@ -2301,6 +2301,7 @@ function openEditor(r, id, note, bad) {
   form.fiberG.value = r.fiberG ?? '';
   form.kcal.value = r.kcal ?? '';
   // One box per part. A part without a name can only come first, so later ones get a name.
+  edSteps = (r.steps || []).map(x => String(x).trim());   // where each step was, so saving keeps the cooking order
   const all = Cook.parts(r, { noGuess: true });   // the recipe as written, not our guesses
   // An unnamed part that only has steps can stay unnamed if it holds all the steps.
   const stepsOnly = p => !p.ings.length && !all.some(q => q !== p && q.steps.length);
@@ -2335,12 +2336,15 @@ $('#edParts').addEventListener('input', () => showEstimate());
 
 /* ───────── the parts boxes in the edit box ───────── */
 let edParts = [];        // [{ name, ings: [lines], steps: [lines] }]
+let edSteps = [];        // the recipe's steps as they were when the box opened (with the part headings)
+// "10. Set the thighs…", "Step 3: …": the number goes (the page numbers the steps itself).
+const STEP_NO = /^\s*(?:(?:step|steg|trinn)\s*\d+\s*[:.)-]?|\d+\s*[.):])\s*/i;
 function readParts() {
   return [...document.querySelectorAll('#edParts .part')].map((el, k) => ({
     order: (edParts[k] || {}).order ?? 1e9 + k,
     name: el.querySelector('.pname').value.trim().replace(/:$/, ''),
     ings: lines(el.querySelector('.ping').value),
-    steps: lines(el.querySelector('.pstep').value),
+    steps: lines(el.querySelector('.pstep').value).map(l => l.replace(STEP_NO, '').trim()).filter(Boolean),
   }));
 }
 function drawParts() {
@@ -2387,11 +2391,45 @@ function flattenParts(list) {
     if (p.name && p.ings.length) ingredients.push(p.name + ':');
     ingredients.push(...p.ings);
   });
-  // Steps keep their cooking order (the sauce may be made first even if the meat is listed first).
-  const unnamedFirst = (a, b) => (a.name ? 1 : 0) - (b.name ? 1 : 0) || a.order - b.order;
-  list.slice().sort(unnamedFirst).forEach(p => {
-    if (p.name && p.steps.length) steps.push(p.name + ':');
-    steps.push(...p.steps);
+  // Steps keep their cooking order, even when the parts take turns (the turkey, then the aromatics,
+  // then the turkey again): each step goes back to where it was when the box was opened, and a new or
+  // changed line goes right after the line above it in the same box. A part's heading is written
+  // again each time the cooking switches back to it. The part without a name always comes first.
+  const used = new Set();
+  const all = [];
+  list.forEach((p, n) => p.steps.forEach((text, k) => all.push({ p, text, n, k, was: null })));
+  // 1. Lines that weren't changed: exactly where they were.
+  all.forEach(x => {
+    const i = edSteps.findIndex((t, j) => !used.has(j) && t === x.text);
+    if (i >= 0) { used.add(i); x.was = i; }
+  });
+  // 2. Lines that were changed a little ("25 minutes" → "30 minutes"): where the old line was,
+  //    if at least half their words are the same.
+  const wordsIn = t => new Set(t.toLowerCase().split(/[^a-zæøå0-9]+/).filter(w => w.length > 2));
+  all.filter(x => x.was == null).forEach(x => {
+    const mine = wordsIn(x.text);
+    let best = -1, score = 0.5;
+    edSteps.forEach((t, j) => {
+      if (used.has(j) || Cook.isHeading(t)) return;
+      const theirs = wordsIn(t), same = [...mine].filter(w => theirs.has(w)).length;
+      const s = same / Math.max(mine.size, theirs.size, 1);
+      if (s >= score) { best = j; score = s; }
+    });
+    if (best >= 0) { used.add(best); x.was = best; }
+  });
+  // 3. New lines: right after the line above them in the same box.
+  list.forEach((p, n) => {
+    let at = p.order < 1e9 ? p.order - 0.5 : 1e9 + n;
+    all.filter(x => x.n === n).forEach(x => { at = x.was != null ? x.was : at + 0.001; x.at = at; });
+  });
+  const inOrder = (a, b) => a.at - b.at || a.n - b.n || a.k - b.k;
+  const unnamed = all.filter(x => !x.p.name).sort((a, b) => a.k - b.k);
+  const named = all.filter(x => x.p.name).sort(inOrder);
+  unnamed.forEach(x => steps.push(x.text));
+  let current = null;
+  named.forEach(x => {
+    if (x.p !== current) { steps.push(x.p.name + ':'); current = x.p; }
+    steps.push(x.text);
   });
   // A heading with nothing under it at the very end is just noise.
   while (ingredients.length && Cook.isHeading(ingredients[ingredients.length - 1])) ingredients.pop();
