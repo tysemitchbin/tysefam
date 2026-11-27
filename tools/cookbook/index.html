@@ -1077,10 +1077,14 @@ function showRecipe(id) {
   </div>` : '';
   const forPart = pick >= 0 ? `: ${esc(nameOf(ps[pick]))}` : '';
 
+  // Already planned on a day from today on? Then the button says when.
+  const today = todayKey();
+  const plannedOn = Object.values(plans).filter(p => p.recipeId === id && p.date >= today).map(p => p.date).sort();
   const page = recipeInBook(`
     <div class="rv-top">
       <a class="btn ghost sm" href="#" id="rvBack">↩ Contents</a>
       <span style="flex:1"></span>
+      <button class="btn sm" id="rvPlanTop" title="Pick a day to make this">🗓️ ${plannedOn.length ? `Planned: ${esc(i0(plannedOn[0], today))}` : 'Add to plan'}</button>
       <button class="btn ghost sm" id="rvEdit">✏️ Edit</button>
     </div>
     <div class="card rv-head">
@@ -1101,7 +1105,7 @@ function showRecipe(id) {
           <button class="chipbtn${timer ? ' on' : ''}" id="rvTimer">${timer ? `⏱️ <span id="tmr">${fmtMin(elapsed)}</span>… done?` : '⏱️ Start cooking timer'}</button>
           <button class="chipbtn${logOpen ? ' on' : ''}" id="rvCooked">✅ We made this</button>
           <button class="chipbtn" id="rvLeft">🥡 We ate leftovers</button>
-          <button class="chipbtn" id="rvPlan">🗓️ Plan it</button>
+          <button class="chipbtn" id="rvPlan">🗓️ Add to plan</button>
           ${'wakeLock' in navigator ? `<button class="chipbtn${wake ? ' on' : ''}" id="rvWake">📱 ${wake ? 'Screen stays on' : 'Keep screen on'}</button>` : ''}
         </div>
         ${logOpen ? `<div class="logrow">Made it on
@@ -1141,6 +1145,7 @@ function showRecipe(id) {
   box.querySelector('#rvFav').onclick = () => store.update('recipes', id, { favs: Object.assign({}, r.favs, { [me]: !(r.favs || {})[me] }) });
   box.querySelector('#rvCooked').onclick = () => { logOpen = !logOpen; showRecipe(id); };
   box.querySelector('#rvPlan').onclick = () => openDayPicker(id);
+  box.querySelector('#rvPlanTop').onclick = () => openDayPicker(id);
   // Leftovers can be breakfast, lunch or dinner, so this opens the log box with this recipe first.
   box.querySelector('#rvLeft').onclick = () => openLog({ recipeId: id });
   if (logOpen) {
