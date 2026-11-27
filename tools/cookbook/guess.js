@@ -390,6 +390,7 @@
       own.forEach(([p, it]) => p.steps.push(it));
       if (!loose.length) continue;
       const p = g.name ? named(g.name) : out.find(p => !p.name);
+      if (g.name) out.headed = true;      // the steps have their own part headings: no guessing needed
       if (p) p.steps = p.steps.concat(loose);
       else out.push({ name: g.name, ings: [], steps: loose });
     }
@@ -400,10 +401,14 @@
 
   /* Many recipes split the INGREDIENTS into parts but give one plain list of steps. Then we work
      out which part each step belongs to from what it mentions: "Put the couscous, salt and butter
-     in a bowl…" uses couscous-part ingredients, so it's a couscous step. A step that brings several
+     in a bowl…" uses couscous-part ingredients, so it's a couscous step. A part that was already
+     made in an earlier step and is mentioned again is being USED ("pour the teriyaki sauce over the
+     salmon" is a salmon step), so a part that hasn't been started yet wins. A step that brings several
      parts together goes under "Putting it together"; a step that mentions nothing ("Heat the
      oven") goes with the step after it. The steps keep their numbers, and on the recipe page
-     "All parts" still lists them in the original order (out.guessed is set). */
+     "All parts" still lists them in the original order (out.guessed is set).
+     The first list of ingredients may have no name (the main ingredients, then "For the sauce:"):
+     it takes part in the guessing too, and keeps the steps that are its own. */
   const STOP = new Set(('and or the with for into from about then cut cuts small large big fresh finely roughly thinly chopped '
     + 'sliced diced minced grated crushed peeled optional keeps them tender will goes go some more extra each plus '
     + 'taste serve serving whole half piece pieces inch cm thick thin strips wedges chunks medium ground '
@@ -413,9 +418,11 @@
     .filter(w => w.length > 2 && !STOP.has(w) && !UNIT_WORDS.test(w)).map(stem);
   const UNIT_WORDS = /^(tsp|tbsp|teaspoons?|tablespoons?|cups?|grams?|kg|ml|dl|cl|litres?|liters?|pinch|klype|ss|ts|can|cans|tin|tins|cloves?|fedd|boks|pakke|stk)$/;
   function guessStepParts(out) {
-    const named = out.filter(p => p.name && p.ings.length);
-    const loose = out.find(p => !p.name && !p.ings.length && p.steps.length);
-    if (named.length < 2 || !loose || out.some(p => p.name && p.steps.length)) return;
+    if (out.headed) return;
+    const loose = out.find(p => !p.name && p.steps.length);   // where the unsorted steps are now
+    if (!loose) return;
+    const named = out.filter(p => p.ings.length && (p.name || p === loose));
+    if (named.length < 2 || !named.some(p => p.name)) return;
     // The words that point to just one part ("couscous", "breadcrumbs", "cottage"), not shared ones like "salt".
     const count = {};
     const partWords = named.map(p => {
@@ -425,24 +432,40 @@
     });
     const nameWords = named.map(p => new Set(wordsOf(p.name)));
     const together = { name: 'Putting it together', ings: [], steps: [] };
-    const pick = loose.steps.map(st => {
+    // Which parts have been worked on before step i (steps already sorted by "Make the sauce: …" count too).
+    const started = new Map();   // part → its first step number
+    named.forEach(p => p.steps.forEach(st => { if (p !== loose && !(started.get(p) <= st.i)) started.set(p, st.i); }));
+    const steps = loose.steps.slice();
+    const pick = steps.map(st => {
       const ws = new Set(wordsOf(st.line));
       const scores = named.map((p, k) => [...partWords[k]].filter(w => count[w] === 1 && ws.has(w)).length);
       const said = named.map((p, k) => [...nameWords[k]].some(w => ws.has(w)));
-      const mentioned = named.filter((p, k) => scores[k] > 0 || said[k]).length;
-      if (mentioned >= 3) return together;
-      const top = Math.max(...scores);
-      if (top > 0 && scores.filter(x => x === top).length === 1) return named[scores.indexOf(top)];
-      if (said.filter(Boolean).length === 1) return named[said.indexOf(true)];
-      return mentioned >= 2 ? together : null;
+      const hit = named.map((p, k) => scores[k] > 0 || said[k]);
+      let chosen = null;
+      // Of the parts this step mentions, the ones not made yet (the others are being used up).
+      const fresh = named.filter((p, k) => hit[k] && !(started.get(p) < st.i));
+      const used = named.filter((p, k) => hit[k]).length - fresh.length;
+      if (fresh.length === 1 && used) chosen = fresh[0];
+      else {
+        const mentioned = hit.filter(Boolean).length;
+        const top = Math.max(...scores);
+        if (mentioned >= 3) chosen = together;
+        else if (top > 0 && scores.filter(x => x === top).length === 1) chosen = named[scores.indexOf(top)];
+        else if (said.filter(Boolean).length === 1) chosen = named[said.indexOf(true)];
+        else if (mentioned >= 2) chosen = together;
+      }
+      if (chosen && chosen !== together && !started.has(chosen)) started.set(chosen, st.i);
+      return chosen;
     });
     // Steps that mention nothing go with the next step that does (or the one before, at the end).
     for (let k = pick.length - 1; k >= 0; k--) if (!pick[k]) pick[k] = pick.slice(k + 1).find(Boolean) || null;
     for (let k = 0; k < pick.length; k++) if (!pick[k]) pick[k] = pick.slice(0, k).reverse().find(Boolean) || together;
     // Only worth it if the steps really spread over the parts.
-    if (new Set(pick.filter(p => p !== together)).size < 2) return;
-    loose.steps.forEach((st, k) => pick[k].steps.push(st));
-    out.splice(out.indexOf(loose), 1);
+    if (new Set([...pick.filter(p => p !== together), ...started.keys()]).size < 2) return;
+    loose.steps = [];
+    steps.forEach((st, k) => pick[k].steps.push(st));
+    named.forEach(p => p.steps.sort((a, b) => a.i - b.i));
+    if (!loose.ings.length && !loose.steps.length) out.splice(out.indexOf(loose), 1);
     if (together.steps.length) out.push(together);
     out.guessed = true;
   }
@@ -586,19 +609,54 @@
     }
     return out.slice(0, 120);
   }
-  // Bullets and "Step 1" / "1." off; a line starting in lowercase carries on the step before it.
-  function tidySteps(list) {
+  // Bullets and "Step 1" / "1." off; a line starting in lowercase carries on the step before it
+  // (not for steps from a recipe website: the site already split them up itself).
+  const JUST_STEPS = /^(?:instructions?|method|directions?|steps?|preparation|fremgangsmåte|framgangsmåte|slik gjør du|tilberedning|instruksjoner)\s*:?$/i;
+  function tidySteps(list, opts = {}) {
+    // A step with line breaks inside it is really several steps.
+    list = (list || []).flatMap(s => String(s).split(/\n+/));
     const out = [];
     for (const raw of list) {
       const part = partLine(list, raw);
       if (part) { out.push(part); continue; }
       const l = raw.replace(BULLET, '').replace(STEP_NUMBER, '').trim();
       if (!l || /^\d+$/.test(l)) continue;
-      if (isHeading(l)) { out.push(/:$/.test(l) ? l : l + ':'); continue; }
-      if (out.length && /^[a-zæøå(]/.test(l) && !/[.!:]$/.test(out[out.length - 1])) out[out.length - 1] += ' ' + l;
+      if (isHeading(l)) {
+        // "Instructions:" / "Method:" is just the list's title, not a part of the dish.
+        if (!JUST_STEPS.test(l)) out.push(/:$/.test(l) ? l : l + ':');
+        continue;
+      }
+      if (!opts.fromSite && out.length && /^[a-zæøå(]/.test(l) && !/[.!:]$/.test(out[out.length - 1])) out[out.length - 1] += ' ' + l;
       else out.push(l);
     }
-    return out.slice(0, 80);
+    return splitBlob(out).slice(0, 80);
+  }
+
+  /* Some websites send the whole method as one long paragraph. When a recipe has only one or two
+     steps and one of them is long, cut it into sentences: each sentence is a step, but a very
+     short one ("Really blend well.") or a bracketed one stays with the step before it.
+     Chatter that isn't cooking ("don't forget to leave a review!", "View Nutrition Facts") goes. */
+  const CHATTER = /leave a (review|comment|rating)|rate (this|the) recipe|nutrition facts|don[’']?t forget to|tag (me|us)\b|pin (it|this)\b|subscribe|newsletter|affiliate|this post may contain|jump to recipe|print recipe/i;
+  function splitBlob(steps) {
+    const real = steps.filter(s => !/:$/.test(s));
+    if (!real.length || real.length > 2 || !real.some(s => s.length > 250)) return steps;
+    const out = [];
+    steps.forEach((s, k) => {
+      if (/:$/.test(s) || s.length <= 250) { out.push(s); return; }
+      // "Black Bean Brownies Recipe: Preheat…": the recipe's name in front isn't part of the step.
+      if (k === 0) s = s.replace(/^[^:.!?]{3,60}\b(recipe|oppskrift)\s*:\s*/i, '');
+      // A full stop glued to the next word ("guessed!View") gets its space back.
+      s = s.replace(/([a-zæøå)][.!?])(?=[A-ZÆØÅ][a-zæøå])/g, '$1 ');
+      const sentences = s.split(/(?<=[.!?][)"”’]?)\s+(?=[("“A-ZÆØÅ])/).map(x => x.trim()).filter(Boolean)
+        .filter(x => !CHATTER.test(x));
+      const mine = [];
+      sentences.forEach(x => {
+        if (mine.length && (x.length < 45 || /^\(/.test(x))) mine[mine.length - 1] += ' ' + x;
+        else mine.push(x);
+      });
+      out.push(...mine);
+    });
+    return out;
   }
 
   /* ───────── a recipe read from a web page ───────── */
@@ -612,7 +670,7 @@
       cookMin: s.cookMin || null,
       totalMin: s.totalMin || null,
       ingredients: tidyIngredients(s.ingredients || []),
-      steps: tidySteps(s.steps || []),
+      steps: tidySteps(s.steps || [], { fromSite: true }),
       notes: '',
       cuisineNames: s.cuisine || [],
       category: s.category || [],

@@ -89,7 +89,9 @@ code readable and commented for a non-expert.
   sauce, the rice) are heading lines ending in ":" inside `ingredients`/`steps`; `Cook.parts()` pairs them
   up, the recipe page has a button per part and the edit box a box per part (steps keep cooking order);
   when only the ingredients have parts, `guessStepParts` assigns each step by the ingredients it mentions
-  (shown on the page, never saved; the edit box uses `parts(r, {noGuess: true})`);
+  (a part already made earlier and mentioned again is being used, so the step goes to the part not started yet;
+  shown on the page, never saved; the edit box uses `parts(r, {noGuess: true})`). A method that arrives as one
+  long paragraph is cut into sentence-steps (`splitBlob` in `guess.js`), and website chatter is dropped;
   the edge function reads ingredient groups from WP Recipe Maker / Tasty Recipes pages. `prices.js`
   (`Cook.price`) costs a dish in kr from typical Norwegian prices; the Cost group is the kr band (under 100,
   100–200 … over 500), or `priceNok` if someone typed the real cost. **Update its PRICES table now and then.**
