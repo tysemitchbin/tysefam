@@ -1829,6 +1829,9 @@ function buildShop(range) {
   }
   return { entries, aisles: Cook.shoppingList(items) };
 }
+// Is the "Probably at home" box open? Remembered, because ticking something redraws the list
+// and the box would otherwise snap shut after every tick.
+let pantryOpen = false;
 function showShop(range) {
   range = range || 'next';
   const box = $('#shopView');
@@ -1860,9 +1863,11 @@ function showShop(range) {
       <span class="st">${esc(x.text)}<small>${esc(x.by || '')}</small></span></button><button class="del" data-del-extra="${esc(id)}" aria-label="Remove">✕</button></div>`).join('')}</div>` : ''}
     ${main.map(a => `<div class="card aisle"><h3>${a.emoji} ${esc(a.label)}</h3>
       ${a.items.slice().sort((x, y) => ticked(x.key) - ticked(y.key)).map(it => row(it, a.id)).join('')}</div>`).join('')}
-    ${pantry ? `<details class="card aisle pantry"><summary><h3 style="display:inline">🧂 Probably at home (${pantry.items.length})</h3> <span class="mini">tap to check the cupboard</span></summary>
+    ${pantry ? `<details class="card aisle pantry"${pantryOpen ? ' open' : ''}><summary><h3 style="display:inline">🧂 Probably at home (${pantry.items.length})</h3> <span class="mini">tap to check the cupboard</span></summary>
       ${pantry.items.map(it => row(it, 'pantry')).join('')}</details>` : ''}`;
 
+  const pantryBox = box.querySelector('details.pantry');
+  if (pantryBox) pantryBox.addEventListener('toggle', () => { pantryOpen = pantryBox.open; });
   box.querySelectorAll('[data-tick-item]').forEach(b => b.onclick = () => {
     const id = shopId(b.dataset.tickItem);
     if (shopTicks[id]) store.remove('shop', id); else store.set('shop', id, { checked: true, by: Family.me(), ts: Date.now() });
