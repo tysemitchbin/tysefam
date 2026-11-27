@@ -348,8 +348,10 @@ dialog{border:none;border-radius:20px;padding:0;max-width:680px;width:calc(100% 
 dialog[open]{display:flex;flex-direction:column;}
 @media(max-width:560px){dialog{width:100%;max-width:none;margin:auto 0 0;border-radius:20px 20px 0 0;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);}}
 dialog::backdrop{background:rgba(60,65,56,.35);}
-dialog form{display:flex;flex-direction:column;flex:1;min-height:0;}
-.dlg-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:18px;display:flex;flex-direction:column;gap:12px;}
+/* "0 1 auto" (start at the content's own height, shrink to fit the screen) instead of "flex:1":
+   older iPhones (iOS 18) squashed "flex:1" boxes to nothing, so only the dark backdrop showed. */
+dialog form{display:flex;flex-direction:column;flex:0 1 auto;min-height:0;}
+.dlg-body{flex:0 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:18px;display:flex;flex-direction:column;gap:12px;}
 .dlg-body h3:focus{outline:none;}
 .dlg-body > *{flex-shrink:0;}   /* the box scrolls; the things inside it never get squeezed */
 dialog h3{margin:0;color:var(--forest);}
@@ -1296,7 +1298,7 @@ function openLog({ date, kind, slot, recipeId } = {}) {
   logState.recipeId = recipeId || '';
   $('#logSearch').value = '';
   drawLog();
-  logDlg.showModal();
+  showBox(logDlg);
   $('#logBody').scrollTop = 0;
 }
 // "tonight" / "last night" for dinner, "today" / "yesterday" for the others, else the date.
@@ -1715,7 +1717,7 @@ function openPlan(day) {
   planDay = day;
   $('#planSearch').value = '';
   drawPlanBox();
-  planDlg.showModal();
+  showBox(planDlg);
   $('#planBody').scrollTop = 0;
 }
 function planIdeas(day) {
@@ -1784,7 +1786,7 @@ function openDayPicker(id) {
       <span class="mini">${taken.length ? esc(taken.join(', ').slice(0, 30)) : 'free'}</span></button>`;
   }).join('');
   $('#dayList').querySelectorAll('[data-dday]').forEach(b => b.onclick = () => { planDay = b.dataset.dday; dayDlg.close(); addPlan({ kind: 'recipe', recipeId: dayRecipe }); });
-  dayDlg.showModal();
+  showBox(dayDlg);
 }
 const i0 = (d, today) => d === today ? 'Today' : d === addDays(today, 1) ? 'Tomorrow' : `${WEEKDAYS[keyDate(d).getDay()]} ${fmtDay(d)}`;
 $('#dayClose').onclick = () => dayDlg.close();
@@ -2290,7 +2292,7 @@ function openEditor(r, id, note, bad) {
   edTags = [...(r.tags || [])];
   tagBoxes();
   showEstimate();
-  ed.showModal();
+  showBox(ed);
   $('#edBody').scrollTop = 0;
   if (!r.title) form.title.focus();
 }
@@ -2434,6 +2436,21 @@ $('#edDel').onclick = async () => {
   location.hash = '';
   await store.remove('recipes', id);
 };
+
+/* ───────── opening and closing the boxes ───────── */
+// Open a box. The phone keyboard is put away first: on iPhones a box that opens while
+// the keyboard is up can end up hidden behind it, leaving just a darker screen.
+function showBox(dlg) {
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  dlg.showModal();
+}
+// Tapping the dark area around a box closes it, so you can never get stuck behind it.
+// (The recipe edit box asks first, so a half-typed recipe isn't lost by accident.)
+document.querySelectorAll('dialog').forEach(dlg => dlg.addEventListener('click', e => {
+  if (e.target !== dlg) return;      // a tap inside the box, not on the dark area
+  if (dlg === ed && !confirm('Close without saving?')) return;
+  dlg.close();
+}));
 
 /* ───────── start ───────── */
 store.ready.then(() => {
