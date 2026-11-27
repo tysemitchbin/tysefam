@@ -1756,13 +1756,18 @@ function drawPlanBox() {
   $('#planQuick').querySelectorAll('[data-pq]').forEach(b => b.onclick = () => { const q = quick[+b.dataset.pq]; addPlan({ kind: 'quick', name: q.name, emoji: q.emoji }); });
   $('#planQuick').querySelector('[data-pout]').onclick = () => addPlan({ kind: 'out', name: 'Eating out', emoji: '🍔' });
 }
+// The recipes to pick from: ones added in the last two weeks first (newest on top, marked ✨ New),
+// then the ones you make most, then A–Z. Every recipe is listed, so nothing falls off the end.
+const NEW_DAYS = 14;
+const isNew = r => r.ts && Date.now() - r.ts < NEW_DAYS * 864e5;
 function drawPlanPick() {
   const q = $('#planSearch').value.trim();
   const list = Object.entries(recipes).filter(([, r]) => !q || searchMatch(r, q))
-    .sort((a, b) => (b[1].cooked || []).length - (a[1].cooked || []).length || (a[1].title || '').localeCompare(b[1].title || '')).slice(0, 40);
+    .sort(([, a], [, b]) => (isNew(b) - isNew(a)) || (isNew(a) && isNew(b) ? b.ts - a.ts : 0)
+      || (b.cooked || []).length - (a.cooked || []).length || (a.title || '').localeCompare(b.title || ''));
   $('#planPick').innerHTML = list.length ? list.map(([id, r]) => {
     const n = perServing(r);
-    return `<button type="button" class="pick" data-pp="${esc(id)}"><span>${recipeEmoji(r)} ${esc(r.title)}</span>${nutChip(n.protein, 'protein')}</button>`;
+    return `<button type="button" class="pick" data-pp="${esc(id)}"><span>${recipeEmoji(r)} ${esc(r.title)}${isNew(r) ? ' <span class="mini">✨ New</span>' : ''}</span>${nutChip(n.protein, 'protein')}</button>`;
   }).join('') : `<div class="empty">No recipes ${q ? 'match' : 'yet'}.</div>`;
   $('#planPick').querySelectorAll('[data-pp]').forEach(b => b.onclick = () => addPlan({ kind: 'recipe', recipeId: b.dataset.pp }));
 }
